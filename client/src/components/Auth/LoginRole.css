@@ -1,0 +1,151 @@
+.login-role-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 20px;
+}
+
+.role-selection {
+  text-align: center;
+  width: 100%;
+  max-width: 1200px;
+}
+
+.role-selection h1 {
+  font-size: 40px;
+  color: white;
+  margin-bottom: 10px;
+  font-weight: bold;
+}
+
+.role-selection p {
+  font-size: 18px;
+  color: rgba(255, 255, 255, 0.9);
+  margin-bottom: 50px;
+}
+
+.role-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 30px;
+}
+
+.role-card {
+  background: white;
+  border-radius: 12px;
+  padding: 30px;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.role-card:hover {
+  transform: translateY(-10px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+.role-card.student {
+  border-top: 4px solid #3498db;
+}
+
+.role-card.staff {
+  border-top: 4px solid #2ecc71;
+}
+
+.role-card.teacher {
+  border-top: 4px solid #f39c12;
+}
+
+.role-card.director {
+  border-top: 4px solid #e74c3c;
+}
+
+.role-card.disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.role-card.disabled button {
+  background-color: #95a5a6;
+  cursor: not-allowed;
+}
+
+.role-card.disabled button:hover {
+  background-color: #95a5a6;
+}
+
+.role-icon {
+  font-size: 64px;
+  margin-bottom: 20px;
+}
+
+.role-card h3 {
+  font-size: 24px;
+  color: #2c3e50;
+  margin-bottom: 10px;
+}
+
+.role-card p {
+  font-size: 14px;
+  color: #7f8c8d;
+  margin-bottom: 20px;
+  line-height: 1.5;
+}
+
+.role-card button {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  padding: 12px 30px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 14px;
+  transition: all 0.3s;
+  width: 100%;
+}
+
+.role-card button:hover {
+  transform: scale(1.05);
+}
+
+.info-text {
+  font-size: 12px;
+  color: #27ae60;
+  margin: 8px 0;
+  font-weight: bold;
+}
+
+.role-card.staff .info-text,
+.role-card.teacher .info-text,
+.role-card.director .info-text {
+  color: #e74c3c;
+}
+
+@media (max-width: 768px) {
+  .role-selection h1 {
+    font-size: 28px;
+  }
+
+  .role-selection p {
+    font-size: 14px;
+  }
+
+  .role-cards {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  .role-card {
+    padding: 20px;
+  }
+
+  .role-icon {
+    font-size: 48px;
+  }
+}

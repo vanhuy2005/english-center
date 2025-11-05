@@ -1,0 +1,261 @@
+.schedule-table-container {
+  background: white;
+  border-radius: 12px;
+  padding: 40px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.schedule-table-container h2 {
+  font-size: 28px;
+  color: #2c3e50;
+  margin-bottom: 20px;
+  border-bottom: 2px solid #e8ecf1;
+  padding-bottom: 15px;
+}
+
+.view-toggle {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 30px;
+}
+
+.view-toggle button {
+  padding: 10px 20px;
+  background-color: #e8ecf1;
+  color: #555;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: all 0.3s;
+}
+
+.view-toggle button.active {
+  background-color: #667eea;
+  color: white;
+}
+
+.by-room-view {
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+}
+
+.room-section h3 {
+  font-size: 18px;
+  color: #2c3e50;
+  margin-bottom: 15px;
+  font-weight: bold;
+}
+
+.table-wrapper {
+  overflow-x: auto;
+  border-radius: 8px;
+  border: 1px solid #e8ecf1;
+}
+
+.schedule-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+  font-size: 12px;
+}
+
+.schedule-table thead {
+  background-color: #1e3a5f;
+  color: white;
+}
+
+.schedule-table th {
+  padding: 12px 8px;
+  text-align: center;
+  border: 1px solid #ddd;
+  font-weight: bold;
+}
+
+.schedule-table th small {
+  display: block;
+  font-size: 10px;
+  font-weight: normal;
+}
+
+.schedule-table td {
+  padding: 10px;
+  border: 1px solid #ddd;
+  vertical-align: top;
+}
+
+.room-cell {
+  background-color: #e8f4f8;
+  font-weight: bold;
+  min-width: 80px;
+}
+
+.day-cell {
+  min-width: 200px;
+  max-height: 400px;
+  overflow-y: auto;
+  background-color: #f9fbfd;
+}
+
+.schedule-event {
+  background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+  border-left: 4px solid #1976d2;
+  padding: 8px;
+  margin-bottom: 8px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+.event-title {
+  font-weight: bold;
+  color: #c41c3b;
+  margin-bottom: 3px;
+}
+
+.event-code {
+  color: #0d47a1;
+  font-weight: bold;
+  margin-bottom: 5px;
+}
+
+.event-info {
+  font-size: 10px;
+  color: #333;
+  line-height: 1.4;
+}
+
+.event-room {
+  font-weight: bold;
+  color: #1565c0;
+  margin-top: 3px;
+}
+
+.event-teacher {
+  color: #0d47a1;
+  margin-top: 2px;
+}
+
+.by-day-view {
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+}
+
+.day-section h3 {
+  font-size: 16px;
+  font-weight: bold;
+  color: white;
+}
+
+.day-section h3 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.no-schedule {
+  background-color: #f5f7fa;
+  border: 2px dashed #e8ecf1;
+  border-radius: 8px;
+  padding: 30px;
+  text-align: center;
+  color: #999;
+  font-size: 14px;
+}
+
+.time-cell {
+  font-weight: bold;
+  color: #c41c3b;
+  min-width: 100px;
+}
+
+.loading {
+  text-align: center;
+  padding: 60px 20px;
+  color: #999;
+}
+
+.week-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 25px;
+  padding: 15px;
+  background: linear-gradient(135deg, #f5f7fa 0%, #ffffff 100%);
+  border: 2px solid #e8ecf1;
+  border-radius: 10px;
+}
+
+.week-controls button {
+  padding: 10px 16px;
+  background-color: #667eea;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: all 0.3s;
+}
+
+.week-controls button:hover {
+  background-color: #5568d3;
+  transform: translateY(-2px);
+}
+
+.week-controls .today-btn {
+  background-color: #f39c12;
+}
+
+.week-controls .today-btn:hover {
+  background-color: #e67e22;
+}
+
+.week-controls .nav-btn {
+  background-color: #3498db;
+}
+
+.week-controls .nav-btn:hover {
+  background-color: #2980b9;
+}
+
+.week-info {
+  text-align: center;
+  flex: 1;
+  margin: 0 20px;
+}
+
+.week-info p {
+  font-size: 14px;
+  color: #2c3e50;
+  margin: 0;
+}
+
+@media (max-width: 1024px) {
+  .schedule-table {
+    font-size: 11px;
+  }
+
+  .schedule-table th,
+  .schedule-table td {
+    padding: 8px 4px;
+  }
+
+  .day-cell {
+    min-width: 150px;
+  }
+}
+
+@media (max-width: 768px) {
+  .schedule-table-container {
+    padding: 20px;
+  }
+
+  .day-cell {
+    min-width: 120px;
+  }
+
+  .schedule-event {
+    font-size: 9px;
+  }
+}
