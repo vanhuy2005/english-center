@@ -1,139 +1,270 @@
-import React, { useState, useEffect } from "react";
-import axios from "axios";
-import LoginRole from "./components/Auth/LoginRole";
-import Login from "./components/Auth/Login";
-import Register from "./components/Auth/Register";
-import StudentDashboard from "./components/Students/StudentDashboard";
-import TeacherDashboard from "./components/Teachers/TeacherDashboard";
-import StaffDashboard from "./components/Staff/StaffDashboard";
-import DirectorDashboard from "./components/Director/DirectorDashboard";
-import "./App.css";
+import React from "react";
+import { Routes, Route, Navigate } from "react-router-dom";
+import { useAuth } from "@hooks";
+import { Loading } from "@components/common";
+import { AuthLayout, MainLayout } from "@layouts";
+import { getMenuByRole } from "@config/menu";
 
-function App() {
-  const [currentPage, setCurrentPage] = useState("role");
-  const [currentRole, setCurrentRole] = useState(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [currentUser, setCurrentUser] = useState(null);
-  const [userRole, setUserRole] = useState(null);
-  const [loading, setLoading] = useState(true);
+// Auth Pages
+import LoginPage from "@pages/auth/LoginPage";
+import RoleSelectionPage from "@pages/auth/RoleSelectionPage";
 
-  useEffect(() => {
-    const token = localStorage.getItem("token");
-    const user = localStorage.getItem("user");
-    const role = localStorage.getItem("role");
-    if (token && user && role) {
-      setIsAuthenticated(true);
-      setCurrentUser(JSON.parse(user));
-      setUserRole(role);
-    }
-    setLoading(false);
-  }, []);
+// Dashboard Pages
+import {
+  DirectorDashboard,
+  UserManagementPage,
+  RevenueReportPage,
+  StudentReportPage,
+  ClassReportPage,
+  TeacherReportPage,
+  RetentionReportPage,
+  DepartmentsPage,
+} from "@pages/director";
+import TeacherDashboardPage from "@pages/teacher/TeacherDashboardPage";
+import StudentDashboard from "@pages/student/StudentDashboard";
+import EnrollmentStaffDashboard from "@pages/staff/EnrollmentStaffDashboard";
+import AcademicStaffDashboard from "@pages/staff/academic/AcademicStaffDashboardPage";
+import AccountantDashboard from "@pages/staff/accountant/AccountantDashboardPage";
 
-  const handleSelectRole = (role) => {
-    setCurrentRole(role);
-    // Chỉ học viên và giám đốc được đăng ký
-    // Nhân viên và giáo viên chỉ đăng nhập
-    if (role === "student" || role === "director") {
-      setCurrentPage("login-register");
-    } else {
-      // Nhân viên và giáo viên chỉ đăng nhập
-      setCurrentPage("login");
-    }
-  };
+// Student Pages
+import ProfilePage from "@pages/student/ProfilePage";
+import NotificationsPage from "@pages/student/NotificationsPage";
+import SchedulePage from "@pages/student/SchedulePage";
+import GradesPage from "@pages/student/GradesPage";
+import TuitionPage from "@pages/student/TuitionPage";
+import MyCoursesPage from "@pages/student/MyCoursesPage";
+import RequestListPage from "@pages/student/RequestListPage";
+import RequestFormPage from "@pages/student/RequestFormPage";
+import EnrollPage from "@pages/student/EnrollPage";
 
-  const handleLoginSuccess = (user, role, token) => {
-    setCurrentUser(user);
-    setUserRole(role);
-    setIsAuthenticated(true);
-    localStorage.setItem("token", token);
-    localStorage.setItem("user", JSON.stringify(user));
-    localStorage.setItem("role", role);
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    localStorage.removeItem("role");
-    setIsAuthenticated(false);
-    setCurrentUser(null);
-    setUserRole(null);
-    setCurrentPage("role");
-    setCurrentRole(null);
-  };
+/**
+ * Protected Route Component
+ */
+const ProtectedRoute = ({ children, allowedRoles = [] }) => {
+  const { isAuthenticated, role, loading } = useAuth();
 
   if (loading) {
-    return (
-      <div className="loading-container">
-        <div className="spinner"></div>
-        <p>Đang tải...</p>
-      </div>
-    );
+    return <Loading fullScreen text="Đang tải..." />;
   }
 
-  if (isAuthenticated && userRole) {
-    switch (userRole) {
-      case "student":
-        return (
-          <StudentDashboard student={currentUser} onLogout={handleLogout} />
-        );
-      case "teacher":
-        return (
-          <TeacherDashboard teacher={currentUser} onLogout={handleLogout} />
-        );
-      case "staff":
-        return <StaffDashboard staff={currentUser} onLogout={handleLogout} />;
-      case "director":
-        return (
-          <DirectorDashboard director={currentUser} onLogout={handleLogout} />
-        );
-      default:
-        return <LoginRole onSelectRole={handleSelectRole} />;
-    }
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
   }
 
-  if (currentPage === "role") {
-    return <LoginRole onSelectRole={handleSelectRole} />;
+  if (allowedRoles.length > 0 && !allowedRoles.includes(role)) {
+    return <Navigate to="/unauthorized" replace />;
   }
 
-  if (currentPage === "login-register") {
-    return (
-      <div>
-        <Login
-          role={currentRole}
-          onLoginSuccess={handleLoginSuccess}
-          onSwitchToRegister={() => setCurrentPage("register")}
-          onSwitchToRole={() => setCurrentPage("role")}
+  return children;
+};
+
+/**
+ * Dashboard Route based on role
+ */
+const DashboardRoute = () => {
+  const { role } = useAuth();
+  switch (role) {
+    case "director":
+      return <DirectorDashboard />;
+    case "teacher":
+      return <TeacherDashboardPage />;
+    case "student":
+      return <StudentDashboard />;
+    case "enrollment":
+      return <EnrollmentStaffDashboard />;
+    case "academic":
+      return <AcademicStaffDashboard />;
+    case "accountant":
+      return <AccountantDashboard />;
+    default:
+      return <Navigate to="/login" replace />;
+  }
+};
+
+/**
+ * Layout Route with menu based on role
+ */
+const LayoutRoute = () => {
+  const { role } = useAuth();
+  const menuItems = getMenuByRole(role);
+
+  return <MainLayout menuItems={menuItems} />;
+};
+
+function App() {
+  const { loading, isAuthenticated } = useAuth();
+
+  if (loading) {
+    return <Loading fullScreen text="Đang khởi tạo..." />;
+  }
+
+  return (
+    <Routes>
+      {/* Public Routes */}
+      <Route element={<AuthLayout />}>
+        <Route path="/login" element={<LoginPage />} />
+      </Route>
+
+      {/* Protected Routes with MainLayout */}
+      <Route
+        element={
+          <ProtectedRoute>
+            <LayoutRoute />
+          </ProtectedRoute>
+        }
+      >
+        {/* Dashboard Route */}
+        <Route path="/dashboard" element={<DashboardRoute />} />
+
+        {/* Director Routes */}
+        <Route
+          path="/users"
+          element={
+            <ProtectedRoute allowedRoles={["director"]}>
+              <UserManagementPage />
+            </ProtectedRoute>
+          }
         />
-        <div className="auth-switch-container">
-          <button onClick={() => setCurrentPage("register")}>
-            Chưa có tài khoản? Đăng ký ngay
-          </button>
-        </div>
-      </div>
-    );
-  }
+        <Route
+          path="/reports/revenue"
+          element={
+            <ProtectedRoute allowedRoles={["director"]}>
+              <RevenueReportPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/reports/students"
+          element={
+            <ProtectedRoute allowedRoles={["director"]}>
+              <StudentReportPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/reports/classes"
+          element={
+            <ProtectedRoute allowedRoles={["director"]}>
+              <ClassReportPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/reports/teachers"
+          element={
+            <ProtectedRoute allowedRoles={["director"]}>
+              <TeacherReportPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/reports/retention"
+          element={
+            <ProtectedRoute allowedRoles={["director"]}>
+              <RetentionReportPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/departments"
+          element={
+            <ProtectedRoute allowedRoles={["director"]}>
+              <DepartmentsPage />
+            </ProtectedRoute>
+          }
+        />
 
-  if (currentPage === "login") {
-    return (
-      <Login
-        role={currentRole}
-        onLoginSuccess={handleLoginSuccess}
-        onSwitchToRole={() => setCurrentPage("role")}
+        {/* Student Routes */}
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute allowedRoles={["student"]}>
+              <ProfilePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/notifications"
+          element={
+            <ProtectedRoute allowedRoles={["student"]}>
+              <NotificationsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/schedule"
+          element={
+            <ProtectedRoute allowedRoles={["student"]}>
+              <SchedulePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/grades"
+          element={
+            <ProtectedRoute allowedRoles={["student"]}>
+              <GradesPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/tuition"
+          element={
+            <ProtectedRoute allowedRoles={["student"]}>
+              <TuitionPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/my-courses"
+          element={
+            <ProtectedRoute allowedRoles={["student"]}>
+              <MyCoursesPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/requests"
+          element={
+            <ProtectedRoute allowedRoles={["student"]}>
+              <RequestListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/requests/new"
+          element={
+            <ProtectedRoute allowedRoles={["student"]}>
+              <RequestFormPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/enroll"
+          element={
+            <ProtectedRoute allowedRoles={["student"]}>
+              <EnrollPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Root Redirect */}
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      </Route>
+
+      {/* Redirects */}
+      <Route
+        path="*"
+        element={
+          isAuthenticated ? (
+            <Navigate to="/dashboard" replace />
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
       />
-    );
-  }
-
-  if (currentPage === "register") {
-    return (
-      <Register
-        role={currentRole}
-        onRegisterSuccess={handleLoginSuccess}
-        onSwitchToLogin={() => setCurrentPage("login-register")}
-      />
-    );
-  }
-
-  return <LoginRole onSelectRole={handleSelectRole} />;
+    </Routes>
+  );
 }
 
 export default App;

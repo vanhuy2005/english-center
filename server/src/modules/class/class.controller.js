@@ -1,0 +1,538 @@
+const Class = require("../../shared/models/Class.model");
+const Student = require("../../shared/models/Student.model");
+const Teacher = require("../../shared/models/Teacher.model");
+const Course = require("../../shared/models/Course.model");
+
+/**
+ * @desc    Get all classes with filters, pagination, search
+ * @route   GET /api/classes
+ * @access  Private (director, staff, teacher)
+ */
+exports.getAllClasses = async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 10,
+      search,
+      status,
+      course,
+      teacher,
+      sortBy = "createdAt",
+      sortOrder = "desc",
+    } = req.query;
+
+    // Build filter
+    const filter = {};
+
+    if (search) {
+      filter.$or = [
+        { className: { $regex: search, $options: "i" } },
+        { classCode: { $regex: search, $options: "i" } },
+      ];
+    }
+
+    if (status) filter.status = status;
+    if (course) filter.course = course;
+    if (teacher) filter.teacher = teacher;
+
+    // Pagination
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const sort = { [sortBy]: sortOrder === "asc" ? 1 : -1 };
+
+    // Execute query
+    const classes = await Class.find(filter)
+      .populate("course", "name courseCode level fee duration")
+      .populate("teacher", "fullName email phone specialization")
+      .populate("students", "studentCode fullName email phone")
+      .sort(sort)
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    // Get total count
+    const total = await Class.countDocuments(filter);
+
+    res.status(200).json({
+      success: true,
+      data: classes,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / parseInt(limit)),
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching classes:", error);
+    res.status(500).json({
+      success: false,
+      message: "Lỗi khi lấy danh sách lớp học",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * @desc    Get single class by ID
+ * @route   GET /api/classes/:id
+ * @access  Private
+ */
+exports.getClassById = async (req, res) => {
+  try {
+    const classData = await Class.findById(req.params.id)
+      .populate("course", "name courseCode level fee duration description")
+      .populate("teacher", "fullName email phone specialization experience")
+      .populate(
+        "students",
+        "studentCode fullName email phone dateOfBirth address"
+      );
+
+    if (!classData) {
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy lớp học",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: classData,
+    });
+  } catch (error) {
+    console.error("Error fetching class:", error);
+    res.status(500).json({
+      success: false,
+      message: "Lỗi khi lấy thông tin lớp học",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * @desc    Create new class
+ * @route   POST /api/classes
+ * @access  Private (director, academic staff)
+ */
+exports.createClass = async (req, res) => {
+  try {
+    const {
+      className,
+      course,
+      teacher,
+      schedule,
+      startDate,
+      endDate,
+      maxStudents,
+      room,
+      tuitionFee,
+      status,
+    } = req.body;
+
+    // Validate required fields
+    if (!className || !course || !startDate) {
+      return res.status(400).json({
+        success: false,
+        message: "Vui lòng cung cấp đầy đủ thông tin bắt buộc",
+      });
+    }
+
+    // Check if course exists
+    const courseExists = await Course.findById(course);
+    if (!courseExists) {
+      return res.status(404).json({
+        success: false,
+        message: "Khóa học không tồn tại",
+      });
+    }
+
+    // Check if teacher exists (if provided)
+    if (teacher) {
+      const teacherExists = await Teacher.findById(teacher);
+      if (!teacherExists) {
+        return res.status(404).json({
+          success: false,
+          message: "Giáo viên không tồn tại",
+        });
+      }
+    }
+
+    // Create class
+    const newClass = await Class.create({
+      className,
+      course,
+      teacher,
+      schedule,
+      startDate,
+      endDate,
+      capacity: { max: maxStudents || 30 },
+      room,
+      tuitionFee: tuitionFee || courseExists.fee.amount,
+      status: status || "upcoming",
+      createdBy: req.user._id,
+    });
+
+    // Populate for response
+    const populatedClass = await Class.findById(newClass._id)
+      .populate("course", "name courseCode level")
+      .populate("teacher", "fullName email");
+
+    res.status(201).json({
+      success: true,
+      message: "Tạo lớp học thành công",
+      data: populatedClass,
+    });
+  } catch (error) {
+    console.error("Error creating class:", error);
+    res.status(500).json({
+      success: false,
+      message: "Lỗi khi tạo lớp học",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * @desc    Update class
+ * @route   PUT /api/classes/:id
+ * @access  Private (director, academic staff)
+ */
+exports.updateClass = async (req, res) => {
+  try {
+    const classData = await Class.findById(req.params.id);
+
+    if (!classData) {
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy lớp học",
+      });
+    }
+
+    const {
+      className,
+      teacher,
+      schedule,
+      startDate,
+      endDate,
+      maxStudents,
+      room,
+      tuitionFee,
+      status,
+    } = req.body;
+
+    // Check if teacher exists (if provided)
+    if (teacher && teacher !== classData.teacher?.toString()) {
+      const teacherExists = await Teacher.findById(teacher);
+      if (!teacherExists) {
+        return res.status(404).json({
+          success: false,
+          message: "Giáo viên không tồn tại",
+        });
+      }
+    }
+
+    // Update fields
+    if (className) classData.className = className;
+    if (teacher) classData.teacher = teacher;
+    if (schedule) classData.schedule = schedule;
+    if (startDate) classData.startDate = startDate;
+    if (endDate) classData.endDate = endDate;
+    if (maxStudents) classData.capacity.max = maxStudents;
+    if (room) classData.room = room;
+    if (tuitionFee) classData.tuitionFee = tuitionFee;
+    if (status) classData.status = status;
+
+    await classData.save();
+
+    // Populate for response
+    const updatedClass = await Class.findById(classData._id)
+      .populate("course", "name courseCode level")
+      .populate("teacher", "fullName email")
+      .populate("students", "studentCode fullName");
+
+    res.status(200).json({
+      success: true,
+      message: "Cập nhật lớp học thành công",
+      data: updatedClass,
+    });
+  } catch (error) {
+    console.error("Error updating class:", error);
+    res.status(500).json({
+      success: false,
+      message: "Lỗi khi cập nhật lớp học",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * @desc    Delete class
+ * @route   DELETE /api/classes/:id
+ * @access  Private (director)
+ */
+exports.deleteClass = async (req, res) => {
+  try {
+    const classData = await Class.findById(req.params.id);
+
+    if (!classData) {
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy lớp học",
+      });
+    }
+
+    // Check if class has students
+    if (classData.students && classData.students.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Không thể xóa lớp học đã có học viên. Vui lòng chuyển học viên sang lớp khác trước.",
+      });
+    }
+
+    await classData.deleteOne();
+
+    res.status(200).json({
+      success: true,
+      message: "Xóa lớp học thành công",
+    });
+  } catch (error) {
+    console.error("Error deleting class:", error);
+    res.status(500).json({
+      success: false,
+      message: "Lỗi khi xóa lớp học",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * @desc    Add student to class
+ * @route   POST /api/classes/:id/students/:studentId
+ * @access  Private (director, enrollment staff)
+ */
+exports.addStudentToClass = async (req, res) => {
+  try {
+    const { id, studentId } = req.params;
+
+    const classData = await Class.findById(id);
+    if (!classData) {
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy lớp học",
+      });
+    }
+
+    const student = await Student.findById(studentId);
+    if (!student) {
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy học viên",
+      });
+    }
+
+    // Check if class is full
+    if (classData.students.length >= classData.capacity.max) {
+      return res.status(400).json({
+        success: false,
+        message: "Lớp học đã đầy",
+      });
+    }
+
+    // Check if student already in class
+    if (classData.students.includes(studentId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Học viên đã có trong lớp này",
+      });
+    }
+
+    // Add student to class
+    classData.students.push(studentId);
+    classData.capacity.current = classData.students.length;
+    await classData.save();
+
+    // Update student's classes
+    if (!student.classes) student.classes = [];
+    if (!student.classes.includes(id)) {
+      student.classes.push(id);
+      await student.save();
+    }
+
+    const updatedClass = await Class.findById(id).populate(
+      "students",
+      "studentCode fullName email phone"
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Thêm học viên vào lớp thành công",
+      data: updatedClass,
+    });
+  } catch (error) {
+    console.error("Error adding student to class:", error);
+    res.status(500).json({
+      success: false,
+      message: "Lỗi khi thêm học viên vào lớp",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * @desc    Remove student from class
+ * @route   DELETE /api/classes/:id/students/:studentId
+ * @access  Private (director, academic staff)
+ */
+exports.removeStudentFromClass = async (req, res) => {
+  try {
+    const { id, studentId } = req.params;
+
+    const classData = await Class.findById(id);
+    if (!classData) {
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy lớp học",
+      });
+    }
+
+    // Check if student is in class
+    if (!classData.students.includes(studentId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Học viên không có trong lớp này",
+      });
+    }
+
+    // Remove student from class
+    classData.students = classData.students.filter(
+      (s) => s.toString() !== studentId
+    );
+    classData.capacity.current = classData.students.length;
+    await classData.save();
+
+    // Update student's classes
+    const student = await Student.findById(studentId);
+    if (student && student.classes) {
+      student.classes = student.classes.filter((c) => c.toString() !== id);
+      await student.save();
+    }
+
+    const updatedClass = await Class.findById(id).populate(
+      "students",
+      "studentCode fullName email phone"
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Xóa học viên khỏi lớp thành công",
+      data: updatedClass,
+    });
+  } catch (error) {
+    console.error("Error removing student from class:", error);
+    res.status(500).json({
+      success: false,
+      message: "Lỗi khi xóa học viên khỏi lớp",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * @desc    Get class schedule
+ * @route   GET /api/classes/:id/schedule
+ * @access  Private
+ */
+exports.getClassSchedule = async (req, res) => {
+  try {
+    const Schedule = require("../../shared/models/Schedule.model");
+
+    const schedules = await Schedule.find({ class: req.params.id })
+      .populate("teacher", "fullName")
+      .populate("class", "className classCode")
+      .sort({ date: 1, startTime: 1 });
+
+    res.status(200).json({
+      success: true,
+      data: schedules,
+    });
+  } catch (error) {
+    console.error("Error fetching class schedule:", error);
+    res.status(500).json({
+      success: false,
+      message: "Lỗi khi lấy lịch học",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * @desc    Get class statistics
+ * @route   GET /api/classes/:id/stats
+ * @access  Private
+ */
+exports.getClassStats = async (req, res) => {
+  try {
+    const classData = await Class.findById(req.params.id).populate("students");
+
+    if (!classData) {
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy lớp học",
+      });
+    }
+
+    const Attendance = require("../../shared/models/Attendance.model");
+    const Grade = require("../../shared/models/Grade.model");
+
+    // Get attendance stats
+    const attendanceStats = await Attendance.aggregate([
+      { $match: { class: classData._id } },
+      {
+        $group: {
+          _id: null,
+          totalSessions: { $sum: 1 },
+          presentCount: {
+            $sum: { $cond: [{ $eq: ["$status", "present"] }, 1, 0] },
+          },
+          absentCount: {
+            $sum: { $cond: [{ $eq: ["$status", "absent"] }, 1, 0] },
+          },
+          lateCount: {
+            $sum: { $cond: [{ $eq: ["$status", "late"] }, 1, 0] },
+          },
+        },
+      },
+    ]);
+
+    // Get grade stats
+    const gradeStats = await Grade.getClassAverage(req.params.id);
+
+    const stats = {
+      enrollment: {
+        current: classData.students.length,
+        max: classData.capacity.max,
+        percentage: Math.round(
+          (classData.students.length / classData.capacity.max) * 100
+        ),
+      },
+      attendance: attendanceStats[0] || {
+        totalSessions: 0,
+        presentCount: 0,
+        absentCount: 0,
+        lateCount: 0,
+      },
+      grades: gradeStats,
+    };
+
+    res.status(200).json({
+      success: true,
+      data: stats,
+    });
+  } catch (error) {
+    console.error("Error fetching class stats:", error);
+    res.status(500).json({
+      success: false,
+      message: "Lỗi khi lấy thống kê lớp học",
+      error: error.message,
+    });
+  }
+};
