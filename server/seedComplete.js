@@ -1,37 +1,22 @@
 /**
- * Comprehensive Seed Data Script
- * Tạo dữ liệu đầy đủ cho tất cả các chức năng của hệ thống
+ * Complete Seed Script for English Center Database
+ * Seeds all models with sample data for testing authentication and authorization
  */
 
 require("dotenv").config();
 const mongoose = require("mongoose");
-const bcrypt = require("bcryptjs");
+const connectDB = require("./src/config/database");
 
-// Import models
+// Import all models
 const User = require("./src/shared/models/User.model");
 const Student = require("./src/shared/models/Student.model");
 const Teacher = require("./src/shared/models/Teacher.model");
-const EnrollmentStaff = require("./src/shared/models/EnrollmentStaff.model");
 const AcademicStaff = require("./src/shared/models/AcademicStaff.model");
+const EnrollmentStaff = require("./src/shared/models/EnrollmentStaff.model");
 const Accountant = require("./src/shared/models/Accountant.model");
 const Course = require("./src/shared/models/Course.model");
 const Class = require("./src/shared/models/Class.model");
-const Finance = require("./src/shared/models/Finance.model");
-
-// Database connection
-const connectDB = async () => {
-  try {
-    const mongoUri = process.env.MONGODB_URI || process.env.MONGO_URI;
-    if (!mongoUri) {
-      throw new Error("MongoDB URI not found in environment variables");
-    }
-    await mongoose.connect(mongoUri);
-    console.log("✅ MongoDB Connected");
-  } catch (error) {
-    console.error("❌ MongoDB Connection Error:", error);
-    process.exit(1);
-  }
-};
+const Counter = require("./src/shared/models/Counter.model");
 
 // Clear all collections
 const clearDatabase = async () => {
@@ -39,366 +24,236 @@ const clearDatabase = async () => {
   await User.deleteMany({});
   await Student.deleteMany({});
   await Teacher.deleteMany({});
-  await EnrollmentStaff.deleteMany({});
   await AcademicStaff.deleteMany({});
+  await EnrollmentStaff.deleteMany({});
   await Accountant.deleteMany({});
   await Course.deleteMany({});
   await Class.deleteMany({});
-  await Finance.deleteMany({});
+  await Counter.deleteMany({});
   console.log("✅ Database cleared");
 };
 
-// Seed Users and Profiles
-const seedUsersAndProfiles = async () => {
-  console.log("👥 Seeding users and profiles...");
+// Seed Users with different roles
+const seedUsers = async () => {
+  console.log("\n👥 Seeding Users...");
 
-  const usersData = [
-    // === DIRECTOR (1 người) ===
+  const users = [
+    // Director
     {
       fullName: "Nguyễn Văn Giám Đốc",
-      phone: "0900000001",
-      email: "director@english.edu.vn",
+      phone: "0901000001",
+      email: "director@englishcenter.com",
       password: "123456",
       role: "director",
       status: "active",
-      isFirstLogin: false, // Director đã đổi mật khẩu
+      isFirstLogin: true,
     },
-
-    // === TEACHERS (3 người) ===
+    // Teachers
     {
-      fullName: "Trần Thị Mai",
-      phone: "0901111111",
-      email: "mai.teacher@english.edu.vn",
+      fullName: "Trần Thị Hương",
+      phone: "0902000001",
+      email: "huong.teacher@englishcenter.com",
       password: "123456",
       role: "teacher",
       status: "active",
       isFirstLogin: true,
-      profile: {
-        teacherCode: "GV001",
-        dateOfBirth: new Date("1990-05-15"),
-        gender: "female",
-        address: "123 Nguyễn Huệ, Quận 1, TP.HCM",
-        subjects: ["English Communication", "IELTS"],
-        employmentStatus: "active",
-        dateJoined: new Date("2020-01-15"),
-      },
     },
     {
-      fullName: "Lê Văn Hùng",
-      phone: "0901111112",
-      email: "hung.teacher@english.edu.vn",
+      fullName: "Lê Văn Nam",
+      phone: "0902000002",
+      email: "nam.teacher@englishcenter.com",
       password: "123456",
       role: "teacher",
       status: "active",
       isFirstLogin: true,
-      profile: {
-        teacherCode: "GV002",
-        dateOfBirth: new Date("1988-03-20"),
-        gender: "male",
-        address: "456 Lê Lợi, Quận 3, TP.HCM",
-        subjects: ["TOEIC", "Business English"],
-        employmentStatus: "active",
-        dateJoined: new Date("2019-08-01"),
-      },
     },
+    // Students
     {
-      fullName: "Phạm Thị Lan",
-      phone: "0901111113",
-      password: "123456",
-      role: "teacher",
-      status: "active",
-      isFirstLogin: true,
-      profile: {
-        teacherCode: "GV003",
-        dateOfBirth: new Date("1992-11-10"),
-        gender: "female",
-        address: "789 Trần Hưng Đạo, Quận 5, TP.HCM",
-        subjects: ["TOEFL", "Academic Writing"],
-        employmentStatus: "active",
-        dateJoined: new Date("2021-03-01"),
-      },
-    },
-
-    // === STUDENTS (3 người) ===
-    {
-      fullName: "Nguyễn Văn An",
-      phone: "0902222221",
-      email: "an.student@gmail.com",
+      fullName: "Phạm Thị Mai",
+      phone: "0903000001",
+      email: "mai.student@gmail.com",
       password: "123456",
       role: "student",
       status: "active",
       isFirstLogin: true,
-      profile: {
-        studentCode: "SV001",
-        dateOfBirth: new Date("2002-06-15"),
-        gender: "male",
-        address: "12 Nguyễn Trãi, Quận 5, TP.HCM",
-        academicStatus: "active",
-      },
     },
     {
-      fullName: "Trần Thị Bình",
-      phone: "0902222222",
-      email: "binh.student@gmail.com",
+      fullName: "Nguyễn Văn Anh",
+      phone: "0903000002",
+      email: "anh.student@gmail.com",
       password: "123456",
       role: "student",
       status: "active",
       isFirstLogin: true,
-      profile: {
-        studentCode: "SV002",
-        dateOfBirth: new Date("2003-08-20"),
-        gender: "female",
-        address: "34 Võ Văn Tần, Quận 3, TP.HCM",
-        academicStatus: "active",
-      },
     },
+    // Academic Staff
     {
-      fullName: "Lê Minh Chiến",
-      phone: "0902222223",
-      password: "123456",
-      role: "student",
-      status: "active",
-      isFirstLogin: true,
-      profile: {
-        studentCode: "SV003",
-        dateOfBirth: new Date("2001-12-05"),
-        gender: "male",
-        address: "56 Hai Bà Trưng, Quận 1, TP.HCM",
-        academicStatus: "active",
-      },
-    },
-
-    // === ENROLLMENT STAFF (2 người) ===
-    {
-      fullName: "Võ Thị Dung",
-      phone: "0903333331",
-      email: "dung.enrollment@english.edu.vn",
-      password: "123456",
-      role: "enrollment",
-      status: "active",
-      isFirstLogin: true,
-      profile: {
-        staffCode: "NV-TD001",
-        dateOfBirth: new Date("1995-04-10"),
-        gender: "female",
-        address: "78 Cách Mạng Tháng 8, Quận 10, TP.HCM",
-        employmentStatus: "active",
-        dateJoined: new Date("2021-06-01"),
-        performanceMetrics: {
-          totalEnrollments: 45,
-          thisMonthEnrollments: 8,
-          conversionRate: 75,
-        },
-      },
-    },
-    {
-      fullName: "Hoàng Văn Em",
-      phone: "0903333332",
-      password: "123456",
-      role: "enrollment",
-      status: "active",
-      isFirstLogin: true,
-      profile: {
-        staffCode: "NV-TD002",
-        dateOfBirth: new Date("1994-07-22"),
-        gender: "male",
-        address: "90 Điện Biên Phủ, Quận Bình Thạnh, TP.HCM",
-        employmentStatus: "active",
-        dateJoined: new Date("2020-09-15"),
-        performanceMetrics: {
-          totalEnrollments: 62,
-          thisMonthEnrollments: 12,
-          conversionRate: 82,
-        },
-      },
-    },
-
-    // === ACADEMIC STAFF (2 người) ===
-    {
-      fullName: "Đặng Thị Phương",
-      phone: "0904444441",
-      email: "phuong.academic@english.edu.vn",
+      fullName: "Vũ Thị Lan",
+      phone: "0904000001",
+      email: "lan.academic@englishcenter.com",
       password: "123456",
       role: "academic",
       status: "active",
       isFirstLogin: true,
-      profile: {
-        staffCode: "NV-HV001",
-        dateOfBirth: new Date("1993-09-18"),
-        gender: "female",
-        address: "111 Phan Đăng Lưu, Quận Phú Nhuận, TP.HCM",
-        employmentStatus: "active",
-        dateJoined: new Date("2020-02-10"),
-        performanceMetrics: {
-          totalRequestsProcessed: 128,
-          thisMonthRequests: 15,
-          averageResponseTime: 4.5,
-        },
-      },
     },
+    // Enrollment Staff
     {
-      fullName: "Bùi Văn Quang",
-      phone: "0904444442",
+      fullName: "Hoàng Văn Hải",
+      phone: "0905000001",
+      email: "hai.enrollment@englishcenter.com",
       password: "123456",
-      role: "academic",
+      role: "enrollment",
       status: "active",
       isFirstLogin: true,
-      profile: {
-        staffCode: "NV-HV002",
-        dateOfBirth: new Date("1991-01-25"),
-        gender: "male",
-        address: "222 Lý Thường Kiệt, Quận 11, TP.HCM",
-        employmentStatus: "active",
-        dateJoined: new Date("2019-11-01"),
-        performanceMetrics: {
-          totalRequestsProcessed: 156,
-          thisMonthRequests: 18,
-          averageResponseTime: 3.8,
-        },
-      },
     },
-
-    // === ACCOUNTANT (2 người) ===
+    // Accountant
     {
-      fullName: "Ngô Thị Hoa",
-      phone: "0905555551",
-      email: "hoa.accountant@english.edu.vn",
+      fullName: "Đỗ Thị Thu",
+      phone: "0906000001",
+      email: "thu.accountant@englishcenter.com",
       password: "123456",
       role: "accountant",
       status: "active",
       isFirstLogin: true,
-      profile: {
-        staffCode: "NV-KT001",
-        dateOfBirth: new Date("1990-12-30"),
-        gender: "female",
-        address: "333 Nguyễn Thị Minh Khai, Quận 3, TP.HCM",
-        employmentStatus: "active",
-        dateJoined: new Date("2019-05-15"),
-        accessLevel: "senior",
-        performanceMetrics: {
-          totalTransactions: 450,
-          thisMonthTransactions: 38,
-          totalAmountProcessed: 2500000000, // 2.5 tỷ
-        },
-      },
-    },
-    {
-      fullName: "Trương Văn Tài",
-      phone: "0905555552",
-      password: "123456",
-      role: "accountant",
-      status: "active",
-      isFirstLogin: true,
-      profile: {
-        staffCode: "NV-KT002",
-        dateOfBirth: new Date("1992-03-14"),
-        gender: "male",
-        address: "444 Hoàng Văn Thụ, Quận Tân Bình, TP.HCM",
-        employmentStatus: "active",
-        dateJoined: new Date("2020-08-20"),
-        accessLevel: "standard",
-        performanceMetrics: {
-          totalTransactions: 320,
-          thisMonthTransactions: 29,
-          totalAmountProcessed: 1800000000, // 1.8 tỷ
-        },
-      },
     },
   ];
 
-  const createdUsers = [];
-  const createdProfiles = {
-    teachers: [],
-    students: [],
-    enrollmentStaff: [],
-    academicStaff: [],
-    accountants: [],
-  };
+  const createdUsers = await User.create(users);
+  console.log(`✅ Created ${createdUsers.length} users`);
+  return createdUsers;
+};
 
-  for (const userData of usersData) {
-    // Create user - let model handle password hashing via pre-save hook
-    const user = await User.create({
-      fullName: userData.fullName,
-      phone: userData.phone,
-      email: userData.email,
-      password: userData.password, // Model will hash this automatically
-      role: userData.role,
-      status: userData.status,
-      isFirstLogin: userData.isFirstLogin,
+// Seed role-specific profiles
+const seedProfiles = async (users) => {
+  console.log("\n📋 Seeding Profiles...");
+
+  // Find users by role
+  const directorUser = users.find((u) => u.role === "director");
+  const teacherUsers = users.filter((u) => u.role === "teacher");
+  const studentUsers = users.filter((u) => u.role === "student");
+  const academicUser = users.find((u) => u.role === "academic");
+  const enrollmentUser = users.find((u) => u.role === "enrollment");
+  const accountantUser = users.find((u) => u.role === "accountant");
+
+  // Seed Teachers
+  const teachers = [];
+  for (let i = 0; i < teacherUsers.length; i++) {
+    const teacher = await Teacher.create({
+      user: teacherUsers[i]._id,
+      specialization: i === 0 ? ["IELTS", "TOEIC"] : ["Business English"],
+      qualifications: [
+        {
+          degree: "Bachelor of English",
+          institution: "HCMC University",
+          year: 2018,
+        },
+      ],
+      experience: {
+        years: 5,
+        description: "5 years teaching English for adults and children",
+      },
+      employmentStatus: "active",
+      joinDate: new Date("2020-01-15"),
     });
-
-    createdUsers.push(user);
-
-    // Create role-specific profile
-    if (userData.profile) {
-      switch (userData.role) {
-        case "teacher":
-          const teacher = await Teacher.create({
-            ...userData.profile,
-            user: user._id,
-          });
-          createdProfiles.teachers.push(teacher);
-          break;
-
-        case "student":
-          const student = await Student.create({
-            ...userData.profile,
-            user: user._id,
-          });
-          createdProfiles.students.push(student);
-          break;
-
-        case "enrollment":
-          const enrollment = await EnrollmentStaff.create({
-            ...userData.profile,
-            user: user._id,
-          });
-          createdProfiles.enrollmentStaff.push(enrollment);
-          break;
-
-        case "academic":
-          const academic = await AcademicStaff.create({
-            ...userData.profile,
-            user: user._id,
-          });
-          createdProfiles.academicStaff.push(academic);
-          break;
-
-        case "accountant":
-          const accountant = await Accountant.create({
-            ...userData.profile,
-            user: user._id,
-          });
-          createdProfiles.accountants.push(accountant);
-          break;
-      }
-    }
+    teachers.push(teacher);
+    console.log(`✅ Created teacher profile: ${teacherUsers[i].fullName}`);
   }
 
-  console.log(`✅ Created ${createdUsers.length} users`);
-  console.log(`   - ${createdProfiles.teachers.length} teachers`);
-  console.log(`   - ${createdProfiles.students.length} students`);
-  console.log(
-    `   - ${createdProfiles.enrollmentStaff.length} enrollment staff`
-  );
-  console.log(`   - ${createdProfiles.academicStaff.length} academic staff`);
-  console.log(`   - ${createdProfiles.accountants.length} accountants`);
+  // Seed Students
+  const students = [];
+  for (let i = 0; i < studentUsers.length; i++) {
+    const student = await Student.create({
+      user: studentUsers[i]._id,
+      fullName: studentUsers[i].fullName,
+      email: studentUsers[i].email,
+      dateOfBirth: new Date("2000-01-15"),
+      gender: i === 0 ? "female" : "male",
+      address: "123 Main Street, HCMC",
+      contactInfo: {
+        phone: studentUsers[i].phone,
+        email: studentUsers[i].email,
+      },
+      contactPerson: {
+        name: "Nguyễn Văn Phụ Huynh",
+        relation: "Parent",
+        phone: "0909123456",
+        email: "parent@gmail.com",
+      },
+      academicStatus: "active",
+    });
+    students.push(student);
+    console.log(`✅ Created student profile: ${studentUsers[i].fullName}`);
+  }
 
-  return { createdUsers, createdProfiles };
+  // Seed Academic Staff
+  const academicStaff = await AcademicStaff.create({
+    user: academicUser._id,
+    staffCode: "NVHV001",
+    dateOfBirth: new Date("1990-05-20"),
+    gender: "female",
+    address: "456 Academic Street, HCMC",
+    employmentStatus: "active",
+    dateJoined: new Date("2021-03-01"),
+    department: "Phòng Học vụ",
+    position: "Nhân viên Học vụ",
+    responsibilities: [
+      "Quản lý điểm danh",
+      "Quản lý điểm số",
+      "Xử lý yêu cầu học viên",
+    ],
+  });
+  console.log(`✅ Created academic staff profile: ${academicUser.fullName}`);
+
+  // Seed Enrollment Staff
+  const enrollmentStaff = await EnrollmentStaff.create({
+    user: enrollmentUser._id,
+    staffCode: "NVTS001",
+    dateOfBirth: new Date("1992-08-15"),
+    gender: "male",
+    address: "789 Enrollment Road, HCMC",
+    employmentStatus: "active",
+    dateJoined: new Date("2021-06-01"),
+    department: "Phòng Tuyển sinh",
+    position: "Nhân viên Tuyển sinh",
+  });
+  console.log(
+    `✅ Created enrollment staff profile: ${enrollmentUser.fullName}`
+  );
+
+  // Seed Accountant
+  const accountant = await Accountant.create({
+    user: accountantUser._id,
+    staffCode: "NVKT001",
+    dateOfBirth: new Date("1988-11-30"),
+    gender: "female",
+    address: "321 Finance Avenue, HCMC",
+    employmentStatus: "active",
+    dateJoined: new Date("2020-09-01"),
+    department: "Phòng Kế toán",
+    position: "Nhân viên Kế toán",
+    responsibilities: [
+      "Quản lý học phí",
+      "Xử lý thanh toán",
+      "Báo cáo tài chính",
+    ],
+    accessLevel: "standard",
+  });
+  console.log(`✅ Created accountant profile: ${accountantUser.fullName}`);
+
+  return { teachers, students, academicStaff, enrollmentStaff, accountant };
 };
 
 // Seed Courses
 const seedCourses = async () => {
-  console.log("📚 Seeding courses...");
+  console.log("\n📚 Seeding Courses...");
 
-  const coursesData = [
+  const courses = [
     {
-      name: "IELTS Foundation",
-      courseCode: "IELTS-F001",
-      description: "Khóa học nền tảng IELTS cho người mới bắt đầu",
+      name: "General English - Beginner",
+      description: "English course for absolute beginners",
       level: "beginner",
       duration: {
-        hours: 90,
+        hours: 60,
         weeks: 12,
       },
       schedule: {
@@ -406,53 +261,7 @@ const seedCourses = async () => {
         hoursPerDay: 2,
       },
       fee: {
-        amount: 5000000,
-        currency: "VND",
-      },
-      capacity: {
-        min: 5,
-        max: 20,
-      },
-      status: "active",
-    },
-    {
-      name: "TOEIC 550+",
-      courseCode: "TOEIC-550",
-      description: "Khóa học TOEIC mục tiêu 550 điểm",
-      level: "intermediate",
-      duration: {
-        hours: 60,
-        weeks: 8,
-      },
-      schedule: {
-        daysPerWeek: 2,
-        hoursPerDay: 2.5,
-      },
-      fee: {
-        amount: 4000000,
-        currency: "VND",
-      },
-      capacity: {
-        min: 8,
-        max: 25,
-      },
-      status: "active",
-    },
-    {
-      name: "Business English",
-      courseCode: "BE-001",
-      description: "Tiếng Anh giao tiếp trong môi trường kinh doanh",
-      level: "upper-intermediate",
-      duration: {
-        hours: 72,
-        weeks: 12,
-      },
-      schedule: {
-        daysPerWeek: 2,
-        hoursPerDay: 2,
-      },
-      fee: {
-        amount: 6000000,
+        amount: 3000000,
         currency: "VND",
       },
       capacity: {
@@ -460,27 +269,61 @@ const seedCourses = async () => {
         max: 15,
       },
       status: "active",
+      startDate: new Date("2025-01-15"),
+      endDate: new Date("2025-04-15"),
+    },
+    {
+      name: "IELTS Preparation",
+      description: "Intensive IELTS preparation course",
+      level: "intermediate",
+      duration: {
+        hours: 80,
+        weeks: 16,
+      },
+      schedule: {
+        daysPerWeek: 4,
+        hoursPerDay: 2.5,
+      },
+      fee: {
+        amount: 5000000,
+        currency: "VND",
+      },
+      capacity: {
+        min: 5,
+        max: 12,
+      },
+      status: "active",
+      startDate: new Date("2025-02-01"),
+      endDate: new Date("2025-05-31"),
     },
   ];
 
-  const courses = await Course.insertMany(coursesData);
-  console.log(`✅ Created ${courses.length} courses`);
-  return courses;
+  const createdCourses = await Course.create(courses);
+  console.log(`✅ Created ${createdCourses.length} courses`);
+  return createdCourses;
 };
 
 // Seed Classes
-const seedClasses = async (courses, teachers) => {
-  console.log("🏫 Seeding classes...");
+const seedClasses = async (courses, teachers, students) => {
+  console.log("\n🏫 Seeding Classes...");
 
-  const classesData = [
+  const classes = [
     {
-      name: "IELTS Foundation - Lớp A1",
-      classCode: "IELTS-F001-A1",
-      course: courses[0]._id, // IELTS Foundation
-      teacher: teachers[0]._id, // Trần Thị Mai
+      name: "Beginner Class A1",
+      course: courses[0]._id,
+      teacher: teachers[0]._id,
+      students: [
+        {
+          student: students[0]._id,
+          enrolledDate: new Date("2025-01-10"),
+          status: "active",
+        },
+      ],
+      capacity: 15,
+      room: "Room A101",
       schedule: [
         {
-          dayOfWeek: 1, // Monday (0=Sunday, 1=Monday)
+          dayOfWeek: 1, // Monday
           startTime: "18:00",
           endTime: "20:00",
         },
@@ -495,17 +338,23 @@ const seedClasses = async (courses, teachers) => {
           endTime: "20:00",
         },
       ],
-      room: "Room 101",
-      capacity: 20,
-      startDate: new Date("2024-01-15"),
-      endDate: new Date("2024-04-15"),
+      startDate: new Date("2025-01-15"),
+      endDate: new Date("2025-04-15"),
       status: "ongoing",
     },
     {
-      name: "TOEIC 550+ - Lớp B1",
-      classCode: "TOEIC-550-B1",
-      course: courses[1]._id, // TOEIC 550+
-      teacher: teachers[1]._id, // Lê Văn Hùng
+      name: "IELTS Class B1",
+      course: courses[1]._id,
+      teacher: teachers[1]._id,
+      students: [
+        {
+          student: students[1]._id,
+          enrolledDate: new Date("2025-01-25"),
+          status: "active",
+        },
+      ],
+      capacity: 12,
+      room: "Room B202",
       schedule: [
         {
           dayOfWeek: 2, // Tuesday
@@ -518,157 +367,123 @@ const seedClasses = async (courses, teachers) => {
           endTime: "21:30",
         },
       ],
-      room: "Room 102",
-      capacity: 25,
-      startDate: new Date("2024-02-01"),
-      endDate: new Date("2024-04-01"),
-      status: "ongoing",
-    },
-    {
-      name: "Business English - Lớp C1",
-      classCode: "BE-001-C1",
-      course: courses[2]._id, // Business English
-      teacher: teachers[2]._id, // Phạm Thị Lan
-      schedule: [
-        {
-          dayOfWeek: 1, // Monday
-          startTime: "18:30",
-          endTime: "20:30",
-        },
-        {
-          dayOfWeek: 4, // Thursday
-          startTime: "18:30",
-          endTime: "20:30",
-        },
-      ],
-      room: "Room 103",
-      capacity: 15,
-      startDate: new Date("2024-01-20"),
-      endDate: new Date("2024-04-20"),
+      startDate: new Date("2025-02-01"),
+      endDate: new Date("2025-05-31"),
       status: "ongoing",
     },
   ];
 
-  const classes = await Class.insertMany(classesData);
-  console.log(`✅ Created ${classes.length} classes`);
-  return classes;
+  const createdClasses = await Class.create(classes);
+  console.log(`✅ Created ${createdClasses.length} classes`);
+
+  // Update course references
+  await Course.findByIdAndUpdate(courses[0]._id, {
+    $push: { classes: createdClasses[0]._id },
+  });
+  await Course.findByIdAndUpdate(courses[1]._id, {
+    $push: { classes: createdClasses[1]._id },
+  });
+
+  // Update teacher references
+  await Teacher.findByIdAndUpdate(teachers[0]._id, {
+    $push: { classes: createdClasses[0]._id },
+  });
+  await Teacher.findByIdAndUpdate(teachers[1]._id, {
+    $push: { classes: createdClasses[1]._id },
+  });
+
+  // Update student references
+  await Student.findByIdAndUpdate(students[0]._id, {
+    $push: { enrolledCourses: courses[0]._id },
+  });
+  await Student.findByIdAndUpdate(students[1]._id, {
+    $push: { enrolledCourses: courses[1]._id },
+  });
+
+  return createdClasses;
 };
 
-// Seed Finance Records
-const seedFinance = async (students, courses, accountants) => {
-  console.log("💰 Seeding finance records...");
+// Print login credentials
+const printCredentials = async () => {
+  console.log("\n" + "=".repeat(70));
+  console.log("🔐 LOGIN CREDENTIALS (Phone & Password)");
+  console.log("=".repeat(70));
 
-  const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth();
+  const users = await User.find({}).select("fullName phone role");
 
-  const financeData = [];
+  const roleGroups = {
+    director: [],
+    teacher: [],
+    student: [],
+    academic: [],
+    enrollment: [],
+    accountant: [],
+  };
 
-  // Generate finance records for the last 6 months
-  for (let monthOffset = 5; monthOffset >= 0; monthOffset--) {
-    const month = currentMonth - monthOffset;
-    const year = month < 0 ? currentYear - 1 : currentYear;
-    const adjustedMonth = month < 0 ? 12 + month : month;
+  users.forEach((user) => {
+    roleGroups[user.role].push(user);
+  });
 
-    // Create 3-5 random records per month
-    const recordsCount = Math.floor(Math.random() * 3) + 3; // 3-5 records
+  const roleNames = {
+    director: "🎯 DIRECTOR (Giám đốc)",
+    teacher: "👨‍🏫 TEACHERS (Giảng viên)",
+    student: "👨‍🎓 STUDENTS (Học viên)",
+    academic: "📚 ACADEMIC STAFF (Nhân viên Học vụ)",
+    enrollment: "📝 ENROLLMENT STAFF (Nhân viên Tuyển sinh)",
+    accountant: "💰 ACCOUNTANT (Nhân viên Kế toán)",
+  };
 
-    for (let i = 0; i < recordsCount; i++) {
-      const studentIndex = Math.floor(Math.random() * students.length);
-      const courseIndex = Math.floor(Math.random() * courses.length);
-      const accountantIndex = Math.floor(Math.random() * accountants.length);
-
-      const amount = [3000000, 4000000, 5000000, 6000000][
-        Math.floor(Math.random() * 4)
-      ];
-      const isPaid = Math.random() > 0.2; // 80% paid
-      const paidAmount = isPaid
-        ? amount
-        : Math.random() > 0.5
-        ? Math.floor(amount / 2)
-        : 0;
-
-      const dueDate = new Date(year, adjustedMonth, 15);
-      const paidDate = isPaid
-        ? new Date(year, adjustedMonth, Math.floor(Math.random() * 15) + 1)
-        : null;
-
-      financeData.push({
-        student: students[studentIndex]._id,
-        course: courses[courseIndex]._id,
-        type: "tuition",
-        amount,
-        paidAmount,
-        remainingAmount: amount - paidAmount,
-        status:
-          paidAmount === amount
-            ? "paid"
-            : paidAmount > 0
-            ? "partial"
-            : "pending",
-        dueDate,
-        paidDate,
-        paymentMethod: isPaid
-          ? ["bank_transfer", "cash", "credit_card"][
-              Math.floor(Math.random() * 3)
-            ]
-          : "cash",
-        createdBy: accountants[accountantIndex]._id,
-        note: `Học phí tháng ${adjustedMonth + 1}/${year}`,
+  for (const [role, users] of Object.entries(roleGroups)) {
+    if (users.length > 0) {
+      console.log(`\n${roleNames[role]}`);
+      console.log("-".repeat(70));
+      users.forEach((user) => {
+        console.log(`  Name: ${user.fullName}`);
+        console.log(`  Phone: ${user.phone}`);
+        console.log(`  Password: 123456`);
+        console.log(`  Role: ${user.role}`);
+        console.log("");
       });
     }
   }
 
-  const financeRecords = await Finance.insertMany(financeData);
-  console.log(`✅ Created ${financeRecords.length} finance records`);
-  return financeRecords;
+  console.log("=".repeat(70));
+  console.log("⚠️  Default password: 123456 (must change on first login)\n");
 };
 
 // Main seed function
-const seedAll = async () => {
+const seedDatabase = async () => {
   try {
+    console.log("🌱 Starting database seeding...\n");
+
+    // Connect to database
     await connectDB();
+
+    // Clear existing data
     await clearDatabase();
 
-    const { createdUsers, createdProfiles } = await seedUsersAndProfiles();
+    // Seed in order
+    const users = await seedUsers();
+    const profiles = await seedProfiles(users);
     const courses = await seedCourses();
-    const classes = await seedClasses(courses, createdProfiles.teachers);
-    const financeRecords = await seedFinance(
-      createdProfiles.students,
+    const classes = await seedClasses(
       courses,
-      createdProfiles.accountants
+      profiles.teachers,
+      profiles.students
     );
 
-    console.log("\n🎉 Seed completed successfully!");
-    console.log("\n📋 Login Credentials:");
-    console.log("=".repeat(60));
-    console.log("Director:");
-    console.log("  Phone: 0900000001 | Password: 123456");
-    console.log("\nTeachers:");
-    console.log("  Phone: 0901111111 | Password: 123456 (Trần Thị Mai)");
-    console.log("  Phone: 0901111112 | Password: 123456 (Lê Văn Hùng)");
-    console.log("  Phone: 0901111113 | Password: 123456 (Phạm Thị Lan)");
-    console.log("\nStudents:");
-    console.log("  Phone: 0902222221 | Password: 123456 (Nguyễn Văn An)");
-    console.log("  Phone: 0902222222 | Password: 123456 (Trần Thị Bình)");
-    console.log("  Phone: 0902222223 | Password: 123456 (Lê Minh Chiến)");
-    console.log("\nEnrollment Staff:");
-    console.log("  Phone: 0903333331 | Password: 123456 (Võ Thị Dung)");
-    console.log("  Phone: 0903333332 | Password: 123456 (Hoàng Văn Em)");
-    console.log("\nAcademic Staff:");
-    console.log("  Phone: 0904444441 | Password: 123456 (Đặng Thị Phương)");
-    console.log("  Phone: 0904444442 | Password: 123456 (Bùi Văn Quang)");
-    console.log("\nAccountant:");
-    console.log("  Phone: 0905555551 | Password: 123456 (Ngô Thị Hoa)");
-    console.log("  Phone: 0905555552 | Password: 123456 (Trương Văn Tài)");
-    console.log("=".repeat(60));
+    // Print credentials
+    await printCredentials();
+
+    console.log("\n✅ Database seeding completed successfully!");
+    console.log("🚀 You can now start the server and test authentication\n");
 
     process.exit(0);
   } catch (error) {
-    console.error("❌ Seed Error:", error);
+    console.error("❌ Error seeding database:", error);
     process.exit(1);
   }
 };
 
 // Run seed
-seedAll();
+seedDatabase();
