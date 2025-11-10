@@ -1,0 +1,14 @@
+export { default as StudentListPage } from "./StudentListPage";
+export { default as StudentDetailPage } from "./StudentDetailPage";
+export { default as StudentDashboard } from "./StudentDashboard";
+export { default as ProfilePage } from "./ProfilePage";
+export { default as NotificationsPage } from "./NotificationsPage";
+export { default as SchedulePage } from "./SchedulePage";
+export { default as GradesPage } from "./GradesPage";
+export { default as TuitionPage } from "./TuitionPage";
+export { default as MyCoursesPage } from "./MyCoursesPage";
+export { default as RequestListPage } from "./RequestListPage";
+export { default as RequestFormPage } from "./RequestFormPage";
+export { default as EnrollPage } from "./EnrollPage";
+export { default as StudentGradesPage } from "./StudentGradesPage";
+export { default as StudentAttendancePage } from "./StudentAttendancePage";
