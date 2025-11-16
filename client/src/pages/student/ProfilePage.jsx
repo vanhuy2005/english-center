@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@hooks";
 import { userService } from "../../services";
+import apiClient from "../../services/api";
 import {
   Card,
   CardContent,
@@ -13,9 +14,11 @@ import { User, Mail, Phone, MapPin, Calendar, Edit } from "lucide-react";
 import toast from "react-hot-toast";
 
 const ProfilePage = () => {
-  const { user } = useAuth();
+  const { user, setUser } = useAuth();
   const [loading, setLoading] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef(null);
   const [profile, setProfile] = useState({
     fullName: "",
     email: "",
@@ -49,6 +52,36 @@ const ProfilePage = () => {
     }
   };
 
+  const handleAvatarUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Vui lòng chọn file ảnh!');
+      return;
+    }
+
+    try {
+      setUploading(true);
+      const formData = new FormData();
+      formData.append('avatar', file);
+
+      const response = await apiClient.post('/students/me/avatar', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      if (response.data.success) {
+        setUser({ ...user, avatar: response.data.data.avatar });
+        toast.success('Tải ảnh đại diện thành công!');
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast.error('Tải ảnh thất bại!');
+    } finally {
+      setUploading(false);
+    }
+  };
+
   return (
     <div className="p-8">
       {/* Header */}
@@ -74,20 +107,35 @@ const ProfilePage = () => {
             <CardTitle>Ảnh đại diện</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col items-center">
-            <div className="w-32 h-32 rounded-full bg-blue-100 flex items-center justify-center mb-4">
-              <User className="w-16 h-16 text-blue-600" />
+            <div className="w-32 h-32 rounded-full bg-blue-100 flex items-center justify-center mb-4 overflow-hidden">
+              {user?.avatar ? (
+                <img src={`http://localhost:5000${user.avatar}`} alt="Avatar" className="w-full h-full object-cover" />
+              ) : (
+                <User className="w-16 h-16 text-blue-600" />
+              )}
             </div>
             <p className="text-lg font-semibold text-gray-900">
               {user?.fullName}
             </p>
             <p className="text-sm text-gray-500">
-              {user?.profile?.studentCode || "N/A"}
+              {user?.studentCode || "N/A"}
             </p>
-            {!editing && (
-              <Button variant="outline" className="mt-4" size="sm">
-                Tải ảnh lên
-              </Button>
-            )}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleAvatarUpload}
+              className="hidden"
+            />
+            <Button
+              variant="outline"
+              className="mt-4"
+              size="sm"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+            >
+              {uploading ? 'Đang tải...' : 'Tải ảnh lên'}
+            </Button>
           </CardContent>
         </Card>
 

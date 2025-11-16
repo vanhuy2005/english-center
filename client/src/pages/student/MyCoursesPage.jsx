@@ -20,7 +20,8 @@ const MyCoursesPage = () => {
       setLoading(true);
       setError(null);
       const response = await studentService.getMyCourses();
-      setCourses(response.data || []);
+      const activeCourses = (response.data || []).filter(course => course.status === 'active');
+      setCourses(activeCourses);
     } catch (err) {
       console.error("Error fetching courses:", err);
       setError(

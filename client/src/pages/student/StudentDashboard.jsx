@@ -55,7 +55,7 @@ const StudentDashboard = () => {
       const response = await studentService.getMyCourses();
       const courses = response.data || [];
 
-      // Calculate stats
+      // Calculate stats - only count active courses
       const activeCourses = courses.filter((c) => c.status === "active").length;
       const completedCourses = courses.filter(
         (c) => c.status === "completed"

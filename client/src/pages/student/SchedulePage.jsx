@@ -36,7 +36,10 @@ const SchedulePage = () => {
       });
       setSchedules(response.data || []);
     } catch (error) {
-      toast.error("Không thể tải lịch học!");
+      console.error('Fetch schedules error:', error);
+      // Set empty schedules instead of showing error
+      setSchedules([]);
+      // toast.error("Không thể tải lịch học!");
     } finally {
       setLoading(false);
     }

@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, Loading } from "@components/common";
 import { LineChart, BarChart, DoughnutChart } from "@components/charts";
-import { api } from "@services";
+import api from "@services/api";
 
 const StatisticsPage = () => {
   const [loading, setLoading] = useState(true);
@@ -22,7 +22,7 @@ const StatisticsPage = () => {
     try {
       setLoading(true);
       const response = await api.get(
-        `/api/staff/enrollment/statistics?range=${timeRange}`
+        `/staff/enrollment/statistics?range=${timeRange}`
       );
       setStats(response.data);
     } catch (error) {

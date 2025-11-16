@@ -74,7 +74,7 @@ export const AuthProvider = ({ children }) => {
     try {
       console.log("🔐 Attempting login with phone:", phone);
 
-      const response = await apiClient.post("/api/auth/login", {
+      const response = await apiClient.post("/auth/login", {
         phone,
         password,
       });
@@ -93,39 +93,39 @@ export const AuthProvider = ({ children }) => {
       const {
         token: newToken,
         user: userData,
-        profile,
+        role: userRole,
         isFirstLogin,
       } = response.data || {};
 
-      if (!newToken || !userData) {
-        console.error("❌ Missing token or user data in response:", response);
+      if (!newToken || !userData || !userRole) {
+        console.error("❌ Missing token, user data or role in response:", response);
         throw new Error("Invalid response from server");
       }
 
       console.log("✅ Login successful:", {
         user: userData.fullName,
-        role: userData.role,
+        role: userRole,
         token: newToken.substring(0, 20) + "...",
       });
 
       // Save to state
       setToken(newToken);
-      setUser({ ...userData, profile });
-      setRole(userData.role);
+      setUser(userData);
+      setRole(userRole);
 
       // Set token globally for API calls
       setAuthToken(newToken);
 
       // Save to localStorage
       localStorage.setItem("token", newToken);
-      localStorage.setItem("user", JSON.stringify({ ...userData, profile }));
-      localStorage.setItem("role", userData.role);
+      localStorage.setItem("user", JSON.stringify(userData));
+      localStorage.setItem("role", userRole);
 
       if (!isFirstLogin) {
         toast.success("Đăng nhập thành công!");
       }
 
-      return { success: true, user: { ...userData, isFirstLogin, profile } };
+      return { success: true, user: { ...userData, isFirstLogin, role: userRole } };
     } catch (error) {
       console.error("❌ Login error:", error);
       const message =
@@ -137,7 +137,7 @@ export const AuthProvider = ({ children }) => {
 
   const register = async (userData) => {
     try {
-      const response = await apiClient.post("/api/auth/register", userData);
+      const response = await apiClient.post("/auth/register", userData);
       const { token: newToken, user: newUser, role: userRole } = response;
 
       // Auto login after register

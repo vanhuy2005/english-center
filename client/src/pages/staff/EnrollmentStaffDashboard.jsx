@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Card,
@@ -41,16 +41,16 @@ const EnrollmentStaffDashboard = () => {
       setLoading(true);
       const [studentsRes, classesRes, requestsRes, dashboardRes] =
         await Promise.all([
-          api.get("/api/staff/enrollment/students", {
+          api.get("/staff/enrollment/students", {
             params: { limit: 10, sort: "-createdAt" },
           }),
-          api.get("/api/staff/enrollment/classes", {
+          api.get("/staff/enrollment/classes", {
             params: { status: "active,upcoming" },
           }),
-          api.get("/api/staff/enrollment/requests", {
+          api.get("/staff/enrollment/requests", {
             params: { status: "pending", limit: 10 },
           }),
-          api.get("/api/staff/enrollment/dashboard"),
+          api.get("/staff/enrollment/dashboard"),
         ]);
 
       console.log("API Responses:", {
@@ -167,7 +167,7 @@ const EnrollmentStaffDashboard = () => {
 
   const handleProcessRequest = async (requestId, action) => {
     try {
-      await api.put(`/api/staff/enrollment/requests/${requestId}`, { action });
+      await api.put(`/staff/enrollment/requests/${requestId}`, { action });
       toast.success(
         action === "approve" ? "Đã phê duyệt yêu cầu" : "Đã từ chối yêu cầu"
       );
@@ -723,7 +723,7 @@ const NewStudentModal = ({ isOpen, onClose, onSuccess }) => {
     e.preventDefault();
     try {
       setLoading(true);
-      await api.post("/api/staff/enrollment/students", formData);
+      await api.post("/staff/enrollment/students", formData);
       toast.success("Đã thêm học viên mới thành công!");
       onSuccess();
       setFormData({
@@ -836,7 +836,7 @@ const EnrollmentModal = ({ isOpen, onClose, student, onSuccess }) => {
 
   const fetchAvailableClasses = async () => {
     try {
-      const response = await api.get("/api/staff/enrollment/classes", {
+      const response = await api.get("/staff/enrollment/classes", {
         params: { status: "upcoming,active" },
       });
       setClasses(response.data.data || response.data || []);
@@ -855,7 +855,7 @@ const EnrollmentModal = ({ isOpen, onClose, student, onSuccess }) => {
 
     try {
       setLoading(true);
-      await api.post(`/api/staff/enrollment/students/${student._id}/enroll`, {
+      await api.post(`/staff/enrollment/students/${student._id}/enroll`, {
         classId: selectedClass,
       });
       toast.success("Đã ghi danh học viên vào lớp thành công!");

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Card,
   Button,
@@ -45,7 +45,7 @@ const RequestManagementPage = () => {
   const fetchRequests = async () => {
     try {
       setLoading(true);
-      const response = await api.get("/api/staff/enrollment/requests", {
+      const response = await api.get("/staff/enrollment/requests", {
         params: {
           page: pagination.page,
           limit: pagination.limit,
@@ -81,7 +81,7 @@ const RequestManagementPage = () => {
     try {
       setLoading(true);
       const response = await api.put(
-        `/api/staff/enrollment/requests/${selectedRequest._id}`,
+        `/staff/enrollment/requests/${selectedRequest._id}`,
         {
           action: processAction,
           note: processNote,
