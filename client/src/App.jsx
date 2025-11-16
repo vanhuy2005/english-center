@@ -25,6 +25,15 @@ import StudentDashboard from "@pages/student/StudentDashboard";
 import EnrollmentStaffDashboard from "@pages/staff/EnrollmentStaffDashboard";
 import AcademicStaffDashboard from "@pages/staff/academic/AcademicStaffDashboardPage";
 import AccountantDashboard from "@pages/staff/accountant/AccountantDashboardPage";
+import {
+  ClassManagementPage,
+  AttendanceTrackingPage,
+  GradeManagementPage,
+  StudentProgressPage,
+  RequestHandlingPage,
+  ClassReportsPage,
+  AcademicStatisticsPage,
+} from "@pages/staff/academic";
 
 // Student Pages
 import ProfilePage from "@pages/student/ProfilePage";
@@ -36,6 +45,15 @@ import MyCoursesPage from "@pages/student/MyCoursesPage";
 import RequestListPage from "@pages/student/RequestListPage";
 import RequestFormPage from "@pages/student/RequestFormPage";
 import EnrollPage from "@pages/student/EnrollPage";
+
+// Enrollment Staff Pages
+import {
+  StudentManagementPage,
+  RequestManagementPage,
+  ClassTrackingPage,
+  StatisticsPage,
+} from "@pages/staff/enrollment";
+import EnrollmentPlaceholderPage from "@pages/staff/enrollment/PlaceholderPage";
 
 /**
  * Protected Route Component
@@ -178,7 +196,7 @@ function App() {
         <Route
           path="/profile"
           element={
-            <ProtectedRoute allowedRoles={["student"]}>
+            <ProtectedRoute allowedRoles={["student", "academic", "accountant", "enrollment", "teacher", "director"]}>
               <ProfilePage />
             </ProtectedRoute>
           }
@@ -186,7 +204,7 @@ function App() {
         <Route
           path="/notifications"
           element={
-            <ProtectedRoute allowedRoles={["student"]}>
+            <ProtectedRoute allowedRoles={["student", "academic", "accountant", "enrollment", "teacher", "director"]}>
               <NotificationsPage />
             </ProtectedRoute>
           }
@@ -194,7 +212,7 @@ function App() {
         <Route
           path="/schedule"
           element={
-            <ProtectedRoute allowedRoles={["student"]}>
+            <ProtectedRoute allowedRoles={["student", "academic", "teacher"]}>
               <SchedulePage />
             </ProtectedRoute>
           }
@@ -247,6 +265,27 @@ function App() {
             </ProtectedRoute>
           }
         />
+
+        {/* Academic Staff Routes */}
+        <Route path="/academic/classes" element={<ProtectedRoute allowedRoles={["academic", "director"]}><ClassManagementPage /></ProtectedRoute>} />
+        <Route path="/academic/schedule" element={<ProtectedRoute allowedRoles={["academic", "director"]}><SchedulePage /></ProtectedRoute>} />
+        <Route path="/academic/attendance" element={<ProtectedRoute allowedRoles={["academic", "director"]}><AttendanceTrackingPage /></ProtectedRoute>} />
+        <Route path="/academic/grades" element={<ProtectedRoute allowedRoles={["academic", "director"]}><GradeManagementPage /></ProtectedRoute>} />
+        <Route path="/academic/students" element={<ProtectedRoute allowedRoles={["academic", "director"]}><StudentProgressPage /></ProtectedRoute>} />
+        <Route path="/academic/requests" element={<ProtectedRoute allowedRoles={["academic", "director"]}><RequestHandlingPage /></ProtectedRoute>} />
+        <Route path="/academic/reports" element={<ProtectedRoute allowedRoles={["academic", "director"]}><ClassReportsPage /></ProtectedRoute>} />
+        <Route path="/academic/statistics" element={<ProtectedRoute allowedRoles={["academic", "director"]}><AcademicStatisticsPage /></ProtectedRoute>} />
+
+        {/* Enrollment Staff Routes */}
+        <Route path="/enrollment/students" element={<ProtectedRoute allowedRoles={["enrollment", "director"]}><StudentManagementPage /></ProtectedRoute>} />
+        <Route path="/enrollment/students/search" element={<ProtectedRoute allowedRoles={["enrollment", "director"]}><StudentManagementPage /></ProtectedRoute>} />
+        <Route path="/enrollment/students/:id" element={<ProtectedRoute allowedRoles={["enrollment", "director"]}><EnrollmentPlaceholderPage title="Chi Tiết Học Viên" /></ProtectedRoute>} />
+        <Route path="/classes" element={<ProtectedRoute allowedRoles={["enrollment", "director", "teacher"]}><ClassTrackingPage /></ProtectedRoute>} />
+        <Route path="/enrollment/classes" element={<ProtectedRoute allowedRoles={["enrollment", "director"]}><ClassTrackingPage /></ProtectedRoute>} />
+        <Route path="/enrollment/classes/:id" element={<ProtectedRoute allowedRoles={["enrollment", "director"]}><EnrollmentPlaceholderPage title="Chi Tiết Lớp Học" /></ProtectedRoute>} />
+        <Route path="/enrollment/requests" element={<ProtectedRoute allowedRoles={["enrollment", "director"]}><RequestManagementPage /></ProtectedRoute>} />
+        <Route path="/enrollment/notifications" element={<ProtectedRoute allowedRoles={["enrollment", "director"]}><NotificationsPage /></ProtectedRoute>} />
+        <Route path="/enrollment/reports" element={<ProtectedRoute allowedRoles={["enrollment", "director"]}><StatisticsPage /></ProtectedRoute>} />
 
         {/* Root Redirect */}
         <Route path="/" element={<Navigate to="/dashboard" replace />} />

@@ -1,5 +1,4 @@
 const Student = require("../../../shared/models/Student.model");
-const User = require("../../../shared/models/User.model");
 const Class = require("../../../shared/models/Class.model");
 const Course = require("../../../shared/models/Course.model");
 const Request = require("../../../shared/models/Request.model");
@@ -55,7 +54,6 @@ exports.getDashboardStats = async (req, res) => {
 
     // Get recent students
     const recentStudents = await Student.find()
-      .populate("user", "fullName email phone")
       .sort({ createdAt: -1 })
       .limit(10);
 
@@ -98,10 +96,6 @@ exports.getDashboardStats = async (req, res) => {
  * @access  Private (enrollment staff)
  */
 exports.createStudent = async (req, res) => {
-  const mongoose = require("mongoose");
-  const session = await mongoose.startSession();
-  session.startTransaction();
-
   try {
     const {
       fullName,
@@ -115,8 +109,6 @@ exports.createStudent = async (req, res) => {
 
     // Validation
     if (!fullName || !phone) {
-      await session.abortTransaction();
-      session.endSession();
       return errorResponse(
         res,
         "Vui lòng điền đầy đủ họ tên và số điện thoại",
@@ -125,41 +117,26 @@ exports.createStudent = async (req, res) => {
     }
 
     // Check if phone already exists
-    const existingUser = await User.findOne({ phone }).session(session);
-    if (existingUser) {
-      await session.abortTransaction();
-      session.endSession();
+    const existingStudent = await Student.findOne({ phone });
+    if (existingStudent) {
       return errorResponse(res, "Số điện thoại đã được sử dụng", 400);
     }
 
     // Check if email exists (if provided)
     if (email) {
-      const existingEmail = await User.findOne({ email }).session(session);
+      const existingEmail = await Student.findOne({ email });
       if (existingEmail) {
-        await session.abortTransaction();
-        session.endSession();
         return errorResponse(res, "Email đã được sử dụng", 400);
       }
     }
 
-    // Create user account
-    const userData = {
+    // Create student
+    const studentProfile = {
       fullName,
       phone,
       email: email || undefined,
-      role: "student",
-      password: "123456", // Default password
+      password: "123456",
       isFirstLogin: true,
-    };
-
-    const userArr = await User.create([userData], { session });
-    const user = userArr[0];
-
-    // Create student profile
-    const studentProfile = {
-      user: user._id,
-      fullName: user.fullName,
-      email: user.email,
       dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : undefined,
       gender: gender || undefined,
       address: address || undefined,
@@ -167,16 +144,11 @@ exports.createStudent = async (req, res) => {
       academicStatus: "inactive", // Chưa ghi danh khóa học nào
     };
 
-    const studentArr = await Student.create([studentProfile], { session });
-    const student = studentArr[0];
-
-    await session.commitTransaction();
-    session.endSession();
+    const student = await Student.create(studentProfile);
 
     successResponse(
       res,
       {
-        user: user.getPublicProfile(),
         student,
         defaultPassword: "123456",
       },
@@ -184,8 +156,6 @@ exports.createStudent = async (req, res) => {
       201
     );
   } catch (error) {
-    await session.abortTransaction();
-    session.endSession();
     console.error("Create Student Error:", error);
     errorResponse(res, error.message, 500);
   }
@@ -221,7 +191,6 @@ exports.getAllStudents = async (req, res) => {
     const skip = (page - 1) * limit;
     const [students, total] = await Promise.all([
       Student.find(query)
-        .populate("user", "fullName email phone")
         .populate("enrolledCourses", "name courseCode")
         .sort(sort)
         .skip(skip)
@@ -256,7 +225,6 @@ exports.getAllStudents = async (req, res) => {
 exports.getStudentById = async (req, res) => {
   try {
     const student = await Student.findById(req.params.id)
-      .populate("user", "fullName email phone")
       .populate("enrolledCourses", "name courseCode duration")
       .populate("enrollmentHistory.class", "name startDate endDate");
 
@@ -315,14 +283,6 @@ exports.updateStudent = async (req, res) => {
     if (contactInfo) student.contactInfo = contactInfo;
 
     await student.save();
-
-    // Update user if needed
-    if (fullName || email) {
-      await User.findByIdAndUpdate(student.user, {
-        ...(fullName && { fullName }),
-        ...(email && { email }),
-      });
-    }
 
     successResponse(res, student, "Cập nhật thông tin học viên thành công");
   } catch (error) {

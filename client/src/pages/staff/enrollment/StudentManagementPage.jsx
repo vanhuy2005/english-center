@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Card,
@@ -48,7 +48,7 @@ const StudentManagementPage = () => {
   const fetchStudents = async () => {
     try {
       setLoading(true);
-      const response = await api.get("/api/staff/enrollment/students", {
+      const response = await api.get("/staff/enrollment/students", {
         params: {
           page: pagination.page,
           limit: pagination.limit,
@@ -56,9 +56,17 @@ const StudentManagementPage = () => {
         },
       });
 
-      const responseData = response.data.data || response.data;
-      setStudents(responseData.students || responseData);
-      if (response.data.pagination) {
+      console.log("API Response:", response);
+      console.log("Response data:", response.data);
+
+      const responseData = response.data?.data || response.data;
+      const studentsList = responseData?.students || responseData || [];
+      
+      console.log("Students list:", studentsList);
+      
+      setStudents(Array.isArray(studentsList) ? studentsList : []);
+      
+      if (response.data?.pagination) {
         setPagination((prev) => ({
           ...prev,
           ...response.data.pagination,
@@ -66,7 +74,9 @@ const StudentManagementPage = () => {
       }
     } catch (error) {
       console.error("Error fetching students:", error);
+      console.error("Error response:", error.response);
       toast.error("Không thể tải danh sách học viên");
+      setStudents([]);
     } finally {
       setLoading(false);
     }
@@ -83,10 +93,12 @@ const StudentManagementPage = () => {
   };
 
   const handleViewDetails = (student) => {
+    if (!student?._id) return;
     navigate(`/enrollment/students/${student._id}`);
   };
 
   const handleEnrollClick = (student) => {
+    if (!student) return;
     setSelectedStudent(student);
     setShowEnrollModal(true);
   };
@@ -127,9 +139,9 @@ const StudentManagementPage = () => {
           completed: { variant: "info", label: "Hoàn thành" },
           dropped: { variant: "danger", label: "Nghỉ học" },
         };
-        const config = statusConfig[student.academicStatus] || {
+        const config = statusConfig[student?.academicStatus] || {
           variant: "secondary",
-          label: student.academicStatus,
+          label: student?.academicStatus || "Chưa xác định",
         };
         return <Badge variant={config.variant}>{config.label}</Badge>;
       },
@@ -170,7 +182,7 @@ const StudentManagementPage = () => {
             <Eye className="w-4 h-4 mr-1 inline" />
             Chi tiết
           </Button>
-          {student.academicStatus !== "active" && (
+          {student?.academicStatus !== "active" && (
             <Button
               size="small"
               variant="success"
@@ -264,7 +276,7 @@ const StudentManagementPage = () => {
         <Card className="bg-gradient-to-br from-green-50 to-green-100">
           <div className="text-center">
             <p className="text-2xl font-bold text-green-600">
-              {students.filter((s) => s.academicStatus === "active").length}
+              {students.filter((s) => s?.academicStatus === "active").length}
             </p>
             <p className="text-sm text-gray-600">Đang học</p>
           </div>
@@ -272,7 +284,7 @@ const StudentManagementPage = () => {
         <Card className="bg-gradient-to-br from-yellow-50 to-yellow-100">
           <div className="text-center">
             <p className="text-2xl font-bold text-yellow-600">
-              {students.filter((s) => s.academicStatus === "paused").length}
+              {students.filter((s) => s?.academicStatus === "paused").length}
             </p>
             <p className="text-sm text-gray-600">Bảo lưu</p>
           </div>
@@ -280,7 +292,7 @@ const StudentManagementPage = () => {
         <Card className="bg-gradient-to-br from-gray-50 to-gray-100">
           <div className="text-center">
             <p className="text-2xl font-bold text-gray-600">
-              {students.filter((s) => s.academicStatus === "inactive").length}
+              {students.filter((s) => s?.academicStatus === "inactive").length}
             </p>
             <p className="text-sm text-gray-600">Chưa ghi danh</p>
           </div>

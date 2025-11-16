@@ -3,7 +3,7 @@ import toast from "react-hot-toast";
 
 // Create axios instance
 const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:3000",
+  baseURL: (import.meta.env.VITE_API_BASE_URL || "http://localhost:5000") + "/api",
   timeout: 30000,
   headers: {
     "Content-Type": "application/json",
@@ -23,9 +23,9 @@ apiClient.interceptors.request.use(
   (config) => {
     // SKIP TOKEN for public endpoints (login, register, refresh-token)
     const publicEndpoints = [
-      "/api/auth/login",
-      "/api/auth/register",
-      "/api/auth/refresh-token",
+      "/auth/login",
+      "/auth/register",
+      "/auth/refresh-token",
     ];
     const isPublicEndpoint = publicEndpoints.some((endpoint) =>
       config.url?.includes(endpoint)
@@ -55,7 +55,7 @@ apiClient.interceptors.response.use(
     // Handle errors globally
     if (error.response) {
       const { status, data } = error.response;
-      const isAuthEndpoint = error.config?.url?.includes("/api/auth/");
+      const isAuthEndpoint = error.config?.url?.includes("/auth/");
 
       switch (status) {
         case 401:

@@ -40,10 +40,10 @@ const AccountantDashboardPage = () => {
   const loadDashboard = async () => {
     try {
       setLoading(true);
-      const response = await api.get("/api/staff/accountant/dashboard");
+      const response = await api.get("/staff/accountant/dashboard");
 
-      if (response.data.success) {
-        setDashboardData(response.data.data);
+      if (response.success) {
+        setDashboardData(response.data);
       } else {
         console.error("API returned success=false:", response.data);
         setDashboardData({

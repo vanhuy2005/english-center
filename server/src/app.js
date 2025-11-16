@@ -38,6 +38,8 @@ app.use(
 );
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+const path = require("path");
+app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
 // Async initialization for DB connection
 async function initApp() {
@@ -55,9 +57,17 @@ app.get("/health", (req, res) => {
   res.json({ status: "OK", message: "Server is running" });
 });
 
+// Create uploads directory if not exists
+const fs = require("fs");
+const uploadsDir = path.join(__dirname, "../uploads/avatars");
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
 // Module Routes
 app.use("/api/auth", require("./modules/auth/auth.routes"));
 app.use("/api/students", require("./modules/student/student.routes"));
+app.use("/api/student/requests", require("./modules/student/request.routes"));
 app.use("/api/teachers", require("./modules/teacher/teacher.routes"));
 app.use("/api/courses", require("./modules/course/course.routes"));
 app.use("/api/classes", require("./modules/class/class.routes"));
@@ -78,6 +88,10 @@ app.use(
 app.use(
   "/api/staff/academic",
   require("./modules/staff/academic/academic.routes")
+);
+app.use(
+  "/api/staff/academic/requests",
+  require("./modules/staff/academic/request.routes")
 );
 app.use(
   "/api/staff/accountant",

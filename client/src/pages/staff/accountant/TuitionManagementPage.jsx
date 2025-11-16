@@ -22,27 +22,29 @@ const TuitionManagementPage = () => {
 
   const loadClasses = async () => {
     try {
-      const response = await api.get("/api/classes");
-      if (response.data.success) {
-        setClasses(response.data.data.classes || response.data.data);
+      const response = await api.get("/classes");
+      if (response.success) {
+        setClasses(response.data?.classes || response.data || []);
       }
     } catch (error) {
       console.error("Error loading classes:", error);
+      setClasses([]);
     }
   };
 
   const loadTuitionFees = async () => {
     try {
       setLoading(true);
-      const response = await api.get("/api/staff/accountant/tuition", {
+      const response = await api.get("/staff/accountant/tuition", {
         params: filters,
       });
 
-      if (response.data.success) {
-        setTuitionFees(response.data.data.tuitionFees);
+      if (response.success) {
+        setTuitionFees(response.data?.tuitionFees || []);
       }
     } catch (error) {
       console.error("Error loading tuition fees:", error);
+      setTuitionFees([]);
     } finally {
       setLoading(false);
     }

@@ -40,6 +40,16 @@ router.post(
   studentController.createRequest
 );
 
+// Upload avatar (current student only)
+const multer = require("multer");
+const upload = multer({ dest: "uploads/avatars/" });
+router.post(
+  "/me/avatar",
+  authorize("student"),
+  upload.single("avatar"),
+  studentController.uploadAvatar
+);
+
 // Get all students (director, staff)
 router.get(
   "/",

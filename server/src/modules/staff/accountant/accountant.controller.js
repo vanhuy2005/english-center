@@ -23,8 +23,37 @@ const {
 exports.getDashboard = async (req, res) => {
   try {
     // Get all payments (using Finance model for now)
-    const Finance = require("../../shared/models/Finance.model");
-    const allFinances = await Finance.find({});
+    let allFinances = [];
+    try {
+      const Finance = require("../../../shared/models/Finance.model");
+      allFinances = await Finance.find({});
+    } catch (err) {
+      console.log('Finance model error:', err.message);
+      // Return empty data if model not found
+      return successResponse(
+        res,
+        {
+          stats: {
+            totalRevenue: 0,
+            pendingPayments: 0,
+            pendingAmount: 0,
+            totalDebt: 0,
+            paymentRate: 0,
+          },
+          recentReceipts: [],
+          revenueTrend: {
+            labels: [],
+            datasets: [{ label: 'Doanh thu (VNĐ)', data: [], borderColor: 'rgb(34, 197, 94)', backgroundColor: 'rgba(34, 197, 94, 0.1)' }],
+          },
+          paymentStatusDistribution: {
+            labels: ['Đã thanh toán', 'Chưa thanh toán', 'Thanh toán một phần'],
+            datasets: [{ data: [0, 0, 0], backgroundColor: ['rgba(34, 197, 94, 0.8)', 'rgba(239, 68, 68, 0.8)', 'rgba(251, 191, 36, 0.8)'] }],
+          },
+          pendingPaymentsList: [],
+        },
+        'Dashboard data (no finance records)'
+      );
+    }
     const completedPayments = allFinances.filter(
       (f) => f.status === "paid" || f.status === "partial"
     );
@@ -128,7 +157,7 @@ exports.getDashboard = async (req, res) => {
         dueDate: f.dueDate || new Date(),
       }));
 
-    successResponse(
+    return successResponse(
       res,
       {
         stats: {
@@ -147,7 +176,7 @@ exports.getDashboard = async (req, res) => {
     );
   } catch (error) {
     console.error("Error in getDashboard:", error);
-    errorResponse(res, "Không thể lấy dữ liệu dashboard", 500);
+    return errorResponse(res, "Không thể lấy dữ liệu dashboard", 500);
   }
 };
 

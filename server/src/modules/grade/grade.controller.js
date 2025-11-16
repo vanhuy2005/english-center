@@ -500,3 +500,32 @@ exports.bulkImportGrades = async (req, res) => {
     });
   }
 };
+
+/**
+ * @desc    Get my grades (for students)
+ * @route   GET /api/grades/me
+ * @access  Private (student)
+ */
+exports.getMyGrades = async (req, res) => {
+  try {
+    const studentId = req.user._id;
+
+    const grades = await Grade.find({ student: studentId, isPublished: true })
+      .populate("class", "className classCode")
+      .populate("course", "name courseCode level")
+      .populate("gradedBy", "fullName")
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      data: grades,
+    });
+  } catch (error) {
+    console.error("Error fetching my grades:", error);
+    res.status(500).json({
+      success: false,
+      message: "Lỗi khi lấy điểm số",
+      error: error.message,
+    });
+  }
+};

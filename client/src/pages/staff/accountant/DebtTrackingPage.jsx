@@ -16,13 +16,14 @@ const DebtTrackingPage = () => {
   const loadDebtors = async () => {
     try {
       setLoading(true);
-      const response = await api.get("/api/staff/accountant/reports/debt");
+      const response = await api.get("/staff/accountant/reports/debt");
 
-      if (response.data.success) {
-        setDebtors(response.data.data.debtors);
+      if (response.success) {
+        setDebtors(response.data?.debtors || []);
       }
     } catch (error) {
       console.error("Error loading debtors:", error);
+      setDebtors([]);
     } finally {
       setLoading(false);
     }

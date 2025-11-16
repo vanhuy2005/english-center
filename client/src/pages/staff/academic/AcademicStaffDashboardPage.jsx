@@ -42,7 +42,7 @@ const AcademicStaffDashboardPage = () => {
   const loadDashboard = async () => {
     try {
       setLoading(true);
-      const response = await api.get("/api/staff/academic/dashboard");
+      const response = await api.get("/staff/academic/dashboard");
 
       if (response.data.success) {
         setDashboardData(response.data.data);

@@ -1,170 +1,98 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
+import { Award } from "lucide-react";
+import { Card, Button, Badge, Loading, Table } from "@components/common";
 import api from "@services/api";
-import { Card, Loading, Table, Badge, Button } from "@components/common";
-import { FileCheck, Search, Filter } from "lucide-react";
+import { toast } from "react-hot-toast";
 
 const GradeManagementPage = () => {
-  const [loading, setLoading] = useState(true);
+  const [classes, setClasses] = useState([]);
+  const [selectedClass, setSelectedClass] = useState("");
   const [grades, setGrades] = useState([]);
-  const [filters, setFilters] = useState({
-    search: "",
-    classId: "",
-    status: "",
-  });
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadGrades();
-  }, [filters]);
+    fetchClasses();
+  }, []);
 
-  const loadGrades = async () => {
+  useEffect(() => {
+    if (selectedClass) fetchGrades();
+  }, [selectedClass]);
+
+  const fetchClasses = async () => {
     try {
-      setLoading(true);
-      const response = await api.get("/api/staff/academic/grades", {
-        params: filters,
-      });
-      if (response.data.success) {
-        setGrades(response.data.data || []);
-      }
+      const response = await api.get("/staff/academic/classes");
+      setClasses(response.data || []);
+      setLoading(false);
     } catch (error) {
-      console.error("Error:", error);
-    } finally {
+      toast.error("Không thể tải danh sách lớp");
       setLoading(false);
     }
   };
 
-  const handleUpdateGrade = async (gradeId, data) => {
+  const fetchGrades = async () => {
     try {
-      const response = await api.put(
-        `/api/staff/academic/grades/${gradeId}`,
-        data
-      );
-      if (response.data.success) {
-        alert("Cập nhật điểm thành công!");
-        loadGrades();
-      }
+      const response = await api.get(`/staff/academic/grades/${selectedClass}`);
+      setGrades(response.data || []);
     } catch (error) {
-      alert("Có lỗi xảy ra!");
+      setGrades([]);
+    }
+  };
+
+  const handleApprove = async (gradeId) => {
+    try {
+      await api.put(`/staff/academic/grades/${gradeId}/approve`);
+      toast.success("Đã phê duyệt điểm");
+      fetchGrades();
+    } catch (error) {
+      toast.error("Không thể phê duyệt điểm");
     }
   };
 
   const columns = [
-    {
-      key: "student",
-      label: "Học viên",
-      render: (row) => (
-        <div>
-          <p className="font-medium text-gray-900">
-            {row.studentId?.fullName || "N/A"}
-          </p>
-          <p className="text-sm text-gray-600">{row.studentId?.email}</p>
-        </div>
-      ),
-    },
-    {
-      key: "class",
-      label: "Lớp học",
-      render: (row) => row.classId?.name || "N/A",
-    },
-    {
-      key: "score",
-      label: "Điểm số",
-      render: (row) => (
-        <span className="text-lg font-bold text-blue-600">
-          {row.score || "N/A"}
-        </span>
-      ),
-    },
-    {
-      key: "status",
-      label: "Kết quả",
-      render: (row) => {
-        const statusConfig = {
-          passed: { variant: "success", label: "Đạt" },
-          failed: { variant: "danger", label: "Không đạt" },
-          pending: { variant: "warning", label: "Chờ duyệt" },
-        };
-        const config = statusConfig[row.status] || statusConfig.pending;
-        return <Badge variant={config.variant}>{config.label}</Badge>;
-      },
-    },
-    {
-      key: "updatedBy",
-      label: "Cập nhật bởi",
-      render: (row) => row.updatedBy?.fullName || "N/A",
-    },
-    {
-      key: "actions",
-      label: "Thao tác",
-      render: (row) => (
-        <div className="flex gap-2">
-          {row.status === "pending" && (
-            <>
-              <Button
-                size="sm"
-                onClick={() => handleUpdateGrade(row._id, { status: "passed" })}
-              >
-                Duyệt
-              </Button>
-              <Button
-                size="sm"
-                variant="danger"
-                onClick={() => handleUpdateGrade(row._id, { status: "failed" })}
-              >
-                Từ chối
-              </Button>
-            </>
-          )}
-        </div>
-      ),
-    },
+    { key: "studentCode", label: "Mã HV" },
+    { key: "fullName", label: "Họ và tên" },
+    { key: "midterm", label: "Giữa kỳ", render: (row) => row.midterm || "-" },
+    { key: "final", label: "Cuối kỳ", render: (row) => row.final || "-" },
+    { key: "average", label: "Trung bình", render: (row) => {
+      const avg = row.average || 0;
+      return <span className={avg >= 8 ? "text-green-600 font-semibold" : avg >= 5 ? "text-yellow-600" : "text-red-600"}>{avg.toFixed(1)}</span>;
+    }},
+    { key: "status", label: "Trạng thái", render: (row) => (
+      <Badge variant={row.status === "approved" ? "success" : "warning"}>
+        {row.status === "approved" ? "Đã duyệt" : "Chờ duyệt"}
+      </Badge>
+    )},
+    { key: "actions", label: "Thao tác", render: (row) => (
+      row.status === "pending" && <Button size="sm" onClick={() => handleApprove(row._id)}>Phê duyệt</Button>
+    )}
   ];
 
-  if (loading) return <Loading />;
+  if (loading) return <Loading fullScreen />;
 
   return (
-    <div className="space-y-6">
+    <div className="p-6 space-y-6">
       <div className="flex items-center gap-3">
-        <FileCheck className="text-green-600" size={32} />
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Quản Lý Điểm</h1>
-          <p className="text-gray-600 mt-1">Xem và duyệt điểm học viên</p>
-        </div>
+        <Award className="w-8 h-8 text-[#3B9797]" />
+        <h1 className="text-2xl font-bold text-gray-800">Quản lý điểm</h1>
       </div>
 
-      {/* Filters */}
       <Card>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="relative">
-            <Search
-              className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
-              size={18}
-            />
-            <input
-              type="text"
-              placeholder="Tìm kiếm học viên..."
-              value={filters.search}
-              onChange={(e) =>
-                setFilters({ ...filters, search: e.target.value })
-              }
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg"
-            />
-          </div>
+        <div className="mb-6">
           <select
-            value={filters.status}
-            onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-            className="px-4 py-2 border border-gray-300 rounded-lg"
+            value={selectedClass}
+            onChange={(e) => setSelectedClass(e.target.value)}
+            className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3B9797]"
           >
-            <option value="">Tất cả trạng thái</option>
-            <option value="passed">Đạt</option>
-            <option value="failed">Không đạt</option>
-            <option value="pending">Chờ duyệt</option>
+            <option value="">Chọn lớp học</option>
+            {classes.map((cls) => (
+              <option key={cls._id} value={cls._id}>{cls.name}</option>
+            ))}
           </select>
         </div>
-      </Card>
 
-      {/* Table */}
-      <Card>
-        <Table data={grades} columns={columns} />
+        {selectedClass ? <Table columns={columns} data={grades} /> : (
+          <div className="text-center py-12 text-gray-500">Vui lòng chọn lớp học</div>
+        )}
       </Card>
     </div>
   );

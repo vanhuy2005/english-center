@@ -1,6 +1,6 @@
 const Schedule = require("../../shared/models/Schedule.model");
 const Class = require("../../shared/models/Class.model");
-const Teacher = require("../../shared/models/Teacher.model");
+const Staff = require("../../shared/models/Staff.model");
 
 /**
  * @desc    Get all schedules with filters
@@ -141,7 +141,7 @@ exports.createSchedule = async (req, res) => {
 
     // Check if teacher exists
     if (scheduleTeacher) {
-      const teacherExists = await Teacher.findById(scheduleTeacher);
+      const teacherExists = await Staff.findOne({ _id: scheduleTeacher, staffType: "teacher" });
       if (!teacherExists) {
         return res.status(404).json({
           success: false,
@@ -463,6 +463,74 @@ exports.createRecurringSchedules = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Lỗi khi tạo lịch học định kỳ",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * @desc    Get my schedules (for students/teachers)
+ * @route   GET /api/schedules/me
+ * @access  Private (student, teacher)
+ */
+exports.getMySchedules = async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+    const userId = req.user._id;
+    const userRole = req.user.staffType || 'student';
+
+    let filter = {};
+
+    // Build filter based on role
+    if (userRole === 'teacher') {
+      filter.teacher = userId;
+    } else if (userRole === 'student') {
+      // Get student's enrolled classes
+      const Student = require("../../shared/models/Student.model");
+      const student = await Student.findById(userId).populate('enrolledCourses');
+      
+      if (!student || !student.enrolledCourses || student.enrolledCourses.length === 0) {
+        return res.status(200).json({
+          success: true,
+          data: [],
+          message: "Bạn chưa đăng ký khóa học nào"
+        });
+      }
+
+      // Get classes for enrolled courses
+      const Class = require("../../shared/models/Class.model");
+      const classes = await Class.find({ 
+        course: { $in: student.enrolledCourses }
+      }).select('_id');
+
+      filter.class = { $in: classes.map(c => c._id) };
+    }
+
+    // Date range filter
+    if (startDate || endDate) {
+      filter.date = {};
+      if (startDate) filter.date.$gte = new Date(startDate);
+      if (endDate) filter.date.$lte = new Date(endDate);
+    }
+
+    const schedules = await Schedule.find(filter)
+      .populate("class", "name classCode room")
+      .populate("teacher", "fullName")
+      .populate({
+        path: "class",
+        populate: { path: "course", select: "name courseCode" }
+      })
+      .sort({ date: 1, startTime: 1 });
+
+    res.status(200).json({
+      success: true,
+      data: schedules,
+    });
+  } catch (error) {
+    console.error("Get My Schedules Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Lỗi khi lấy lịch học",
       error: error.message,
     });
   }

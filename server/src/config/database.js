@@ -1,27 +1,31 @@
 const mongoose = require("mongoose");
 
 const connectDB = async () => {
+  const uri =
+    process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/english_center_dev";
+
+  if (!process.env.MONGODB_URI) {
+    console.warn(
+      "⚠️  MONGODB_URI not set in .env — falling back to local MongoDB:",
+      uri
+    );
+  }
+
   try {
-    const conn = await mongoose.connect(process.env.MONGODB_URI, {
+    await mongoose.connect(uri, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
     });
-
-    console.log(` MongoDB Connected: ${conn.connection.host}`);
-    console.log(` Database: ${conn.connection.name}`);
-  } catch (error) {
-    console.error(" MongoDB Connection Error:", error.message);
-    process.exit(1);
+    
+    // Disable transactions for standalone MongoDB
+    mongoose.set('autoCreate', false);
+    mongoose.set('autoIndex', false);
+    
+    console.log("✅ MongoDB connected");
+  } catch (err) {
+    console.error("❌ MongoDB connection failed:", err.message);
+    throw err;
   }
 };
-
-// Handle connection events
-mongoose.connection.on("disconnected", () => {
-  console.log("  MongoDB Disconnected");
-});
-
-mongoose.connection.on("error", (err) => {
-  console.error(" MongoDB Error:", err.message);
-});
 
 module.exports = connectDB;

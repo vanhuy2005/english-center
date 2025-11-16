@@ -9,6 +9,7 @@ const {
   getTeacherSchedule,
   getClassSchedule,
   createRecurringSchedules,
+  getMySchedules,
 } = require("./schedule.controller");
 const {
   protect,
@@ -18,6 +19,9 @@ const validateObjectId = require("../../shared/middleware/validateObjectId");
 
 // All routes require authentication
 router.use(protect);
+
+// Get my schedules (student/teacher)
+router.get("/me", getMySchedules);
 
 // Get all schedules & create new schedule
 router

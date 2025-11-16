@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Card, Button, Input, Table, Modal, Badge } from "@components/common";
 import { useAuth } from "@hooks";
-import axios from "axios";
+import apiClient from "@services/api";
 import toast from "react-hot-toast";
 
 const UserManagementPage = () => {
@@ -66,15 +66,13 @@ const UserManagementPage = () => {
         ...(filters.search && { search: filters.search }),
       });
 
-      const response = await axios.get(`/api/director/users?${params}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await apiClient.get(`/director/users?${params}`);
 
-      if (response.data.success) {
-        setUsers(response.data.data.users);
+      if (response.success) {
+        setUsers(response.data.users || []);
         setPagination((prev) => ({
           ...prev,
-          total: response.data.data.pagination.total,
+          total: response.data.pagination?.total || 0,
         }));
       }
     } catch (error) {
@@ -237,15 +235,14 @@ const UserManagementPage = () => {
         submitData.staffData.department = formData.staffDepartment.trim();
       }
 
-      const response = await axios.post("/api/director/users", submitData, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await apiClient.post("/director/users", submitData);
 
-      if (response.data.success) {
+      if (response.success) {
         toast.success(
           `Tạo tài khoản thành công! Mật khẩu mặc định: ${
-            response.data.data?.defaultPassword || "123456"
-          }`
+            response.data?.defaultPassword || "123456"
+          }`,
+          { duration: 4000 }
         );
         setShowCreateModal(false);
         resetForm();

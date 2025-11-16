@@ -1,195 +1,126 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
+import { ClipboardList, Check, X } from "lucide-react";
+import { Card, Button, Badge, Loading, Table, Modal } from "@components/common";
 import api from "@services/api";
-import { Card, Loading, Table, Badge, Button } from "@components/common";
-import { ClipboardList, CheckCircle, XCircle } from "lucide-react";
+import { toast } from "react-hot-toast";
 
 const RequestHandlingPage = () => {
-  const [loading, setLoading] = useState(true);
   const [requests, setRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedRequest, setSelectedRequest] = useState(null);
+  const [showModal, setShowModal] = useState(false);
+  const [action, setAction] = useState("");
+  const [stats, setStats] = useState({ pending: 0, approved: 0, rejected: 0 });
 
   useEffect(() => {
-    loadRequests();
+    fetchRequests();
   }, []);
 
-  const loadRequests = async () => {
+  const fetchRequests = async () => {
     try {
-      setLoading(true);
-      const response = await api.get("/api/staff/academic/requests");
-      if (response.data.success) {
-        setRequests(response.data.data || []);
-      }
+      const response = await api.get("/staff/academic/requests");
+      const data = response.data || [];
+      setRequests(data);
+      
+      const pending = data.filter(r => r.status === "pending").length;
+      const approved = data.filter(r => r.status === "approved").length;
+      const rejected = data.filter(r => r.status === "rejected").length;
+      
+      setStats({ pending, approved, rejected });
     } catch (error) {
-      console.error("Error:", error);
+      toast.error("Không thể tải danh sách yêu cầu");
+      setRequests([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleApprove = async (requestId) => {
-    if (!confirm("Xác nhận duyệt yêu cầu này?")) return;
-    try {
-      const response = await api.put(
-        `/api/staff/academic/requests/${requestId}/approve`
-      );
-      if (response.data.success) {
-        alert("Đã duyệt yêu cầu!");
-        loadRequests();
-      }
-    } catch (error) {
-      alert("Có lỗi xảy ra!");
-    }
+  const handleAction = (request, actionType) => {
+    setSelectedRequest(request);
+    setAction(actionType);
+    setShowModal(true);
   };
 
-  const handleReject = async (requestId) => {
-    const reason = prompt("Nhập lý do từ chối:");
-    if (!reason) return;
+  const confirmAction = async () => {
     try {
-      const response = await api.put(
-        `/api/staff/academic/requests/${requestId}/reject`,
-        {
-          rejectionReason: reason,
-        }
-      );
-      if (response.data.success) {
-        alert("Đã từ chối yêu cầu!");
-        loadRequests();
-      }
+      await api.put(`/staff/academic/requests/${selectedRequest._id}`, { status: action });
+      toast.success(`Đã ${action === "approved" ? "phê duyệt" : "từ chối"} yêu cầu`);
+      setShowModal(false);
+      fetchRequests();
     } catch (error) {
-      alert("Có lỗi xảy ra!");
+      toast.error("Không thể xử lý yêu cầu");
     }
   };
 
   const columns = [
-    {
-      key: "student",
-      label: "Học viên",
-      render: (row) => (
-        <div>
-          <p className="font-medium text-gray-900">
-            {row.studentId?.fullName || "N/A"}
-          </p>
-          <p className="text-sm text-gray-600">{row.studentId?.email}</p>
-        </div>
-      ),
-    },
-    {
-      key: "type",
-      label: "Loại yêu cầu",
-      render: (row) => {
-        const typeConfig = {
-          transfer: { label: "Chuyển lớp", color: "blue" },
-          defer: { label: "Bảo lưu", color: "orange" },
-          leave: { label: "Nghỉ học", color: "red" },
-        };
-        const config = typeConfig[row.type] || {
-          label: row.type,
-          color: "gray",
-        };
-        return <Badge variant={config.color}>{config.label}</Badge>;
-      },
-    },
-    {
-      key: "reason",
-      label: "Lý do",
-      render: (row) => (
-        <p className="text-gray-700 max-w-xs truncate">{row.reason}</p>
-      ),
-    },
-    {
-      key: "status",
-      label: "Trạng thái",
-      render: (row) => {
-        const statusConfig = {
-          pending: { variant: "warning", label: "Chờ duyệt" },
-          approved: { variant: "success", label: "Đã duyệt" },
-          rejected: { variant: "danger", label: "Từ chối" },
-        };
-        const config = statusConfig[row.status] || statusConfig.pending;
-        return <Badge variant={config.variant}>{config.label}</Badge>;
-      },
-    },
-    {
-      key: "createdAt",
-      label: "Ngày gửi",
-      render: (row) => new Date(row.createdAt).toLocaleDateString("vi-VN"),
-    },
-    {
-      key: "actions",
-      label: "Thao tác",
-      render: (row) => (
+    { key: "studentCode", label: "Mã HV", render: (row) => row.student?.studentCode || "N/A" },
+    { key: "studentName", label: "Học viên", render: (row) => row.student?.fullName || "N/A" },
+    { key: "type", label: "Loại", render: (row) => (
+      <Badge variant="info">{row.type === "leave" ? "Nghỉ học" : row.type === "makeup" ? "Học bù" : "Chuyển lớp"}</Badge>
+    )},
+    { key: "reason", label: "Lý do" },
+    { key: "status", label: "Trạng thái", render: (row) => (
+      <Badge variant={row.status === "approved" ? "success" : row.status === "rejected" ? "danger" : "warning"}>
+        {row.status === "approved" ? "Đã duyệt" : row.status === "rejected" ? "Từ chối" : "Chờ duyệt"}
+      </Badge>
+    )},
+    { key: "actions", label: "Thao tác", render: (row) => (
+      row.status === "pending" && (
         <div className="flex gap-2">
-          {row.status === "pending" && (
-            <>
-              <Button
-                size="sm"
-                onClick={() => handleApprove(row._id)}
-                className="flex items-center gap-1"
-              >
-                <CheckCircle size={16} />
-                Duyệt
-              </Button>
-              <Button
-                size="sm"
-                variant="danger"
-                onClick={() => handleReject(row._id)}
-                className="flex items-center gap-1"
-              >
-                <XCircle size={16} />
-                Từ chối
-              </Button>
-            </>
-          )}
+          <Button size="sm" onClick={() => handleAction(row, "approved")} className="bg-green-600 hover:bg-green-700">
+            <Check className="w-4 h-4" />
+          </Button>
+          <Button size="sm" variant="danger" onClick={() => handleAction(row, "rejected")}>
+            <X className="w-4 h-4" />
+          </Button>
         </div>
-      ),
-    },
+      )
+    )}
   ];
 
-  if (loading) return <Loading />;
+  if (loading) return <Loading fullScreen />;
 
   return (
-    <div className="space-y-6">
+    <div className="p-6 space-y-6">
       <div className="flex items-center gap-3">
-        <ClipboardList className="text-purple-600" size={32} />
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Xử Lý Yêu Cầu</h1>
-          <p className="text-gray-600 mt-1">
-            Duyệt yêu cầu chuyển lớp, bảo lưu của học viên
-          </p>
-        </div>
+        <ClipboardList className="w-8 h-8 text-[#3B9797]" />
+        <h1 className="text-2xl font-bold text-gray-800">Xử lý yêu cầu</h1>
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="bg-yellow-50">
-          <div className="text-center">
-            <p className="text-sm text-yellow-600 font-medium">Chờ xử lý</p>
-            <p className="text-2xl font-bold text-yellow-900 mt-1">
-              {requests.filter((r) => r.status === "pending").length}
-            </p>
+        <Card className="bg-gradient-to-br from-yellow-500 to-yellow-600 text-white">
+          <div>
+            <p className="text-sm opacity-90">Chờ xử lý</p>
+            <p className="text-3xl font-bold mt-1">{stats.pending}</p>
           </div>
         </Card>
-        <Card className="bg-green-50">
-          <div className="text-center">
-            <p className="text-sm text-green-600 font-medium">Đã duyệt</p>
-            <p className="text-2xl font-bold text-green-900 mt-1">
-              {requests.filter((r) => r.status === "approved").length}
-            </p>
+        <Card className="bg-gradient-to-br from-green-500 to-green-600 text-white">
+          <div>
+            <p className="text-sm opacity-90">Đã phê duyệt</p>
+            <p className="text-3xl font-bold mt-1">{stats.approved}</p>
           </div>
         </Card>
-        <Card className="bg-red-50">
-          <div className="text-center">
-            <p className="text-sm text-red-600 font-medium">Từ chối</p>
-            <p className="text-2xl font-bold text-red-900 mt-1">
-              {requests.filter((r) => r.status === "rejected").length}
-            </p>
+        <Card className="bg-gradient-to-br from-red-500 to-red-600 text-white">
+          <div>
+            <p className="text-sm opacity-90">Đã từ chối</p>
+            <p className="text-3xl font-bold mt-1">{stats.rejected}</p>
           </div>
         </Card>
       </div>
 
-      {/* Table */}
       <Card>
-        <Table data={requests} columns={columns} />
+        <Table columns={columns} data={requests} />
       </Card>
+
+      <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="Xác nhận">
+        <div className="space-y-4">
+          <p>Bạn có chắc chắn muốn {action === "approved" ? "phê duyệt" : "từ chối"} yêu cầu này?</p>
+          <div className="flex gap-2 justify-end">
+            <Button variant="outline" onClick={() => setShowModal(false)}>Hủy</Button>
+            <Button onClick={confirmAction} className={action === "approved" ? "bg-green-600" : "bg-red-600"}>Xác nhận</Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

@@ -33,9 +33,9 @@ const NotificationsPage = () => {
 
   const markAsRead = async (id) => {
     try {
-      await notificationService.markAsRead(id);
+      await notificationService.markAsRead([id]);
       setNotifications(
-        notifications.map((n) => (n._id === id ? { ...n, read: true } : n))
+        notifications.map((n) => (n._id === id ? { ...n, isRead: true } : n))
       );
       toast.success("Đã đánh dấu là đã đọc!");
     } catch (error) {
@@ -46,7 +46,7 @@ const NotificationsPage = () => {
   const markAllAsRead = async () => {
     try {
       await notificationService.markAllAsRead();
-      setNotifications(notifications.map((n) => ({ ...n, read: true })));
+      setNotifications(notifications.map((n) => ({ ...n, isRead: true })));
       toast.success("Đã đánh dấu tất cả là đã đọc!");
     } catch (error) {
       toast.error("Không thể cập nhật!");
@@ -67,12 +67,12 @@ const NotificationsPage = () => {
   };
 
   const filteredNotifications = notifications.filter((n) => {
-    if (filter === "unread") return !n.read;
-    if (filter === "read") return n.read;
+    if (filter === "unread") return !n.isRead;
+    if (filter === "read") return n.isRead;
     return true;
   });
 
-  const unreadCount = notifications.filter((n) => !n.read).length;
+  const unreadCount = notifications.filter((n) => !n.isRead).length;
 
   if (loading) {
     return (
@@ -153,11 +153,11 @@ const NotificationsPage = () => {
             <Card
               key={notification._id}
               className={`${
-                !notification.read
+                !notification.isRead
                   ? "border-l-4 border-l-blue-600 bg-blue-50"
                   : "hover:shadow-md"
               } transition-shadow cursor-pointer`}
-              onClick={() => !notification.read && markAsRead(notification._id)}
+              onClick={() => !notification.isRead && markAsRead(notification._id)}
             >
               <CardContent className="p-6">
                 <div className="flex items-start gap-4">
@@ -172,7 +172,7 @@ const NotificationsPage = () => {
                       <h3 className="font-semibold text-gray-900 text-lg">
                         {notification.title}
                       </h3>
-                      {!notification.read && (
+                      {!notification.isRead && (
                         <Badge className="bg-red-500 hover:bg-red-600 flex-shrink-0">
                           Mới
                         </Badge>

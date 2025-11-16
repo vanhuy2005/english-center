@@ -9,6 +9,13 @@ const {
 // All routes require authentication
 router.use(protect);
 
+// Get my payments (student)
+router.get(
+  "/me/payments",
+  authorize("student"),
+  financeController.getMyPayments
+);
+
 // Get overview (director, accountant)
 router.get(
   "/overview",

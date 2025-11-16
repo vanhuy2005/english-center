@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { financeService } from "../../services";
 import { DataGrid } from "@mui/x-data-grid";
 import {
@@ -28,8 +29,11 @@ import {
 import toast from "react-hot-toast";
 
 const TuitionPage = () => {
+  const navigate = useNavigate();
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [selectedPayment, setSelectedPayment] = useState(null);
   const [stats, setStats] = useState({
     totalPaid: 0,
     totalPending: 0,
@@ -184,9 +188,18 @@ const TuitionPage = () => {
   return (
     <div className="p-8">
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Học Phí</h1>
-        <p className="text-gray-600">Theo dõi và quản lý học phí của bạn</p>
+      <div className="mb-8 flex items-center justify-between">
+        <div>
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">Lịch Sử Thanh Toán</h1>
+          <p className="text-lg text-gray-600">Danh sách chi tiết các khoản thanh toán</p>
+        </div>
+        <button
+          onClick={() => setShowPaymentModal(true)}
+          className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center gap-2"
+        >
+          <DollarSign className="w-5 h-5" />
+          Thanh toán
+        </button>
       </div>
 
       {/* Stats Cards */}
@@ -392,6 +405,91 @@ const TuitionPage = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Payment Modal */}
+      {showPaymentModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-2xl w-full p-6 max-h-[80vh] overflow-y-auto">
+            <h3 className="text-2xl font-bold text-gray-900 mb-4">
+              Chọn khóa học cần thanh toán
+            </h3>
+            <p className="text-gray-600 mb-6">
+              Vui lòng chọn khóa học bạn muốn thanh toán học phí
+            </p>
+            
+            <div className="space-y-3 mb-6">
+              {payments
+                .filter(p => p.status === 'pending' || p.remainingAmount > 0)
+                .map((payment) => (
+                  <div
+                    key={payment._id}
+                    onClick={() => setSelectedPayment(payment)}
+                    className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                      selectedPayment?._id === payment._id
+                        ? 'border-blue-600 bg-blue-50'
+                        : 'border-gray-200 hover:border-blue-300'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-lg text-gray-900">
+                          {payment.course?.name || 'Khóa học'}
+                        </h4>
+                        <p className="text-sm text-gray-600 mt-1">
+                          Mã: {payment.course?.courseCode || 'N/A'}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xl font-bold text-red-600">
+                          {formatCurrency(payment.remainingAmount || payment.amount)}
+                        </p>
+                        <p className="text-sm text-gray-500 mt-1">
+                          Còn nợ
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              
+              {payments.filter(p => p.status === 'pending' || p.remainingAmount > 0).length === 0 && (
+                <div className="text-center py-8 text-gray-500">
+                  <CheckCircle className="w-16 h-16 mx-auto mb-4 text-green-500" />
+                  <p className="text-lg">Bạn đã thanh toán hết tất cả học phí!</p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowPaymentModal(false);
+                  setSelectedPayment(null);
+                }}
+                className="flex-1 px-4 py-3 border-2 border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 transition-all"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={() => {
+                  if (selectedPayment) {
+                    navigate(`/student/payment/${selectedPayment._id}`);
+                  } else {
+                    toast.error('Vui lòng chọn khóa học!');
+                  }
+                }}
+                disabled={!selectedPayment}
+                className={`flex-1 px-4 py-3 font-semibold rounded-lg transition-all ${
+                  selectedPayment
+                    ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                }`}
+              >
+                Tiếp tục thanh toán
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

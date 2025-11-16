@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth, useLanguage } from "@hooks";
 import { Button, Input, Card, Modal } from "@components/common";
+import apiClient from "@services/api";
 
 const LoginPage = () => {
   const navigate = useNavigate();
@@ -18,6 +19,18 @@ const LoginPage = () => {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
+  const getRoleDashboard = (role) => {
+    const dashboards = {
+      director: "/director/dashboard",
+      academic: "/staff/academic/dashboard",
+      accountant: "/staff/accountant/dashboard",
+      enrollment: "/staff/enrollment/dashboard",
+      teacher: "/teacher/dashboard",
+      student: "/student/dashboard",
+    };
+    return dashboards[role] || "/dashboard";
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -29,7 +42,8 @@ const LoginPage = () => {
         if (result.user?.isFirstLogin) {
           setShowChangePassword(true);
         } else {
-          navigate("/dashboard");
+          const dashboardPath = getRoleDashboard(result.user?.role);
+          navigate(dashboardPath);
         }
       } else {
         setError(result.error || "Đăng nhập thất bại");
@@ -55,22 +69,16 @@ const LoginPage = () => {
     setLoading(true);
     setError("");
     try {
-      const response = await fetch("/api/auth/change-password", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-        body: JSON.stringify({
-          newPassword,
-          isFirstLogin: true,
-        }),
+      const data = await apiClient.put("/auth/change-password", {
+        newPassword,
+        isFirstLogin: true,
       });
 
-      const data = await response.json();
       if (data.success) {
         setShowChangePassword(false);
-        navigate("/dashboard");
+        const userRole = JSON.parse(localStorage.getItem("user"))?.role || localStorage.getItem("role");
+        const dashboardPath = getRoleDashboard(userRole);
+        navigate(dashboardPath);
       } else {
         setError(data.message || "Đổi mật khẩu thất bại");
       }

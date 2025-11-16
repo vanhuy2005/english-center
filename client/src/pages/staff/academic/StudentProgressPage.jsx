@@ -1,100 +1,128 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { Users, Search, TrendingUp, AlertTriangle, CheckCircle } from "lucide-react";
+import { Card, Button, Badge, Loading, Input, Table } from "@components/common";
 import api from "@services/api";
-import { Card, Loading, Badge } from "@components/common";
-import { Users, TrendingUp, CheckCircle, XCircle } from "lucide-react";
-import { LineChart, DoughnutChart } from "@components/charts";
+import { toast } from "react-hot-toast";
 
 const StudentProgressPage = () => {
-  const navigate = useNavigate();
-  const [loading, setLoading] = useState(true);
   const [students, setStudents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [stats, setStats] = useState({ good: 0, warning: 0, danger: 0, total: 0 });
 
   useEffect(() => {
-    loadProgress();
+    fetchStudents();
   }, []);
 
-  const loadProgress = async () => {
+  const fetchStudents = async () => {
     try {
-      setLoading(true);
-      const response = await api.get("/api/staff/academic/students/progress");
-      if (response.data.success) {
-        setStudents(response.data.data || []);
-      }
+      const response = await api.get("/staff/academic/students/progress");
+      const data = response.data || [];
+      setStudents(data);
+      
+      const good = data.filter(s => s.average >= 8 && s.attendanceRate >= 80).length;
+      const warning = data.filter(s => (s.average >= 5 && s.average < 8) || (s.attendanceRate >= 60 && s.attendanceRate < 80)).length;
+      const danger = data.filter(s => s.average < 5 || s.attendanceRate < 60).length;
+      
+      setStats({ good, warning, danger, total: data.length });
     } catch (error) {
-      console.error("Error:", error);
+      toast.error("Không thể tải dữ liệu học viên");
+      setStudents([]);
     } finally {
       setLoading(false);
     }
   };
 
-  if (loading) return <Loading />;
+  const filteredStudents = students.filter((student) =>
+    student.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    student.studentCode?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const columns = [
+    { key: "studentCode", label: "Mã HV" },
+    { key: "fullName", label: "Họ và tên" },
+    { key: "class", label: "Lớp", render: (row) => row.class?.name || "N/A" },
+    { key: "attendanceRate", label: "Điểm danh", render: (row) => (
+      <span className={row.attendanceRate >= 80 ? "text-green-600" : row.attendanceRate >= 60 ? "text-yellow-600" : "text-red-600"}>
+        {row.attendanceRate}%
+      </span>
+    )},
+    { key: "average", label: "Điểm TB", render: (row) => (
+      <span className={row.average >= 8 ? "text-green-600 font-semibold" : row.average >= 5 ? "text-yellow-600" : "text-red-600"}>
+        {row.average?.toFixed(1) || "0.0"}
+      </span>
+    )},
+    { key: "status", label: "Trạng thái", render: (row) => {
+      const isGood = row.average >= 8 && row.attendanceRate >= 80;
+      const isDanger = row.average < 5 || row.attendanceRate < 60;
+      return (
+        <Badge variant={isGood ? "success" : isDanger ? "danger" : "warning"}>
+          {isGood ? "Tốt" : isDanger ? "Cần cải thiện" : "Trung bình"}
+        </Badge>
+      );
+    }},
+    { key: "actions", label: "Thao tác", render: () => <Button size="sm" variant="outline">Chi tiết</Button> }
+  ];
+
+  if (loading) return <Loading fullScreen />;
 
   return (
-    <div className="space-y-6">
+    <div className="p-6 space-y-6">
       <div className="flex items-center gap-3">
-        <TrendingUp className="text-blue-600" size={32} />
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Tiến Độ Học Viên</h1>
-          <p className="text-gray-600 mt-1">
-            Theo dõi tiến độ học tập của học viên
-          </p>
-        </div>
+        <Users className="w-8 h-8 text-[#3B9797]" />
+        <h1 className="text-2xl font-bold text-gray-800">Theo dõi tiến độ học viên</h1>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {students.map((student) => (
-          <Card
-            key={student._id}
-            className="hover:shadow-lg transition-shadow cursor-pointer"
-            onClick={() => navigate(`/academic/students/${student._id}`)}
-          >
-            <div className="space-y-4">
-              {/* Student Info */}
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                  <Users className="text-blue-600" size={24} />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900">
-                    {student.fullName}
-                  </h3>
-                  <p className="text-sm text-gray-600">{student.email}</p>
-                </div>
-              </div>
-
-              {/* Progress */}
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Điểm trung bình</span>
-                  <span className="text-lg font-bold text-blue-600">
-                    {student.averageGrade?.toFixed(1) || "N/A"}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Điểm danh</span>
-                  <span className="text-lg font-bold text-green-600">
-                    {student.attendanceRate?.toFixed(0) || 0}%
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Số lớp</span>
-                  <span className="text-lg font-bold text-gray-900">
-                    {student.classCount || 0}
-                  </span>
-                </div>
-              </div>
-
-              {/* Status */}
-              {student.attendanceRate < 80 ? (
-                <Badge variant="danger">Điểm danh thấp</Badge>
-              ) : (
-                <Badge variant="success">Tốt</Badge>
-              )}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card className="bg-gradient-to-br from-green-500 to-green-600 text-white">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm opacity-90">Học tốt</p>
+              <p className="text-3xl font-bold mt-1">{stats.good}</p>
             </div>
-          </Card>
-        ))}
+            <CheckCircle className="w-12 h-12 opacity-80" />
+          </div>
+        </Card>
+        <Card className="bg-gradient-to-br from-yellow-500 to-yellow-600 text-white">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm opacity-90">Cần chú ý</p>
+              <p className="text-3xl font-bold mt-1">{stats.warning}</p>
+            </div>
+            <AlertTriangle className="w-12 h-12 opacity-80" />
+          </div>
+        </Card>
+        <Card className="bg-gradient-to-br from-red-500 to-red-600 text-white">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm opacity-90">Cần cải thiện</p>
+              <p className="text-3xl font-bold mt-1">{stats.danger}</p>
+            </div>
+            <TrendingUp className="w-12 h-12 opacity-80" />
+          </div>
+        </Card>
+        <Card className="bg-gradient-to-br from-[#132440] to-[#16476A] text-white">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm opacity-90">Tổng học viên</p>
+              <p className="text-3xl font-bold mt-1">{stats.total}</p>
+            </div>
+            <Users className="w-12 h-12 opacity-80" />
+          </div>
+        </Card>
       </div>
+
+      <Card>
+        <div className="mb-4">
+          <Input
+            placeholder="Tìm kiếm học viên..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            icon={<Search className="w-4 h-4" />}
+          />
+        </div>
+        <Table columns={columns} data={filteredStudents} />
+      </Card>
     </div>
   );
 };

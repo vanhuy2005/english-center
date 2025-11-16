@@ -26,6 +26,7 @@ export const Badge = ({
     danger: "bg-danger/10 text-danger",
     info: "bg-blue-100 text-blue-800",
     secondary: "bg-secondary/10 text-secondary",
+    default: "bg-gray-100 text-gray-800",
   };
 
   const sizes = {

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, Button, Badge, Loading, Input } from "@components/common";
 import {
   School,
@@ -9,7 +9,7 @@ import {
   BookOpen,
   BarChart3,
 } from "lucide-react";
-import { api } from "@services";
+import api from "@services/api";
 import { useNavigate } from "react-router-dom";
 
 const ClassTrackingPage = () => {
@@ -36,11 +36,12 @@ const ClassTrackingPage = () => {
       if (filters.courseId) params.append("courseId", filters.courseId);
       if (filters.status) params.append("status", filters.status);
 
-      const response = await api.get(`/api/staff/enrollment/classes?${params}`);
+      const response = await api.get(`/staff/enrollment/classes?${params}`);
       const responseData = response.data.data || response.data;
-      setClasses(responseData);
+      setClasses(Array.isArray(responseData) ? responseData : []);
     } catch (error) {
       console.error("Error fetching classes:", error);
+      setClasses([]);
     } finally {
       setLoading(false);
     }
@@ -48,10 +49,11 @@ const ClassTrackingPage = () => {
 
   const fetchCourses = async () => {
     try {
-      const response = await api.get("/api/courses");
-      setCourses(response.data);
+      const response = await api.get("/courses");
+      setCourses(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.error("Error fetching courses:", error);
+      setCourses([]);
     }
   };
 
