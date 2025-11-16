@@ -40,7 +40,6 @@ exports.getAllCourses = async (req, res) => {
 
     // Execute query
     const courses = await Course.find(query)
-      .populate("classes", "className")
       .sort({ [sortBy]: sortOrder === "desc" ? -1 : 1 })
       .skip((page - 1) * pageSize)
       .limit(parseInt(pageSize));
@@ -67,7 +66,6 @@ exports.getAllCourses = async (req, res) => {
 exports.getCourseById = async (req, res) => {
   try {
     const course = await Course.findById(req.params.id)
-      .populate("classes")
       .populate("prerequisites", "name courseCode");
 
     if (!course) {

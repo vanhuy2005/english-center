@@ -7,34 +7,56 @@ require("dotenv").config();
 const mongoose = require("mongoose");
 const connectDB = require("./src/config/database");
 
-// Import all models
-const User = require("./src/shared/models/User.model");
-const Student = require("./src/shared/models/Student.model");
-const Teacher = require("./src/shared/models/Teacher.model");
-const AcademicStaff = require("./src/shared/models/AcademicStaff.model");
-const EnrollmentStaff = require("./src/shared/models/EnrollmentStaff.model");
-const Accountant = require("./src/shared/models/Accountant.model");
-const Course = require("./src/shared/models/Course.model");
-const Class = require("./src/shared/models/Class.model");
-const Counter = require("./src/shared/models/Counter.model");
+// Safe require helper
+const safeRequire = (path) => {
+  try {
+    return require(path);
+  } catch (err) {
+    console.warn(
+      `⚠️  Optional module not found: ${path} - skipping related seed steps.`
+    );
+    return null;
+  }
+};
 
-// Clear all collections
+// Import models (use safeRequire for optional models)
+const User = safeRequire("./src/shared/models/User.model");
+const Student = safeRequire("./src/shared/models/Student.model");
+// const Teacher = safeRequire("./src/shared/models/Teacher.model"); // Replaced by Staff model
+const Staff = safeRequire("./src/shared/models/Staff.model");
+const Course = safeRequire("./src/shared/models/Course.model");
+const Class = safeRequire("./src/shared/models/Class.model");
+const Counter = safeRequire("./src/shared/models/Counter.model");
+
+// Clear all collections (only when model exists)
 const clearDatabase = async () => {
   console.log("🗑️  Clearing database...");
-  await User.deleteMany({});
-  await Student.deleteMany({});
-  await Teacher.deleteMany({});
-  await AcademicStaff.deleteMany({});
-  await EnrollmentStaff.deleteMany({});
-  await Accountant.deleteMany({});
-  await Course.deleteMany({});
-  await Class.deleteMany({});
-  await Counter.deleteMany({});
-  console.log("✅ Database cleared");
+  const models = {
+    User,
+    Student,
+    Staff,
+    Course,
+    Class,
+    Counter,
+  };
+  for (const [name, model] of Object.entries(models)) {
+    if (model) {
+      try {
+        await model.deleteMany({});
+      } catch (err) {
+        console.warn(`Failed to clear ${name}:`, err.message);
+      }
+    }
+  }
+  console.log("✅ Database cleared (for available models)");
 };
 
 // Seed Users with different roles
 const seedUsers = async () => {
+  if (!User) {
+    throw new Error("User model is required but not found. Cannot seed users.");
+  }
+
   console.log("\n👥 Seeding Users...");
 
   const users = [
@@ -116,18 +138,27 @@ const seedUsers = async () => {
       status: "active",
       isFirstLogin: true,
     },
+    // New Accountant
+    {
+      fullName: "Nguyễn Văn Kế Toán",
+      phone: "0906000002",
+      email: "ketoan@englishcenter.com",
+      password: "123456",
+      role: "accountant",
+      status: "active",
+      isFirstLogin: true,
+    },
   ];
 
-  const createdUsers = await User.create(users);
+  const createdUsers = await User.insertMany(users);
   console.log(`✅ Created ${createdUsers.length} users`);
   return createdUsers;
 };
 
-// Seed role-specific profiles
+// Seed role-specific profiles (only if corresponding models exist)
 const seedProfiles = async (users) => {
   console.log("\n📋 Seeding Profiles...");
 
-  // Find users by role
   const directorUser = users.find((u) => u.role === "director");
   const teacherUsers = users.filter((u) => u.role === "teacher");
   const studentUsers = users.filter((u) => u.role === "student");
@@ -135,118 +166,158 @@ const seedProfiles = async (users) => {
   const enrollmentUser = users.find((u) => u.role === "enrollment");
   const accountantUser = users.find((u) => u.role === "accountant");
 
-  // Seed Teachers
   const teachers = [];
-  for (let i = 0; i < teacherUsers.length; i++) {
-    const teacher = await Teacher.create({
-      user: teacherUsers[i]._id,
-      specialization: i === 0 ? ["IELTS", "TOEIC"] : ["Business English"],
-      qualifications: [
-        {
-          degree: "Bachelor of English",
-          institution: "HCMC University",
-          year: 2018,
-        },
-      ],
-      experience: {
-        years: 5,
-        description: "5 years teaching English for adults and children",
-      },
-      employmentStatus: "active",
-      joinDate: new Date("2020-01-15"),
-    });
-    teachers.push(teacher);
-    console.log(`✅ Created teacher profile: ${teacherUsers[i].fullName}`);
-  }
-
-  // Seed Students
   const students = [];
-  for (let i = 0; i < studentUsers.length; i++) {
-    const student = await Student.create({
-      user: studentUsers[i]._id,
-      fullName: studentUsers[i].fullName,
-      email: studentUsers[i].email,
-      dateOfBirth: new Date("2000-01-15"),
-      gender: i === 0 ? "female" : "male",
-      address: "123 Main Street, HCMC",
-      contactInfo: {
-        phone: studentUsers[i].phone,
-        email: studentUsers[i].email,
-      },
-      contactPerson: {
-        name: "Nguyễn Văn Phụ Huynh",
-        relation: "Parent",
-        phone: "0909123456",
-        email: "parent@gmail.com",
-      },
-      academicStatus: "active",
-    });
-    students.push(student);
-    console.log(`✅ Created student profile: ${studentUsers[i].fullName}`);
+
+  if (Staff && teacherUsers.length > 0) {
+    for (let i = 0; i < teacherUsers.length; i++) {
+      try {
+        const teacher = await Staff.create({
+          user: teacherUsers[i]._id,
+          staffType: "teacher",
+          staffCode: `NVGV${(i + 1).toString().padStart(3, '0')}`,
+          specialization: i === 0 ? ["IELTS", "TOEIC"] : ["Business English"],
+          qualifications: [
+            {
+              degree: "Bachelor of English",
+              institution: "HCMC University",
+              year: 2018,
+            },
+          ],
+          experience: {
+            years: 5,
+            description: "5 years teaching English for adults and children",
+          },
+          employmentStatus: "active",
+          dateJoined: new Date("2020-01-15"),
+        });
+        teachers.push(teacher);
+        console.log(`✅ Created teacher profile: ${teacherUsers[i].fullName}`);
+      } catch (err) {
+        console.warn("Failed to create teacher profile:", err.message);
+      }
+    }
+  } else {
+    console.warn(
+      "Skipping teacher profiles (Staff model not available or no teacher users)."
+    );
   }
 
-  // Seed Academic Staff
-  const academicStaff = await AcademicStaff.create({
-    user: academicUser._id,
-    staffCode: "NVHV001",
-    dateOfBirth: new Date("1990-05-20"),
-    gender: "female",
-    address: "456 Academic Street, HCMC",
-    employmentStatus: "active",
-    dateJoined: new Date("2021-03-01"),
-    department: "Phòng Học vụ",
-    position: "Nhân viên Học vụ",
-    responsibilities: [
-      "Quản lý điểm danh",
-      "Quản lý điểm số",
-      "Xử lý yêu cầu học viên",
-    ],
-  });
-  console.log(`✅ Created academic staff profile: ${academicUser.fullName}`);
+  if (Student && studentUsers.length > 0) {
+    for (let i = 0; i < studentUsers.length; i++) {
+      try {
+        const student = await Student.create({
+          user: studentUsers[i]._id,
+          fullName: studentUsers[i].fullName,
+          email: studentUsers[i].email,
+          dateOfBirth: new Date("2000-01-15"),
+          gender: i === 0 ? "female" : "male",
+          address: "123 Main Street, HCMC",
+          contactInfo: {
+            phone: studentUsers[i].phone,
+            email: studentUsers[i].email,
+          },
+          contactPerson: {
+            name: "Nguyễn Văn Phụ Huynh",
+            relation: "Parent",
+            phone: "0909123456",
+            email: "parent@gmail.com",
+          },
+          academicStatus: "active",
+        });
+        students.push(student);
+        console.log(`✅ Created student profile: ${studentUsers[i].fullName}`);
+      } catch (err) {
+        console.warn("Failed to create student profile:", err.message);
+      }
+    }
+  } else {
+    console.warn(
+      "Skipping student profiles (Student model not available or no student users)."
+    );
+  }
 
-  // Seed Enrollment Staff
-  const enrollmentStaff = await EnrollmentStaff.create({
-    user: enrollmentUser._id,
-    staffCode: "NVTS001",
-    dateOfBirth: new Date("1992-08-15"),
-    gender: "male",
-    address: "789 Enrollment Road, HCMC",
-    employmentStatus: "active",
-    dateJoined: new Date("2021-06-01"),
-    department: "Phòng Tuyển sinh",
-    position: "Nhân viên Tuyển sinh",
-  });
-  console.log(
-    `✅ Created enrollment staff profile: ${enrollmentUser.fullName}`
-  );
+  if (Staff && academicUser) {
+    try {
+      const academicStaff = await Staff.create({
+        user: academicUser._id,
+        staffCode: "NVHV001",
+        staffType: "academic",
+        dateOfBirth: new Date("1990-05-20"),
+        gender: "female",
+        address: "456 Academic Street, HCMC",
+        employmentStatus: "active",
+        dateJoined: new Date("2021-03-01"),
+      });
+      console.log(
+        `✅ Created academic staff profile: ${academicUser.fullName}`
+      );
+    } catch (err) {
+      console.warn("Failed to create academic staff profile:", err.message);
+    }
+  } else {
+    console.warn(
+      "Skipping academic staff profile (Staff model not available or user missing)."
+    );
+  }
 
-  // Seed Accountant
-  const accountant = await Accountant.create({
-    user: accountantUser._id,
-    staffCode: "NVKT001",
-    dateOfBirth: new Date("1988-11-30"),
-    gender: "female",
-    address: "321 Finance Avenue, HCMC",
-    employmentStatus: "active",
-    dateJoined: new Date("2020-09-01"),
-    department: "Phòng Kế toán",
-    position: "Nhân viên Kế toán",
-    responsibilities: [
-      "Quản lý học phí",
-      "Xử lý thanh toán",
-      "Báo cáo tài chính",
-    ],
-    accessLevel: "standard",
-  });
-  console.log(`✅ Created accountant profile: ${accountantUser.fullName}`);
+  if (Staff && enrollmentUser) {
+    try {
+      const enrollmentStaff = await Staff.create({
+        user: enrollmentUser._id,
+        staffCode: "NVTS001",
+        staffType: "enrollment",
+        dateOfBirth: new Date("1992-08-15"),
+        gender: "male",
+        address: "789 Enrollment Road, HCMC",
+        employmentStatus: "active",
+        dateJoined: new Date("2021-06-01"),
+      });
+      console.log(
+        `✅ Created enrollment staff profile: ${enrollmentUser.fullName}`
+      );
+    } catch (err) {
+      console.warn("Failed to create enrollment staff profile:", err.message);
+    }
+  } else {
+    console.warn(
+      "Skipping enrollment staff profile (Staff model not available or user missing)."
+    );
+  }
 
-  return { teachers, students, academicStaff, enrollmentStaff, accountant };
+  if (Staff && accountantUser) {
+    try {
+      const accountant = await Staff.create({
+        user: accountantUser._id,
+        staffCode: "NVKT001",
+        staffType: "accountant",
+        dateOfBirth: new Date("1988-11-30"),
+        gender: "female",
+        address: "321 Finance Avenue, HCMC",
+        employmentStatus: "active",
+        dateJoined: new Date("2020-09-01"),
+      });
+      console.log(`✅ Created accountant profile: ${accountantUser.fullName}`);
+    } catch (err) {
+      console.warn("Failed to create accountant profile:", err.message);
+    }
+  } else {
+    console.warn(
+      "Skipping accountant profile (Staff model not available or user missing)."
+    );
+  }
+
+  return { teachers, students };
 };
 
-// Seed Courses
+// Seed Courses (only if Course model exists)
 const seedCourses = async () => {
-  console.log("\n📚 Seeding Courses...");
+  if (!Course) {
+    console.warn("Skipping courses (Course model not available).");
+    return [];
+  }
 
+  console.log("\n📚 Seeding Courses...");
   const courses = [
     {
       name: "General English - Beginner",
@@ -298,113 +369,118 @@ const seedCourses = async () => {
     },
   ];
 
-  const createdCourses = await Course.create(courses);
-  console.log(`✅ Created ${createdCourses.length} courses`);
-  return createdCourses;
+  try {
+    const createdCourses = await Course.create(courses);
+    console.log(`✅ Created ${createdCourses.length} courses`);
+    return createdCourses;
+  } catch (err) {
+    console.warn("Failed to create courses:", err.message);
+    return [];
+  }
 };
 
-// Seed Classes
+// Seed Classes (only if Class model exists)
 const seedClasses = async (courses, teachers, students) => {
+  if (!Class) {
+    console.warn("Skipping classes (Class model not available).");
+    return [];
+  }
   console.log("\n🏫 Seeding Classes...");
 
-  const classes = [
-    {
-      name: "Beginner Class A1",
-      course: courses[0]._id,
-      teacher: teachers[0]._id,
-      students: [
-        {
-          student: students[0]._id,
-          enrolledDate: new Date("2025-01-10"),
-          status: "active",
-        },
-      ],
-      capacity: 15,
-      room: "Room A101",
-      schedule: [
-        {
-          dayOfWeek: 1, // Monday
-          startTime: "18:00",
-          endTime: "20:00",
-        },
-        {
-          dayOfWeek: 3, // Wednesday
-          startTime: "18:00",
-          endTime: "20:00",
-        },
-        {
-          dayOfWeek: 5, // Friday
-          startTime: "18:00",
-          endTime: "20:00",
-        },
-      ],
-      startDate: new Date("2025-01-15"),
-      endDate: new Date("2025-04-15"),
-      status: "ongoing",
-    },
-    {
-      name: "IELTS Class B1",
-      course: courses[1]._id,
-      teacher: teachers[1]._id,
-      students: [
-        {
-          student: students[1]._id,
-          enrolledDate: new Date("2025-01-25"),
-          status: "active",
-        },
-      ],
-      capacity: 12,
-      room: "Room B202",
-      schedule: [
-        {
-          dayOfWeek: 2, // Tuesday
-          startTime: "19:00",
-          endTime: "21:30",
-        },
-        {
-          dayOfWeek: 4, // Thursday
-          startTime: "19:00",
-          endTime: "21:30",
-        },
-      ],
-      startDate: new Date("2025-02-01"),
-      endDate: new Date("2025-05-31"),
-      status: "ongoing",
-    },
-  ];
+  try {
+    const classes = [
+      {
+        name: "Beginner Class A1",
+        course: courses[0]?._id,
+        teacher: teachers[0]?._id,
+        students: students[0]
+          ? [
+              {
+                student: students[0]._id,
+                enrolledDate: new Date("2025-01-10"),
+                status: "active",
+              },
+            ]
+          : [],
+        capacity: 15,
+        room: "Room A101",
+        schedule: [
+          { dayOfWeek: 1, startTime: "18:00", endTime: "20:00" },
+          { dayOfWeek: 3, startTime: "18:00", endTime: "20:00" },
+          { dayOfWeek: 5, startTime: "18:00", endTime: "20:00" },
+        ],
+        startDate: new Date("2025-01-15"),
+        endDate: new Date("2025-04-15"),
+        status: "ongoing",
+      },
+      {
+        name: "IELTS Class B1",
+        course: courses[1]?._id,
+        teacher: teachers[1]?._id,
+        students: students[1]
+          ? [
+              {
+                student: students[1]._id,
+                enrolledDate: new Date("2025-01-25"),
+                status: "active",
+              },
+            ]
+          : [],
+        capacity: 12,
+        room: "Room B202",
+        schedule: [
+          { dayOfWeek: 2, startTime: "19:00", endTime: "21:30" },
+          { dayOfWeek: 4, startTime: "19:00", endTime: "21:30" },
+        ],
+        startDate: new Date("2025-02-01"),
+        endDate: new Date("2025-05-31"),
+        status: "ongoing",
+      },
+    ];
 
-  const createdClasses = await Class.create(classes);
-  console.log(`✅ Created ${createdClasses.length} classes`);
+    const createdClasses = await Class.create(classes);
+    console.log(`✅ Created ${createdClasses.length} classes`);
 
-  // Update course references
-  await Course.findByIdAndUpdate(courses[0]._id, {
-    $push: { classes: createdClasses[0]._id },
-  });
-  await Course.findByIdAndUpdate(courses[1]._id, {
-    $push: { classes: createdClasses[1]._id },
-  });
+    // Update references only if the related models/ids exist
+    if (courses[0] && createdClasses[0])
+      await Course.findByIdAndUpdate(courses[0]._id, {
+        $push: { classes: createdClasses[0]._id },
+      }).catch(() => {});
+    if (courses[1] && createdClasses[1])
+      await Course.findByIdAndUpdate(courses[1]._id, {
+        $push: { classes: createdClasses[1]._id },
+      }).catch(() => {});
 
-  // Update teacher references
-  await Teacher.findByIdAndUpdate(teachers[0]._id, {
-    $push: { classes: createdClasses[0]._id },
-  });
-  await Teacher.findByIdAndUpdate(teachers[1]._id, {
-    $push: { classes: createdClasses[1]._id },
-  });
+    if (teachers[0] && createdClasses[0])
+      await Staff.findByIdAndUpdate(teachers[0]._id, {
+        $push: { teachingClasses: createdClasses[0]._id },
+      }).catch(() => {});
+    if (teachers[1] && createdClasses[1])
+      await Staff.findByIdAndUpdate(teachers[1]._id, {
+        $push: { teachingClasses: createdClasses[1]._id },
+      }).catch(() => {});
 
-  // Update student references
-  await Student.findByIdAndUpdate(students[0]._id, {
-    $push: { enrolledCourses: courses[0]._id },
-  });
-  await Student.findByIdAndUpdate(students[1]._id, {
-    $push: { enrolledCourses: courses[1]._id },
-  });
+    if (students[0] && courses[0])
+      await Student.findByIdAndUpdate(students[0]._id, {
+        $push: { enrolledCourses: courses[0]._id },
+      }).catch(() => {});
+    if (students[1] && courses[1])
+      await Student.findByIdAndUpdate(students[1]._id, {
+        $push: { enrolledCourses: courses[1]._id },
+      }).catch(() => {});
 
-  return createdClasses;
+    return createdClasses;
+  } catch (err) {
+    console.warn("Failed to create classes:", err.message);
+    return [];
+  }
 };
 
-// Print login credentials
+// Print login credentials (only uses User)
 const printCredentials = async () => {
+  if (!User)
+    return console.warn("User model missing - cannot print credentials.");
+
   console.log("\n" + "=".repeat(70));
   console.log("🔐 LOGIN CREDENTIALS (Phone & Password)");
   console.log("=".repeat(70));

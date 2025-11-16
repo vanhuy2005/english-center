@@ -1,6 +1,6 @@
 const Class = require("../../shared/models/Class.model");
 const Student = require("../../shared/models/Student.model");
-const Teacher = require("../../shared/models/Teacher.model");
+const Staff = require("../../shared/models/Staff.model");
 const Course = require("../../shared/models/Course.model");
 
 /**
@@ -146,7 +146,7 @@ exports.createClass = async (req, res) => {
 
     // Check if teacher exists (if provided)
     if (teacher) {
-      const teacherExists = await Teacher.findById(teacher);
+      const teacherExists = await Staff.findOne({ _id: teacher, staffType: "teacher" });
       if (!teacherExists) {
         return res.status(404).json({
           success: false,
@@ -220,7 +220,7 @@ exports.updateClass = async (req, res) => {
 
     // Check if teacher exists (if provided)
     if (teacher && teacher !== classData.teacher?.toString()) {
-      const teacherExists = await Teacher.findById(teacher);
+      const teacherExists = await Staff.findOne({ _id: teacher, staffType: "teacher" });
       if (!teacherExists) {
         return res.status(404).json({
           success: false,

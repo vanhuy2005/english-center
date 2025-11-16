@@ -1,6 +1,5 @@
-const User = require("../../shared/models/User.model");
 const Student = require("../../shared/models/Student.model");
-const Teacher = require("../../shared/models/Teacher.model");
+const Staff = require("../../shared/models/Staff.model");
 const {
   generateToken,
   generateRefreshToken,
@@ -16,103 +15,64 @@ const {
  * @access  Public
  */
 exports.register = async (req, res) => {
-  const mongoose = require("mongoose");
-  const session = await mongoose.startSession();
-  session.startTransaction();
   try {
-    const { email, password, fullName, phone, role } = req.body;
+    const { email, password, fullName, phone, role, ...otherFields } = req.body;
 
     // Validate required fields
-    if (!email || !password || !fullName || !role) {
-      await session.abortTransaction();
-      session.endSession();
+    if (!password || !fullName || !phone || !role) {
       return errorResponse(res, "Vui lòng điền đầy đủ thông tin", 400);
     }
 
-    // Check if user already exists
-    const existingUser = await User.findOne({ email }).session(session);
-    if (existingUser) {
-      await session.abortTransaction();
-      session.endSession();
-      return errorResponse(res, "Email đã được sử dụng", 400);
-    }
-
     // Validate role
-    const allowedRoles = ["student", "teacher", "director"];
+    const allowedRoles = ["student", "teacher", "director", "academic", "accountant", "enrollment"];
     if (!allowedRoles.includes(role)) {
-      await session.abortTransaction();
-      session.endSession();
       return errorResponse(res, "Role không hợp lệ", 400);
     }
 
-    // Create user
-    const userArr = await User.create(
-      [
-        {
-          email,
-          password,
-          fullName,
-          phone,
-          role,
-        },
-      ],
-      { session }
-    );
-    const user = userArr[0];
-
-    // Create role-specific profile
-    // Whitelist and sanitize allowed profile fields
-    let profileArr;
+    let user;
     if (role === "student") {
-      const allowedStudentFields = [
-        "dateOfBirth",
-        "gender",
-        "address",
-        "contactPerson",
-        "contactInfo",
-        "academicStatus",
-      ];
-      const studentProfile = { user: user._id };
-      allowedStudentFields.forEach((field) => {
-        if (req.body[field] !== undefined)
-          studentProfile[field] = req.body[field];
-      });
-      profileArr = await Student.create([studentProfile], { session });
-    } else if (role === "teacher") {
-      const allowedTeacherFields = [
-        "dateOfBirth",
-        "gender",
-        "address",
-        "subjects",
-        "employmentStatus",
-        "contactInfo",
-      ];
-      const teacherProfile = { user: user._id };
-      allowedTeacherFields.forEach((field) => {
-        if (req.body[field] !== undefined)
-          teacherProfile[field] = req.body[field];
-      });
-      profileArr = await Teacher.create([teacherProfile], { session });
-    }
-    const profile = profileArr ? profileArr[0] : null;
+      // Check if phone already exists
+      const existing = await Student.findOne({ phone });
+      if (existing) {
+        return errorResponse(res, "Số điện thoại đã được sử dụng", 400);
+      }
 
-    // Generate refresh token and save to user inside transaction
+      // Create student
+      user = await Student.create({
+        email,
+        password,
+        fullName,
+        phone,
+        ...otherFields,
+      });
+    } else {
+      // Staff (teacher, director, academic, accountant, enrollment)
+      const existing = await Staff.findOne({ phone });
+      if (existing) {
+        return errorResponse(res, "Số điện thoại đã được sử dụng", 400);
+      }
+
+      user = await Staff.create({
+        email,
+        password,
+        fullName,
+        phone,
+        staffType: role,
+        staffCode: `NV${role.toUpperCase().slice(0, 2)}${Date.now().toString().slice(-6)}`,
+        ...otherFields,
+      });
+    }
+
+    // Generate tokens
+    const token = generateToken(user._id);
     const refreshToken = generateRefreshToken(user._id);
     user.refreshToken = refreshToken;
-    await user.save({ session });
+    await user.save();
 
-    await session.commitTransaction();
-    session.endSession();
-
-    // Generate access token
-    const token = generateToken(user._id);
-
-    // Response
     successResponse(
       res,
       {
         user: user.getPublicProfile(),
-        profile,
         token,
         refreshToken,
       },
@@ -120,8 +80,6 @@ exports.register = async (req, res) => {
       201
     );
   } catch (error) {
-    await session.abortTransaction();
-    session.endSession();
     console.error("Register Error:", error);
     errorResponse(res, error.message, 500);
   }
@@ -141,8 +99,18 @@ exports.login = async (req, res) => {
       return errorResponse(res, "Vui lòng nhập số điện thoại và mật khẩu", 400);
     }
 
-    // Find user with password field
-    const user = await User.findOne({ phone }).select("+password");
+    // Try to find in Student first
+    let user = await Student.findOne({ phone }).select("+password +refreshToken");
+    let role = "student";
+
+    // If not found, try Staff
+    if (!user) {
+      user = await Staff.findOne({ phone }).select("+password +refreshToken");
+      if (user) {
+        role = user.staffType;
+      }
+    }
+
     if (!user) {
       return errorResponse(res, "Số điện thoại hoặc mật khẩu không đúng", 401);
     }
@@ -166,25 +134,15 @@ exports.login = async (req, res) => {
     user.refreshToken = refreshToken;
     await user.save();
 
-    // Get role-specific profile
-    let profile = null;
-    if (user.role === "student") {
-      profile = await Student.findOne({ user: user._id }).populate(
-        "enrolledCourses"
-      );
-    } else if (user.role === "teacher") {
-      profile = await Teacher.findOne({ user: user._id }).populate("classes");
-    }
-
     // Response
     successResponse(
       res,
       {
         user: user.getPublicProfile(),
-        profile,
+        role,
         token,
         refreshToken,
-        isFirstLogin: user.isFirstLogin, // Gửi thông tin đăng nhập lần đầu
+        isFirstLogin: user.isFirstLogin,
       },
       "Đăng nhập thành công"
     );
@@ -213,60 +171,24 @@ exports.logout = async (req, res) => {
 };
 
 /**
- * @desc    Get current user
- * @route   GET /api/auth/me
- * @access  Private
- */
-exports.getMe = async (req, res) => {
-  try {
-    const user = await User.findById(req.user._id).select(
-      "-password -refreshToken"
-    );
-
-    // Get role-specific profile
-    let profile = null;
-    if (user.role === "student") {
-      profile = await Student.findOne({ user: user._id });
-    } else if (user.role === "teacher") {
-      profile = await Teacher.findOne({ user: user._id });
-    }
-
-    successResponse(
-      res,
-      { user, profile, role: user.role },
-      "Lấy thông tin thành công"
-    );
-  } catch (error) {
-    console.error("Get Me Error:", error);
-    errorResponse(res, error.message, 500);
-  }
-};
-
-/**
-/**
  * @desc    Get current user info
  * @route   GET /api/auth/me
  * @access  Private
  */
 exports.getMe = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id);
+    // req.user is already populated by auth middleware
+    const user = req.user;
+    const role = user.studentCode ? "student" : user.staffType;
 
-    // Get role-specific profile
-    let profile = null;
-    if (user.role === "student") {
-      profile = await Student.findOne({ user: user._id }).populate(
-        "enrolledCourses"
-      );
-    } else if (user.role === "teacher") {
-      profile = await Teacher.findOne({ user: user._id }).populate("classes");
-    }
+    const profile = user.getPublicProfile();
+    profile.avatar = user.avatar;
 
     successResponse(
       res,
       {
-        user: user.getPublicProfile(),
-        profile,
+        user: profile,
+        role,
       },
       "Lấy thông tin thành công"
     );
@@ -290,8 +212,15 @@ exports.changePassword = async (req, res) => {
       return errorResponse(res, "Mật khẩu mới phải có ít nhất 6 ký tự", 400);
     }
 
-    // Get user with password
-    const user = await User.findById(req.user._id).select("+password");
+    // Get user with password (try both Student and Staff)
+    let user = await Student.findById(req.user._id).select("+password");
+    if (!user) {
+      user = await Staff.findById(req.user._id).select("+password");
+    }
+
+    if (!user) {
+      return errorResponse(res, "Không tìm thấy người dùng", 404);
+    }
 
     // Nếu không phải đăng nhập lần đầu, cần kiểm tra mật khẩu hiện tại
     if (!isFirstLogin) {
@@ -308,8 +237,8 @@ exports.changePassword = async (req, res) => {
 
     // Update password
     user.password = newPassword;
-    user.isFirstLogin = false; // Đánh dấu đã đổi mật khẩu lần đầu
-    user.refreshToken = null; // Clear refresh token để bắt đăng nhập lại
+    user.isFirstLogin = false;
+    user.refreshToken = null;
     await user.save();
 
     successResponse(res, null, "Đổi mật khẩu thành công");
@@ -332,8 +261,12 @@ exports.refreshToken = async (req, res) => {
       return errorResponse(res, "Refresh token is required", 400);
     }
 
-    // Find user with refresh token
-    const user = await User.findOne({ refreshToken }).select("+refreshToken");
+    // Find user with refresh token (try both Student and Staff)
+    let user = await Student.findOne({ refreshToken }).select("+refreshToken");
+    if (!user) {
+      user = await Staff.findOne({ refreshToken }).select("+refreshToken");
+    }
+
     if (!user) {
       return errorResponse(res, "Invalid refresh token", 401);
     }

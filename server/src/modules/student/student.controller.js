@@ -1,5 +1,4 @@
 const Student = require("../../shared/models/Student.model");
-const User = require("../../shared/models/User.model");
 const Class = require("../../shared/models/Class.model");
 const Grade = require("../../shared/models/Grade.model");
 const Attendance = require("../../shared/models/Attendance.model");
@@ -51,27 +50,8 @@ exports.getAllStudents = async (req, res) => {
       matchStage.academicStatus = status;
     }
 
-    // Build $match for search
-    let searchMatch = [];
-    if (search) {
-      const regex = new RegExp(search, "i");
-      searchMatch.push({ studentCode: { $regex: regex } });
-      // $lookup to User and match on fullName/email
-      searchMatch.push({ "userData.fullName": { $regex: regex } });
-      searchMatch.push({ "userData.email": { $regex: regex } });
-    }
-
     const pipeline = [
       { $match: matchStage },
-      {
-        $lookup: {
-          from: "users",
-          localField: "user",
-          foreignField: "_id",
-          as: "userData",
-        },
-      },
-      { $unwind: "$userData" },
       {
         $lookup: {
           from: "courses",
@@ -82,8 +62,17 @@ exports.getAllStudents = async (req, res) => {
       },
     ];
 
-    if (searchMatch.length > 0) {
-      pipeline.push({ $match: { $or: searchMatch } });
+    if (search) {
+      const regex = new RegExp(search, "i");
+      pipeline.push({
+        $match: {
+          $or: [
+            { studentCode: { $regex: regex } },
+            { fullName: { $regex: regex } },
+            { email: { $regex: regex } },
+          ],
+        },
+      });
     }
 
     // Sorting
@@ -100,18 +89,18 @@ exports.getAllStudents = async (req, res) => {
       $project: {
         _id: 1,
         studentCode: 1,
+        fullName: 1,
+        phone: 1,
+        email: 1,
+        avatar: 1,
+        status: 1,
         dateOfBirth: 1,
         gender: 1,
         address: 1,
         contactInfo: 1,
         contactPerson: 1,
         academicStatus: 1,
-        user: "$userData._id",
-        fullName: "$userData.fullName",
-        phone: "$userData.phone",
-        avatar: "$userData.avatar",
-        status: "$userData.status",
-        createdAt: "$userData.createdAt",
+        createdAt: 1,
         enrolledCourses: "$enrolledCoursesData",
       },
     });
@@ -140,11 +129,8 @@ exports.getAllStudents = async (req, res) => {
   }
 };
 exports.getStudentById = async (req, res) => {
-  const session = await Student.startSession();
-  session.startTransaction();
   try {
     const student = await Student.findById(req.params.id)
-      .populate("user", "fullName phone avatar status createdAt")
       .populate("enrolledCourses")
       .populate({
         path: "attendance",
@@ -153,21 +139,14 @@ exports.getStudentById = async (req, res) => {
       .populate({
         path: "financialRecords",
         populate: { path: "course", select: "name courseCode" },
-      })
-      .session(session);
+      });
 
     if (!student) {
-      await session.abortTransaction();
-      session.endSession();
       return errorResponse(res, "Không tìm thấy học viên", 404);
     }
 
-    await session.commitTransaction();
-    session.endSession();
     successResponse(res, student, "Lấy thông tin học viên thành công");
   } catch (error) {
-    await session.abortTransaction();
-    session.endSession();
     console.error("Get Student Error:", error);
     errorResponse(res, error.message, 500);
   }
@@ -179,16 +158,12 @@ exports.getStudentById = async (req, res) => {
  * @access  Private (director, enrollment staff)
  */
 exports.createStudent = async (req, res) => {
-  const session = await Student.startSession();
-  session.startTransaction();
   try {
     const {
-      // User info
       email,
       password,
       fullName,
       phone,
-      // Student info
       dateOfBirth,
       gender,
       address,
@@ -196,61 +171,34 @@ exports.createStudent = async (req, res) => {
     } = req.body;
 
     // Validate required fields
-    if (!email || !password || !fullName || !dateOfBirth || !gender) {
-      await session.abortTransaction();
-      session.endSession();
+    if (!password || !fullName || !phone || !dateOfBirth || !gender) {
       return errorResponse(res, "Vui lòng điền đầy đủ thông tin bắt buộc", 400);
     }
 
-    // Check if user exists
-    const existingUser = await User.findOne({ email }).session(session);
-    if (existingUser) {
-      await session.abortTransaction();
-      session.endSession();
-      return errorResponse(res, "Email đã được sử dụng", 400);
+    // Check if phone exists
+    const existingStudent = await Student.findOne({ phone });
+    if (existingStudent) {
+      return errorResponse(res, "Số điện thoại đã được sử dụng", 400);
     }
 
-    // Create user account
-    const user = await User.create(
-      [
-        {
-          email,
-          password,
-          fullName,
-          phone,
-          role: "student",
-        },
-      ],
-      { session }
-    );
+    // Create student
+    const student = await Student.create({
+      email,
+      password,
+      fullName,
+      phone,
+      dateOfBirth,
+      gender,
+      address,
+      contactInfo: {
+        phone,
+        email,
+      },
+      contactPerson,
+    });
 
-    // Create student profile
-    const student = await Student.create(
-      [
-        {
-          user: user[0]._id,
-          dateOfBirth,
-          gender,
-          address,
-          contactInfo: {
-            phone,
-            email,
-          },
-          contactPerson,
-        },
-      ],
-      { session }
-    );
-
-    // Populate user data
-    await student[0].populate("user", "fullName phone avatar");
-
-    await session.commitTransaction();
-    session.endSession();
-    successResponse(res, student[0], "Tạo học viên thành công", 201);
+    successResponse(res, student, "Tạo học viên thành công", 201);
   } catch (error) {
-    await session.abortTransaction();
-    session.endSession();
     console.error("Create Student Error:", error);
     errorResponse(res, error.message, 500);
   }
@@ -269,42 +217,27 @@ exports.updateStudent = async (req, res) => {
       return errorResponse(res, "Không tìm thấy học viên", 404);
     }
 
-    // Update student fields
-    const {
-      dateOfBirth,
-      gender,
-      address,
-      contactPerson,
-      academicStatus,
-      notes,
-    } = req.body;
+    // Update fields
+    const allowedFields = [
+      "fullName",
+      "phone",
+      "email",
+      "avatar",
+      "dateOfBirth",
+      "gender",
+      "address",
+      "contactPerson",
+      "academicStatus",
+      "notes",
+    ];
 
-    if (dateOfBirth) student.dateOfBirth = dateOfBirth;
-    if (gender) student.gender = gender;
-    if (address) student.address = address;
-    if (contactPerson) student.contactPerson = contactPerson;
-    if (academicStatus) student.academicStatus = academicStatus;
-    if (notes !== undefined) student.notes = notes;
+    allowedFields.forEach((field) => {
+      if (req.body[field] !== undefined) {
+        student[field] = req.body[field];
+      }
+    });
 
     await student.save();
-
-    // Update user info if provided
-    if (req.body.fullName || req.body.phone) {
-      const user = await User.findById(student.user);
-      if (!user) {
-        return errorResponse(
-          res,
-          "Không tìm thấy tài khoản người dùng cho học viên này",
-          404
-        );
-      }
-      if (req.body.fullName) user.fullName = req.body.fullName;
-      if (req.body.phone) user.phone = req.body.phone;
-      await user.save();
-    }
-
-    // Populate and return
-    await student.populate("user", "fullName email phone avatar");
 
     successResponse(res, student, "Cập nhật học viên thành công");
   } catch (error) {
@@ -319,29 +252,17 @@ exports.updateStudent = async (req, res) => {
  * @access  Private (director only)
  */
 exports.deleteStudent = async (req, res) => {
-  const session = await Student.startSession();
-  session.startTransaction();
   try {
-    const student = await Student.findById(req.params.id).session(session);
+    const student = await Student.findById(req.params.id);
 
     if (!student) {
-      await session.abortTransaction();
-      session.endSession();
       return errorResponse(res, "Không tìm thấy học viên", 404);
     }
 
-    // Delete user account
-    await User.findByIdAndDelete(student.user, { session });
+    await student.deleteOne();
 
-    // Delete student profile
-    await student.deleteOne({ session });
-
-    await session.commitTransaction();
-    session.endSession();
     successResponse(res, null, "Xóa học viên thành công");
   } catch (error) {
-    await session.abortTransaction();
-    session.endSession();
     console.error("Delete Student Error:", error);
     errorResponse(res, error.message, 500);
   }
@@ -441,10 +362,9 @@ exports.enrollCourse = async (req, res) => {
  */
 exports.getMyCourses = async (req, res) => {
   try {
-    // Find student profile by user ID
-    const student = await Student.findOne({ user: req.user._id }).populate({
+    const student = await Student.findById(req.user._id).populate({
       path: "enrolledCourses",
-      select: "name courseCode level",
+      select: "name courseCode level status",
     });
 
     if (!student) {
@@ -456,6 +376,24 @@ exports.getMyCourses = async (req, res) => {
       .populate("course", "name courseCode")
       .populate("teacher", "firstName lastName")
       .select("className schedule startDate endDate status");
+
+    // If no classes, return enrolled courses without class info
+    if (classes.length === 0 && student.enrolledCourses.length > 0) {
+      const coursesData = student.enrolledCourses.map(course => ({
+        _id: course._id,
+        courseName: course.name,
+        courseCode: course.courseCode,
+        className: "Chưa phân lớp",
+        teacherName: null,
+        schedule: "Chưa cập nhật",
+        status: course.status || "active",
+        progress: 0,
+        attendanceRate: 0,
+        averageGrade: null,
+        classId: null,
+      }));
+      return successResponse(res, coursesData, "Lấy danh sách khóa học thành công");
+    }
 
     // Build course data with class info
     const coursesData = await Promise.all(
@@ -516,7 +454,7 @@ exports.getMyCourses = async (req, res) => {
  */
 exports.getMyGrades = async (req, res) => {
   try {
-    const student = await Student.findOne({ user: req.user._id });
+    const student = await Student.findById(req.user._id);
 
     if (!student) {
       return errorResponse(res, "Không tìm thấy thông tin học viên", 404);
@@ -559,7 +497,7 @@ exports.getMyGrades = async (req, res) => {
  */
 exports.getMyAttendance = async (req, res) => {
   try {
-    const student = await Student.findOne({ user: req.user._id });
+    const student = await Student.findById(req.user._id);
 
     if (!student) {
       return errorResponse(res, "Không tìm thấy thông tin học viên", 404);
@@ -598,7 +536,7 @@ exports.getMyAttendance = async (req, res) => {
  */
 exports.getMyTuition = async (req, res) => {
   try {
-    const student = await Student.findOne({ user: req.user._id });
+    const student = await Student.findById(req.user._id);
 
     if (!student) {
       return errorResponse(res, "Không tìm thấy thông tin học viên", 404);
@@ -661,7 +599,7 @@ exports.getMyTuition = async (req, res) => {
  */
 exports.getMyRequests = async (req, res) => {
   try {
-    const student = await Student.findOne({ user: req.user._id });
+    const student = await Student.findById(req.user._id);
 
     if (!student) {
       return errorResponse(res, "Không tìm thấy thông tin học viên", 404);
@@ -704,7 +642,7 @@ exports.getMyRequests = async (req, res) => {
  */
 exports.createRequest = async (req, res) => {
   try {
-    const student = await Student.findOne({ user: req.user._id });
+    const student = await Student.findById(req.user._id);
 
     if (!student) {
       return errorResponse(res, "Không tìm thấy thông tin học viên", 404);
@@ -737,6 +675,44 @@ exports.createRequest = async (req, res) => {
     successResponse(res, newRequest, "Gửi yêu cầu thành công", 201);
   } catch (error) {
     console.error("Create Request Error:", error);
+    errorResponse(res, error.message, 500);
+  }
+};
+
+const fs = require("fs");
+const path = require("path");
+
+/**
+ * @desc    Upload avatar (for current logged-in student)
+ * @route   POST /api/students/me/avatar
+ * @access  Private (student only)
+ */
+exports.uploadAvatar = async (req, res) => {
+  try {
+    if (!req.file) {
+      return errorResponse(res, "Vui lòng chọn file ảnh", 400);
+    }
+
+    const student = await Student.findById(req.user._id);
+    if (!student) {
+      return errorResponse(res, "Không tìm thấy thông tin học viên", 404);
+    }
+
+    // Delete old avatar if exists
+    if (student.avatar) {
+      const oldPath = path.join(__dirname, "../../../", student.avatar);
+      if (fs.existsSync(oldPath)) {
+        fs.unlinkSync(oldPath);
+      }
+    }
+
+    // Save new avatar path
+    student.avatar = `/uploads/avatars/${req.file.filename}`;
+    await student.save();
+
+    successResponse(res, { avatar: student.avatar }, "Tải ảnh đại diện thành công");
+  } catch (error) {
+    console.error("Upload Avatar Error:", error);
     errorResponse(res, error.message, 500);
   }
 };

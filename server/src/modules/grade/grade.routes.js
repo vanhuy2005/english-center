@@ -21,6 +21,10 @@ const validateObjectId = require("../../shared/middleware/validateObjectId");
 // All routes require authentication
 router.use(protect);
 
+// Get my grades (student)
+const { getMyGrades } = require("./grade.controller");
+router.route("/me").get(getMyGrades);
+
 // Get all grades & create/update grade
 router
   .route("/")

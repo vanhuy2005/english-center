@@ -4,10 +4,55 @@ const Attendance = require("../../shared/models/Attendance.model");
 const Grade = require("../../shared/models/Grade.model");
 const Schedule = require("../../shared/models/Schedule.model");
 const Notification = require("../../shared/models/Notification.model");
+const Staff = require("../../shared/models/Staff.model");
 const {
   successResponse,
   errorResponse,
 } = require("../../shared/utils/response.util");
+
+/**
+ * Get all teachers (for Director/Admin)
+ */
+exports.getAll = async (req, res) => {
+  try {
+    const { page = 1, pageSize = 10, search } = req.query;
+    const skip = (page - 1) * pageSize;
+
+    const query = { staffType: "teacher", status: "active" };
+    if (search) {
+      query.$or = [
+        { fullName: { $regex: search, $options: "i" } },
+        { email: { $regex: search, $options: "i" } },
+      ];
+    }
+
+    const [teachers, total] = await Promise.all([
+      Staff.find(query)
+        .select("-password")
+        .skip(skip)
+        .limit(parseInt(pageSize))
+        .sort({ createdAt: -1 }),
+      Staff.countDocuments(query),
+    ]);
+
+    successResponse(
+      res,
+      {
+        teachers,
+        pagination: {
+          total,
+          page: parseInt(page),
+          pageSize: parseInt(pageSize),
+          totalPages: Math.ceil(total / pageSize),
+        },
+      },
+      "Lấy danh sách giáo viên thành công"
+    );
+  } catch (error) {
+    console.error("Error in getAll:", error);
+    errorResponse(res, "Không thể lấy danh sách giáo viên", 500);
+  }
+};
 
 /**
  * Get teacher dashboard data

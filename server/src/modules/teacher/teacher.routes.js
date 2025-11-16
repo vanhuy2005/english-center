@@ -1,10 +1,13 @@
 const express = require("express");
 const router = express.Router();
-const { protect } = require("../../shared/middleware/auth.middleware");
+const { protect, authorize } = require("../../shared/middleware/auth.middleware");
 const teacherController = require("./teacher.controller");
 
 // Protect all teacher routes
 router.use(protect);
+
+// Get all teachers (Director/Admin only)
+router.get("/", authorize(["director"]), teacherController.getAll);
 
 // Dashboard
 router.get("/dashboard", teacherController.getDashboard);

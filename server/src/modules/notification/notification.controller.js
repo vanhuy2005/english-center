@@ -239,33 +239,28 @@ exports.broadcastNotification = async (req, res) => {
       });
     }
 
-    const User = require("../../shared/models/User.model");
     const Student = require("../../shared/models/Student.model");
-    const Teacher = require("../../shared/models/Teacher.model");
+    const Staff = require("../../shared/models/Staff.model");
 
     let recipients = [];
 
     if (role === "all") {
       // Get all users
-      const [users, students, teachers] = await Promise.all([
-        User.find({}, "_id"),
-        Student.find({}, "userId"),
-        Teacher.find({}, "userId"),
+      const [students, staff] = await Promise.all([
+        Student.find({}, "_id"),
+        Staff.find({}, "_id"),
       ]);
       recipients = [
-        ...users.map((u) => u._id),
-        ...students.map((s) => s.userId),
-        ...teachers.map((t) => t.userId),
+        ...students.map((s) => s._id),
+        ...staff.map((s) => s._id),
       ];
     } else if (role === "student") {
-      const students = await Student.find({}, "userId");
-      recipients = students.map((s) => s.userId);
-    } else if (role === "teacher") {
-      const teachers = await Teacher.find({}, "userId");
-      recipients = teachers.map((t) => t.userId);
+      const students = await Student.find({}, "_id");
+      recipients = students.map((s) => s._id);
     } else if (role) {
-      const users = await User.find({ role }, "_id");
-      recipients = users.map((u) => u._id);
+      // Staff roles: teacher, director, academic, accountant, enrollment
+      const staff = await Staff.find({ staffType: role }, "_id");
+      recipients = staff.map((s) => s._id);
     }
 
     // Remove duplicates

@@ -7,6 +7,26 @@ const {
 } = require("../../shared/utils/response.util");
 
 /**
+ * @desc    Get my payments (for students)
+ * @route   GET /api/finance/me/payments
+ * @access  Private (student)
+ */
+exports.getMyPayments = async (req, res) => {
+  try {
+    const studentId = req.user._id;
+
+    const finances = await Finance.find({ student: studentId })
+      .populate("course", "name courseCode fee")
+      .sort({ createdAt: -1 });
+
+    successResponse(res, finances, "Lấy lịch sử thanh toán thành công");
+  } catch (error) {
+    console.error("Get My Payments Error:", error);
+    errorResponse(res, error.message, 500);
+  }
+};
+
+/**
  * @desc    Get finance overview
  * @route   GET /api/finance/overview
  * @access  Private (director, accountant)
@@ -327,6 +347,21 @@ exports.processPayment = async (req, res) => {
       { path: "student", populate: { path: "user", select: "fullName" } },
       { path: "course", select: "name courseCode" },
     ]);
+
+    // Create notification for student
+    const Notification = require("../../shared/models/Notification.model");
+    const notificationMessage = newStatus === "paid" 
+      ? `Thanh toán học phí khóa ${updatedFinance.course?.name || 'học'} thành công. Số tiền: ${amountToPay.toLocaleString('vi-VN')} VNĐ.`
+      : `Đã nhận thanh toán ${amountToPay.toLocaleString('vi-VN')} VNĐ cho khóa ${updatedFinance.course?.name || 'học'}. Còn lại: ${remaining.toLocaleString('vi-VN')} VNĐ.`;
+    
+    await Notification.create({
+      recipient: updatedFinance.student._id || updatedFinance.student,
+      type: "system",
+      title: newStatus === "paid" ? "Thanh toán thành công" : "Đã nhận thanh toán",
+      message: notificationMessage,
+      link: "/student/tuition",
+      priority: "normal"
+    });
 
     successResponse(res, updatedFinance, "Xử lý thanh toán thành công");
   } catch (error) {

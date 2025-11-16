@@ -1,9 +1,5 @@
 const Student = require("../../shared/models/Student.model");
-const Teacher = require("../../shared/models/Teacher.model");
-const User = require("../../shared/models/User.model");
-const EnrollmentStaff = require("../../shared/models/EnrollmentStaff.model");
-const AcademicStaff = require("../../shared/models/AcademicStaff.model");
-const Accountant = require("../../shared/models/Accountant.model");
+const Staff = require("../../shared/models/Staff.model");
 const Course = require("../../shared/models/Course.model");
 const Finance = require("../../shared/models/Finance.model");
 const Attendance = require("../../shared/models/Attendance.model");
@@ -19,10 +15,6 @@ const {
  * @access  Private (director only)
  */
 exports.createUserAccount = async (req, res) => {
-  const mongoose = require("mongoose");
-  const session = await mongoose.startSession();
-  session.startTransaction();
-
   try {
     const {
       fullName,
@@ -39,8 +31,6 @@ exports.createUserAccount = async (req, res) => {
 
     // Validate required fields
     if (!fullName || !phone || !role) {
-      await session.abortTransaction();
-      session.endSession();
       return errorResponse(
         res,
         "Vui lòng điền đầy đủ họ tên, số điện thoại và vai trò",
@@ -58,50 +48,38 @@ exports.createUserAccount = async (req, res) => {
       "director",
     ];
     if (!allowedRoles.includes(role)) {
-      await session.abortTransaction();
-      session.endSession();
       return errorResponse(res, "Vai trò không hợp lệ", 400);
     }
 
     // Check if phone already exists
-    const existingUser = await User.findOne({ phone }).session(session);
+    let existingUser = await Student.findOne({ phone });
+    if (!existingUser) {
+      existingUser = await Staff.findOne({ phone });
+    }
     if (existingUser) {
-      await session.abortTransaction();
-      session.endSession();
       return errorResponse(res, "Số điện thoại đã được sử dụng", 400);
     }
 
     // Check if email exists (if provided)
     if (email) {
-      const existingEmail = await User.findOne({ email }).session(session);
+      let existingEmail = await Student.findOne({ email });
+      if (!existingEmail) {
+        existingEmail = await Staff.findOne({ email });
+      }
       if (existingEmail) {
-        await session.abortTransaction();
-        session.endSession();
         return errorResponse(res, "Email đã được sử dụng", 400);
       }
     }
-
-    // Prepare user data with basic fields only
-    const userData = {
-      fullName,
-      phone,
-      role,
-      email: email || undefined,
-      password: "123456",
-      isFirstLogin: true,
-    };
-
-    // Create user
-    const userArr = await User.create([userData], { session });
-    const user = userArr[0];
 
     // Create role-specific profile
     let profile = null;
     if (role === "student") {
       const studentProfile = {
-        user: user._id,
-        fullName: user.fullName,
-        email: user.email,
+        fullName,
+        phone,
+        email: email || undefined,
+        password: "123456",
+        isFirstLogin: true,
       };
 
       // Add student-specific data if provided
@@ -116,122 +94,73 @@ exports.createUserAccount = async (req, res) => {
           studentProfile.contactPerson = studentData.contactPerson;
       }
 
-      const studentArr = await Student.create([studentProfile], { session });
-      profile = studentArr[0];
-    } else if (role === "teacher") {
-      const teacherProfile = {
-        user: user._id,
+      profile = await Student.create(studentProfile);
+    } else {
+      // Staff roles
+      const staffProfile = {
+        fullName,
+        phone,
+        email: email || undefined,
+        password: "123456",
+        isFirstLogin: true,
+        staffType: role,
+        staffCode: `NV${role.toUpperCase().slice(0, 2)}${Date.now().toString().slice(-6)}`,
       };
 
-      // Add teacher-specific data if provided
-      if (teacherData) {
-        if (
-          teacherData.specialization &&
-          teacherData.specialization.length > 0
-        ) {
-          teacherProfile.specialization = teacherData.specialization;
-        }
-        if (
-          teacherData.qualifications &&
-          teacherData.qualifications.length > 0
-        ) {
-          teacherProfile.qualifications = teacherData.qualifications;
-        }
+      // Add common staff data
+      if (dateOfBirth) staffProfile.dateOfBirth = new Date(dateOfBirth);
+      if (gender) staffProfile.gender = gender;
+      if (address) staffProfile.address = address;
+
+      // Add teacher-specific data
+      if (role === "teacher" && teacherData) {
+        if (teacherData.specialization?.length > 0)
+          staffProfile.specialization = teacherData.specialization;
+        if (teacherData.qualifications?.length > 0)
+          staffProfile.qualifications = teacherData.qualifications;
         if (teacherData.experience) {
-          teacherProfile.experience = teacherData.experience;
-        }
-        if (teacherData.salary) {
-          teacherProfile.salary = teacherData.salary;
-        }
-        if (teacherData.department) {
-          teacherProfile.department = teacherData.department;
+          staffProfile.experience = {
+            years: teacherData.experience.years || 0,
+            description: teacherData.experience.description || ""
+          };
         }
       }
 
-      const teacherArr = await Teacher.create([teacherProfile], { session });
-      profile = teacherArr[0];
-    } else if (role === "enrollment") {
-      const staffProfile = {
-        user: user._id,
-        department: "Phòng Tuyển sinh",
-        position: "Nhân viên Tuyển sinh",
-      };
-
-      // Add staff-specific data if provided
+      // Add other staff-specific data
       if (staffData) {
-        if (staffData.dateOfBirth)
-          staffProfile.dateOfBirth = new Date(staffData.dateOfBirth);
-        if (staffData.gender) staffProfile.gender = staffData.gender;
-        if (staffData.address) staffProfile.address = staffData.address;
         if (staffData.position) staffProfile.position = staffData.position;
-        if (staffData.department)
-          staffProfile.department = staffData.department;
+        if (staffData.department) staffProfile.department = staffData.department;
+        if (staffData.accessLevel) staffProfile.accessLevel = staffData.accessLevel;
       }
 
-      const staffArr = await EnrollmentStaff.create([staffProfile], {
-        session,
-      });
-      profile = staffArr[0];
-    } else if (role === "academic") {
-      const staffProfile = {
-        user: user._id,
-        department: "Phòng Học vụ",
-        position: "Nhân viên Học vụ",
-      };
-
-      // Add staff-specific data if provided
-      if (staffData) {
-        if (staffData.dateOfBirth)
-          staffProfile.dateOfBirth = new Date(staffData.dateOfBirth);
-        if (staffData.gender) staffProfile.gender = staffData.gender;
-        if (staffData.address) staffProfile.address = staffData.address;
-        if (staffData.position) staffProfile.position = staffData.position;
-        if (staffData.department)
-          staffProfile.department = staffData.department;
-      }
-
-      const staffArr = await AcademicStaff.create([staffProfile], { session });
-      profile = staffArr[0];
-    } else if (role === "accountant") {
-      const staffProfile = {
-        user: user._id,
-        department: "Phòng Kế toán",
-        position: "Kế toán",
-      };
-
-      // Add staff-specific data if provided
-      if (staffData) {
-        if (staffData.dateOfBirth)
-          staffProfile.dateOfBirth = new Date(staffData.dateOfBirth);
-        if (staffData.gender) staffProfile.gender = staffData.gender;
-        if (staffData.address) staffProfile.address = staffData.address;
-        if (staffData.position) staffProfile.position = staffData.position;
-        if (staffData.department)
-          staffProfile.department = staffData.department;
-      }
-
-      const staffArr = await Accountant.create([staffProfile], { session });
-      profile = staffArr[0];
+      profile = await Staff.create(staffProfile);
     }
 
-    await session.commitTransaction();
-    session.endSession();
+    const userData = {
+      _id: profile._id,
+      fullName: profile.fullName,
+      phone: profile.phone,
+      email: profile.email,
+      role: role,
+      status: profile.status,
+      isFirstLogin: profile.isFirstLogin,
+      createdAt: profile.createdAt
+    };
 
     successResponse(
       res,
       {
-        user: user.getPublicProfile(),
-        profile: profile || null,
+        user: userData,
         defaultPassword: "123456",
       },
       "Tạo tài khoản thành công",
       201
     );
   } catch (error) {
-    await session.abortTransaction();
-    session.endSession();
     console.error("Create User Account Error:", error);
-    errorResponse(res, error.message, 500);
+    console.error("Error stack:", error.stack);
+    console.error("Error name:", error.name);
+    errorResponse(res, `Lỗi tạo tài khoản: ${error.message}`, 500);
   }
 };
 
@@ -244,28 +173,68 @@ exports.getAllUsers = async (req, res) => {
   try {
     const { role, status, search, page = 1, limit = 20 } = req.query;
 
-    // Build query
-    const query = {};
-    if (role) query.role = role;
-    if (status) query.status = status;
-    if (search) {
-      query.$or = [
-        { fullName: { $regex: search, $options: "i" } },
-        { phone: { $regex: search, $options: "i" } },
-        { email: { $regex: search, $options: "i" } },
-      ];
-    }
-
-    // Execute query with pagination
     const skip = (page - 1) * limit;
-    const [users, total] = await Promise.all([
-      User.find(query)
-        .select("-password -refreshToken")
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(parseInt(limit)),
-      User.countDocuments(query),
-    ]);
+    let users = [];
+    let total = 0;
+
+    // Build search query
+    const buildQuery = (baseQuery = {}) => {
+      const query = { ...baseQuery };
+      if (status && status !== 'all') query.status = status;
+      if (search) {
+        query.$or = [
+          { fullName: { $regex: search, $options: "i" } },
+          { phone: { $regex: search, $options: "i" } },
+        ];
+        if (search.includes('@')) {
+          query.$or.push({ email: { $regex: search, $options: "i" } });
+        }
+      }
+      return query;
+    };
+
+    if (!role) {
+      // Load both students and staff
+      const [students, staff] = await Promise.all([
+        Student.find(buildQuery())
+          .select("-password -refreshToken")
+          .sort({ createdAt: -1 }),
+        Staff.find(buildQuery())
+          .select("-password -refreshToken")
+          .sort({ createdAt: -1 }),
+      ]);
+
+      // Combine and sort
+      const allUsers = [
+        ...students.map(s => ({ ...s.toObject(), role: "student" })),
+        ...staff.map(s => ({ ...s.toObject(), role: s.staffType })),
+      ].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+      total = allUsers.length;
+      users = allUsers.slice(skip, skip + parseInt(limit));
+    } else if (role === "student") {
+      const [students, count] = await Promise.all([
+        Student.find(buildQuery())
+          .select("-password -refreshToken")
+          .sort({ createdAt: -1 })
+          .skip(skip)
+          .limit(parseInt(limit)),
+        Student.countDocuments(buildQuery()),
+      ]);
+      users = students.map(s => ({ ...s.toObject(), role: "student" }));
+      total = count;
+    } else {
+      const [staff, count] = await Promise.all([
+        Staff.find(buildQuery({ staffType: role }))
+          .select("-password -refreshToken")
+          .sort({ createdAt: -1 })
+          .skip(skip)
+          .limit(parseInt(limit)),
+        Staff.countDocuments(buildQuery({ staffType: role })),
+      ]);
+      users = staff.map(s => ({ ...s.toObject(), role: s.staffType }));
+      total = count;
+    }
 
     successResponse(
       res,
@@ -282,7 +251,8 @@ exports.getAllUsers = async (req, res) => {
     );
   } catch (error) {
     console.error("Get All Users Error:", error);
-    errorResponse(res, error.message, 500);
+    console.error("Error stack:", error.stack);
+    errorResponse(res, `Lỗi lấy danh sách người dùng: ${error.message}`, 500);
   }
 };
 
@@ -303,7 +273,7 @@ exports.getDashboard = async (req, res) => {
       financeStats,
     ] = await Promise.all([
       Student.countDocuments(),
-      Teacher.countDocuments({ employmentStatus: "active" }),
+      Staff.countDocuments({ staffType: "teacher", employmentStatus: "active" }),
       Course.countDocuments({ status: "active" }),
       Student.countDocuments({ academicStatus: "active" }),
       Student.countDocuments({
@@ -440,14 +410,13 @@ exports.getRecentActivities = async (req, res) => {
     // Get recent enrollments
     const recentStudents = await Student.find()
       .sort({ createdAt: -1 })
-      .limit(limit)
-      .populate("user", "fullName");
+      .limit(limit);
 
     const activities = recentStudents.map((student) => ({
       type: "enrollment",
       title: "Học viên mới ghi danh",
-      description: `${student.user?.fullName || "Unknown"} (${
-        student.user?.studentCode || student.studentCode || "—"
+      description: `${student.fullName || "Unknown"} (${
+        student.studentCode || "—"
       }) đã ghi danh`,
       timestamp: student.createdAt,
       status: "success",
@@ -916,12 +885,11 @@ exports.getTopStudents = async (req, res) => {
 
     // Mock data - In production, calculate from grades and attendance
     const students = await Student.find({ academicStatus: "active" })
-      .populate("user", "fullName")
       .limit(parseInt(limit));
 
     const topStudents = students.map((student, index) => ({
       studentCode: student.studentCode || `SV${1000 + index}`,
-      fullName: student.user?.fullName || "Unknown",
+      fullName: student.fullName || "Unknown",
       course: "General English",
       gpa: (4.0 - index * 0.1).toFixed(1),
       attendance: 95 - index,
@@ -1068,8 +1036,8 @@ exports.getAllClasses = async (req, res) => {
 exports.getTeacherStats = async (req, res) => {
   try {
     const [totalTeachers, activeTeachers] = await Promise.all([
-      Teacher.countDocuments(),
-      Teacher.countDocuments({ employmentStatus: "active" }),
+      Staff.countDocuments({ staffType: "teacher" }),
+      Staff.countDocuments({ staffType: "teacher", employmentStatus: "active" }),
     ]);
 
     successResponse(
@@ -1138,13 +1106,12 @@ exports.getTopTeachers = async (req, res) => {
   try {
     const { limit = 15 } = req.query;
 
-    const teachers = await Teacher.find({ employmentStatus: "active" })
-      .populate("user", "fullName")
+    const teachers = await Staff.find({ staffType: "teacher", employmentStatus: "active" })
       .limit(parseInt(limit));
 
     const topTeachers = teachers.map((teacher, index) => ({
-      teacherCode: teacher.teacherCode || `GV${1000 + index}`,
-      fullName: teacher.user?.fullName || "Unknown",
+      teacherCode: teacher.staffCode || `GV${1000 + index}`,
+      fullName: teacher.fullName || "Unknown",
       totalClasses: Math.floor(Math.random() * 5) + 2,
       totalStudents: Math.floor(Math.random() * 80) + 20,
       rating: (5.0 - index * 0.05).toFixed(1),
@@ -1289,12 +1256,11 @@ exports.getAtRiskStudents = async (req, res) => {
     const { limit = 20 } = req.query;
 
     const students = await Student.find({ academicStatus: "active" })
-      .populate("user", "fullName")
       .limit(parseInt(limit));
 
     const atRiskList = students.map((student, index) => ({
       studentCode: student.studentCode || `SV${1000 + index}`,
-      fullName: student.user?.fullName || "Unknown",
+      fullName: student.fullName || "Unknown",
       course: "General English",
       attendanceRate: 40 + Math.floor(Math.random() * 30),
       lastAttendance: "3 ngày trước",

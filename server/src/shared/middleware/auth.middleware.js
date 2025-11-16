@@ -1,5 +1,6 @@
 const jwt = require("jsonwebtoken");
-const User = require("../models/User.model");
+const Student = require("../models/Student.model");
+const Staff = require("../models/Staff.model");
 
 // Validate JWT_SECRET at module initialization
 if (!process.env.JWT_SECRET) {
@@ -33,10 +34,14 @@ exports.protect = async (req, res, next) => {
     // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // Get user from token
-    const user = await User.findById(decoded.id).select(
+    // Get user from token (try Student first, then Staff)
+    let user = await Student.findById(decoded.id).select(
       "-password -refreshToken"
     );
+    if (!user) {
+      user = await Staff.findById(decoded.id).select("-password -refreshToken");
+    }
+
     if (!user) {
       return res.status(401).json({
         success: false,
@@ -82,20 +87,29 @@ exports.protect = async (req, res, next) => {
 
 /**
  * Authorize roles
- * @param  {...string} roles - Allowed roles
+ * @param  {Array|string} roles - Allowed roles
  */
-exports.authorize = (...roles) => {
+exports.authorize = (roles) => {
   return (req, res, next) => {
-    if (!req.user || !req.user.role) {
+    if (!req.user) {
       return res.status(401).json({
         success: false,
         message: "Không có thông tin xác thực người dùng.",
       });
     }
-    if (!roles.includes(req.user.role)) {
+
+    // Determine role: student or staffType
+    const userRole = req.user.studentCode ? "student" : req.user.staffType;
+
+    // Handle both array and single role
+    const allowedRoles = Array.isArray(roles) ? roles : [roles];
+
+    if (!allowedRoles.includes(userRole)) {
       return res.status(403).json({
         success: false,
-        message: `Role ${req.user.role} không có quyền truy cập.`,
+        message: `Role ${userRole} không có quyền truy cập. Yêu cầu: ${allowedRoles.join(
+          ", "
+        )}`,
       });
     }
     next();
@@ -118,9 +132,14 @@ exports.optionalAuth = async (req, res, next) => {
 
     if (token) {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      const user = await User.findById(decoded.id).select(
+      let user = await Student.findById(decoded.id).select(
         "-password -refreshToken"
       );
+      if (!user) {
+        user = await Staff.findById(decoded.id).select(
+          "-password -refreshToken"
+        );
+      }
       if (user && user.status === "active") {
         req.user = user;
       } else {

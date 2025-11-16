@@ -8,7 +8,7 @@ const {
 
 // All routes require authentication and academic staff or director role
 router.use(protect);
-router.use(authorize(["academic", "director"]));
+router.use(authorize("academic", "director"));
 
 // ==================== DASHBOARD ====================
 router.get("/dashboard", academicController.getDashboard);
