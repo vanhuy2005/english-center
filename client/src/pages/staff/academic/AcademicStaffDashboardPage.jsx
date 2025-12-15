@@ -43,12 +43,11 @@ const AcademicStaffDashboardPage = () => {
     try {
       setLoading(true);
       const response = await api.get("/staff/academic/dashboard");
-
       if (response.data.success) {
         setDashboardData(response.data.data);
       }
     } catch (error) {
-      console.error("Error loading dashboard:", error);
+      // Silent fail - keep default data
     } finally {
       setLoading(false);
     }

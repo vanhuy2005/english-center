@@ -1,14 +1,25 @@
 import React from "react";
 import {
-  LineChart as RechartsLineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
   Tooltip,
   Legend,
-  ResponsiveContainer,
-} from "recharts";
+} from "chart.js";
+import { Line } from "react-chartjs-2";
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend
+);
 
 /**
  * Line Chart Component
@@ -27,74 +38,39 @@ export const LineChart = ({
   title,
   height = 300,
 }) => {
-  const colors = ["#132440", "#3B9797", "#16476A", "#BF092F", "#770000"];
+  const defaultData = {
+    labels: [],
+    datasets: [],
+  };
 
-  let chartData = data;
+  const chartData = data || defaultData;
 
-  // Convert Chart.js format to Recharts format
-  if (!data) {
-    chartData = [];
-  } else if (!Array.isArray(data) && data.labels && data.datasets) {
-    chartData = (data.labels || []).map((label, index) => {
-      const item = { [xKey]: label };
-      (data.datasets || []).forEach((dataset, datasetIndex) => {
-        item[dataset.label || `dataset${datasetIndex}`] =
-          (dataset.data || [])[index] || 0;
-      });
-      return item;
-    });
+  const options = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: "top",
+      },
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+      },
+    },
+  };
+
+  if (!chartData.labels || chartData.labels.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-full text-gray-400">
+        Chưa có dữ liệu
+      </div>
+    );
   }
 
   return (
-    <div className="w-full">
-      {title && (
-        <h3 className="text-lg font-semibold text-primary mb-4">{title}</h3>
-      )}
-      <ResponsiveContainer width="100%" height={height}>
-        <RechartsLineChart
-          data={chartData}
-          margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-        >
-          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-          <XAxis dataKey={xKey} stroke="#6b7280" style={{ fontSize: "12px" }} />
-          <YAxis stroke="#6b7280" style={{ fontSize: "12px" }} />
-          <Tooltip
-            contentStyle={{
-              backgroundColor: "#fff",
-              border: "1px solid #e5e7eb",
-              borderRadius: "8px",
-            }}
-          />
-          <Legend />
-          {lines.length > 0
-            ? lines.map((line, index) => (
-                <Line
-                  key={line.dataKey}
-                  type="monotone"
-                  dataKey={line.dataKey}
-                  stroke={line.stroke || colors[index % colors.length]}
-                  strokeWidth={2}
-                  name={line.name || line.dataKey}
-                  activeDot={{ r: 6 }}
-                />
-              ))
-            : // Auto-generate lines from data keys
-              chartData.length > 0 &&
-              Object.keys(chartData[0])
-                .filter((key) => key !== xKey)
-                .map((key, index) => (
-                  <Line
-                    key={key}
-                    type="monotone"
-                    dataKey={key}
-                    stroke={colors[index % colors.length]}
-                    strokeWidth={2}
-                    name={key}
-                    activeDot={{ r: 6 }}
-                  />
-                ))}
-        </RechartsLineChart>
-      </ResponsiveContainer>
+    <div style={{ height: `${height}px` }}>
+      <Line data={chartData} options={options} />
     </div>
   );
 };

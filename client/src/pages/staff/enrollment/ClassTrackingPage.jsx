@@ -9,7 +9,7 @@ import {
   BookOpen,
   BarChart3,
 } from "lucide-react";
-import api from "@services/api";
+import { classService } from "@services/classService";
 import { useNavigate } from "react-router-dom";
 
 const ClassTrackingPage = () => {
@@ -29,19 +29,16 @@ const ClassTrackingPage = () => {
   }, [filters]);
 
   const fetchClasses = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      const params = new URLSearchParams();
-      if (filters.search) params.append("search", filters.search);
-      if (filters.courseId) params.append("courseId", filters.courseId);
-      if (filters.status) params.append("status", filters.status);
-
-      const response = await api.get(`/staff/enrollment/classes?${params}`);
-      const responseData = response.data.data || response.data;
-      setClasses(Array.isArray(responseData) ? responseData : []);
+      // Use service method instead of direct api call
+      const data = await classService.getClasses({
+        search: filters.search,
+        status: filters.status,
+      });
+      setClasses(data);
     } catch (error) {
       console.error("Error fetching classes:", error);
-      setClasses([]);
     } finally {
       setLoading(false);
     }

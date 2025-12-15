@@ -1,115 +1,95 @@
 import axios from "axios";
-import toast from "react-hot-toast";
 
-// Create axios instance
-const apiClient = axios.create({
-  baseURL: (import.meta.env.VITE_API_BASE_URL || "http://localhost:5000") + "/api",
-  timeout: 30000,
+const API_BASE_URL = "http://localhost:5000/api";
+
+console.log("🌐 API Base URL:", API_BASE_URL);
+
+const api = axios.create({
+  baseURL: API_BASE_URL,
+  timeout: 15000,
   headers: {
     "Content-Type": "application/json",
   },
 });
 
-// Global token variable
-let currentToken = null;
-
-// Function to set token globally
+// Set auth token function
 export const setAuthToken = (token) => {
-  currentToken = token;
+  if (token) {
+    api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+    localStorage.setItem("token", token);
+    console.log("✅ Token set");
+  } else {
+    delete api.defaults.headers.common["Authorization"];
+    localStorage.removeItem("token");
+    localStorage.removeItem("refreshToken");
+    console.log("❌ Token cleared");
+  }
 };
 
+// Initialize token from localStorage
+const savedToken = localStorage.getItem("token");
+if (savedToken) {
+  api.defaults.headers.common["Authorization"] = `Bearer ${savedToken}`;
+}
+
 // Request interceptor
-apiClient.interceptors.request.use(
+api.interceptors.request.use(
   (config) => {
-    // SKIP TOKEN for public endpoints (login, register, refresh-token)
-    const publicEndpoints = [
-      "/auth/login",
-      "/auth/register",
-      "/auth/refresh-token",
-    ];
-    const isPublicEndpoint = publicEndpoints.some((endpoint) =>
-      config.url?.includes(endpoint)
-    );
-
-    if (!isPublicEndpoint) {
-      // Use currentToken if available, otherwise fallback to localStorage
-      const token = currentToken || localStorage.getItem("token");
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
+    const token = localStorage.getItem("token");
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
     }
-
+    console.log(`📤 ${config.method.toUpperCase()} ${config.url}`);
     return config;
   },
   (error) => {
+    console.error("❌ Request error:", error);
     return Promise.reject(error);
   }
 );
 
 // Response interceptor
-apiClient.interceptors.response.use(
+api.interceptors.response.use(
   (response) => {
-    return response.data;
+    console.log(`✅ ${response.status} ${response.config.url}`);
+    return response;
   },
-  (error) => {
-    // Handle errors globally
-    if (error.response) {
-      const { status, data } = error.response;
-      const isAuthEndpoint = error.config?.url?.includes("/auth/");
+  async (error) => {
+    if (error.code === "ERR_NETWORK") {
+      console.error("❌ Network Error - Backend server not running?");
+      console.error("Expected: http://localhost:5000");
+    }
 
-      switch (status) {
-        case 401:
-          // DON'T show toast for login failures (let the form handle it)
-          if (!isAuthEndpoint) {
-            // Unauthorized - clear token and redirect to login
-            localStorage.removeItem("token");
-            localStorage.removeItem("user");
-            localStorage.removeItem("role");
-            currentToken = null; // Clear global token
-            toast.error("Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại!");
-            // Dispatch custom navigation event for SPA redirect
-            window.dispatchEvent(
-              new CustomEvent("navigate", { detail: { to: "/login" } })
-            );
-          }
-          break;
-        case 403:
-          toast.error(
-            data?.message || "Bạn không có quyền thực hiện thao tác này!"
+    if (error.response?.status === 401) {
+      const refreshToken = localStorage.getItem("refreshToken");
+
+      if (refreshToken && !error.config._retry) {
+        error.config._retry = true;
+
+        try {
+          const response = await axios.post(
+            `${API_BASE_URL}/auth/refresh-token`,
+            { refreshToken }
           );
-          break;
-        case 404:
-          if (!isAuthEndpoint) {
-            toast.error(data?.message || "Không tìm thấy dữ liệu!");
-          }
-          break;
-        case 500:
-          toast.error(data?.message || "Lỗi server. Vui lòng thử lại sau!");
-          break;
-        default:
-          if (!isAuthEndpoint) {
-            toast.error(data?.message || "Có lỗi xảy ra!");
-          }
+
+          const { token, refreshToken: newRefreshToken } = response.data.data;
+          setAuthToken(token);
+          localStorage.setItem("refreshToken", newRefreshToken);
+
+          error.config.headers.Authorization = `Bearer ${token}`;
+          return api(error.config);
+        } catch (refreshError) {
+          setAuthToken(null);
+          window.location.href = "/login";
+        }
+      } else {
+        setAuthToken(null);
+        window.location.href = "/login";
       }
-    } else if (error.request) {
-      toast.error("Không thể kết nối đến server!");
-    } else {
-      toast.error("Có lỗi xảy ra!");
     }
 
     return Promise.reject(error);
   }
 );
 
-// Navigation utility for SPA redirects
-export const setNavigate = (navigateFn) => {
-  window.__appNavigate = navigateFn;
-};
-
-window.addEventListener("navigate", (e) => {
-  if (window.__appNavigate && e.detail?.to) {
-    window.__appNavigate(e.detail.to);
-  }
-});
-
-export default apiClient;
+export default api;

@@ -1,12 +1,8 @@
 import React from "react";
-import {
-  PieChart as RechartsPieChart,
-  Pie,
-  Cell,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from "recharts";
+import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
+import { Pie } from "react-chartjs-2";
+
+ChartJS.register(ArcElement, Tooltip, Legend);
 
 /**
  * Pie Chart Component
@@ -40,56 +36,34 @@ export const PieChart = ({
     return `${entry.name}: ${entry.value}`;
   };
 
-  if (!data || data.length === 0) {
+  const defaultData = {
+    labels: [],
+    datasets: [],
+  };
+
+  const chartData = data || defaultData;
+
+  const options = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: "bottom",
+      },
+    },
+  };
+
+  if (!chartData.labels || chartData.labels.length === 0) {
     return (
-      <div
-        className="w-full flex flex-col items-center justify-center"
-        style={{ height }}
-      >
-        {title && (
-          <h3 className="text-lg font-semibold text-primary mb-4">{title}</h3>
-        )}
-        <div className="flex items-center justify-center w-full h-full text-gray-400 text-base">
-          No data available
-        </div>
+      <div className="flex items-center justify-center h-full text-gray-400">
+        Chưa có dữ liệu
       </div>
     );
   }
 
   return (
-    <div className="w-full">
-      {title && (
-        <h3 className="text-lg font-semibold text-primary mb-4">{title}</h3>
-      )}
-      <ResponsiveContainer width="100%" height={height}>
-        <RechartsPieChart>
-          <Pie
-            data={data}
-            cx="50%"
-            cy="50%"
-            labelLine={showLabels}
-            label={renderLabel}
-            outerRadius={80}
-            fill="#8884d8"
-            dataKey="value"
-          >
-            {data.map((entry, index) => (
-              <Cell
-                key={`cell-${index}`}
-                fill={chartColors[index % chartColors.length]}
-              />
-            ))}
-          </Pie>
-          <Tooltip
-            contentStyle={{
-              backgroundColor: "#fff",
-              border: "1px solid #e5e7eb",
-              borderRadius: "8px",
-            }}
-          />
-          <Legend />
-        </RechartsPieChart>
-      </ResponsiveContainer>
+    <div style={{ height: `${height}px` }}>
+      <Pie data={chartData} options={options} />
     </div>
   );
 };

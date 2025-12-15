@@ -12,26 +12,22 @@ export default defineConfig({
       "@pages": path.resolve(__dirname, "./src/pages"),
       "@layouts": path.resolve(__dirname, "./src/layouts"),
       "@hooks": path.resolve(__dirname, "./src/hooks"),
-      "@services": path.resolve(__dirname, "./src/services"),
       "@contexts": path.resolve(__dirname, "./src/contexts"),
-      "@utils": path.resolve(__dirname, "./src/utils"),
-      "@lib": path.resolve(__dirname, "./src/lib"),
-      "@assets": path.resolve(__dirname, "./src/assets"),
-      "@locales": path.resolve(__dirname, "./src/locales"),
       "@config": path.resolve(__dirname, "./src/config"),
+      "@services": path.resolve(__dirname, "./src/services"),
+      "@utils": path.resolve(__dirname, "./src/utils"),
+      "@assets": path.resolve(__dirname, "./src/assets"),
+      "@lib": path.resolve(__dirname, "./src/lib"),
     },
   },
   server: {
     port: 5173,
     proxy: {
       "/api": {
-        target: "http://localhost:3000",
+        target: "http://localhost:5000",
         changeOrigin: true,
+        // Do NOT use rewrite if you want to keep /api prefix
       },
     },
-  },
-  build: {
-    outDir: "dist",
-    sourcemap: true,
   },
 });

@@ -72,46 +72,34 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (phone, password) => {
     try {
-      console.log("🔐 Attempting login with phone:", phone);
+      console.log("🔐 Logging in with phone:", phone);
 
       const response = await apiClient.post("/auth/login", {
         phone,
         password,
       });
 
-      console.log("📥 Login response received:", response);
+      console.log("📤 Login response:", response.data);
 
-      // apiClient interceptor returns response.data directly
-      // Backend returns: { success, message, data: { user, profile, token, refreshToken, isFirstLogin } }
-      // After interceptor, response IS the response.data object
-
-      if (!response || !response.success) {
-        throw new Error(response?.message || "Invalid response from server");
-      }
-
-      // Extract from response.data (not response.data.data)
-      const {
-        token: newToken,
-        user: userData,
-        role: userRole,
-        isFirstLogin,
-      } = response.data || {};
-
-      if (!newToken || !userData || !userRole) {
-        console.error("❌ Missing token, user data or role in response:", response);
+      // Validate response structure
+      if (!response.data || !response.data.success) {
         throw new Error("Invalid response from server");
       }
 
-      console.log("✅ Login successful:", {
-        user: userData.fullName,
-        role: userRole,
-        token: newToken.substring(0, 20) + "...",
-      });
+      if (!response.data.data || !response.data.data.token) {
+        throw new Error("Token not received from server");
+      }
+
+      const {
+        token: newToken,
+        user: userData,
+        isFirstLogin,
+      } = response.data.data;
 
       // Save to state
       setToken(newToken);
       setUser(userData);
-      setRole(userRole);
+      setRole(userData.role);
 
       // Set token globally for API calls
       setAuthToken(newToken);
@@ -119,19 +107,24 @@ export const AuthProvider = ({ children }) => {
       // Save to localStorage
       localStorage.setItem("token", newToken);
       localStorage.setItem("user", JSON.stringify(userData));
-      localStorage.setItem("role", userRole);
+      localStorage.setItem("role", userData.role);
 
       if (!isFirstLogin) {
         toast.success("Đăng nhập thành công!");
       }
 
-      return { success: true, user: { ...userData, isFirstLogin, role: userRole } };
+      return {
+        success: true,
+        user: { ...userData, isFirstLogin, role: userData.role },
+      };
     } catch (error) {
       console.error("❌ Login error:", error);
       const message =
         error.response?.data?.message || error.message || "Đăng nhập thất bại";
       toast.error(message);
       return { success: false, error: message };
+    } finally {
+      setLoading(false);
     }
   };
 

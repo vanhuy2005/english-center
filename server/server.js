@@ -10,6 +10,17 @@ let server;
   try {
     await connectDB();
     const app = await initApp();
+
+    // Import routes
+    const authRoutes = require("./routes/auth");
+    const receiptRoutes = require("./routes/receipts");
+    const staffRoutes = require("./routes/staff");
+
+    // Use routes
+    app.use("/api/auth", authRoutes);
+    app.use("/api/receipts", receiptRoutes);
+    app.use("/api/staff", staffRoutes);
+
     server = app.listen(PORT, () => {
       console.log(` Server running on port ${PORT}`);
       console.log(` Environment: ${process.env.NODE_ENV || "development"}`);

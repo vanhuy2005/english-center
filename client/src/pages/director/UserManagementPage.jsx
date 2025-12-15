@@ -115,6 +115,22 @@ const UserManagementPage = () => {
     });
   };
 
+  const handleDeleteUser = async (userId, userName) => {
+    if (!window.confirm(`Bạn có chắc muốn xóa người dùng "${userName}"?`)) {
+      return;
+    }
+
+    try {
+      const response = await apiClient.delete(`/director/users/${userId}`);
+      if (response.success) {
+        toast.success("Xóa người dùng thành công");
+        fetchUsers();
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Xóa người dùng thất bại");
+    }
+  };
+
   const handleCreateUser = async (e) => {
     e.preventDefault();
 
@@ -316,6 +332,19 @@ const UserManagementPage = () => {
       key: "createdAt",
       label: "Ngày tạo",
       render: (value) => new Date(value).toLocaleDateString("vi-VN"),
+    },
+    {
+      key: "actions",
+      label: "Thao tác",
+      render: (_, row) => (
+        <Button
+          variant="danger"
+          size="sm"
+          onClick={() => handleDeleteUser(row._id, row.fullName)}
+        >
+          Xóa
+        </Button>
+      ),
     },
   ];
 

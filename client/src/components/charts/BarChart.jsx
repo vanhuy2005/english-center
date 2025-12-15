@@ -1,14 +1,23 @@
 import React from "react";
 import {
-  BarChart as RechartsBarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
   Tooltip,
   Legend,
-  ResponsiveContainer,
-} from "recharts";
+} from "chart.js";
+import { Bar } from "react-chartjs-2";
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend
+);
 
 /**
  * Bar Chart Component
@@ -28,41 +37,39 @@ export const BarChart = ({
   height = 300,
   stacked = false,
 }) => {
-  const colors = ["#132440", "#3B9797", "#16476A", "#BF092F", "#770000"];
+  const defaultData = {
+    labels: [],
+    datasets: [],
+  };
+
+  const chartData = data || defaultData;
+
+  const options = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: "top",
+      },
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+      },
+    },
+  };
+
+  if (!chartData.labels || chartData.labels.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-full text-gray-400">
+        Chưa có dữ liệu
+      </div>
+    );
+  }
 
   return (
-    <div className="w-full">
-      {title && (
-        <h3 className="text-lg font-semibold text-primary mb-4">{title}</h3>
-      )}
-      <ResponsiveContainer width="100%" height={height}>
-        <RechartsBarChart
-          data={data}
-          margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-        >
-          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-          <XAxis dataKey={xKey} stroke="#6b7280" style={{ fontSize: "12px" }} />
-          <YAxis stroke="#6b7280" style={{ fontSize: "12px" }} />
-          <Tooltip
-            contentStyle={{
-              backgroundColor: "#fff",
-              border: "1px solid #e5e7eb",
-              borderRadius: "8px",
-            }}
-          />
-          <Legend />
-          {bars.map((bar, index) => (
-            <Bar
-              key={bar.dataKey}
-              dataKey={bar.dataKey}
-              fill={bar.fill || colors[index % colors.length]}
-              name={bar.name || bar.dataKey}
-              stackId={stacked ? "stack" : undefined}
-              radius={[8, 8, 0, 0]}
-            />
-          ))}
-        </RechartsBarChart>
-      </ResponsiveContainer>
+    <div style={{ height: `${height}px` }}>
+      <Bar data={chartData} options={options} />
     </div>
   );
 };

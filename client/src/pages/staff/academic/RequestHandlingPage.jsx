@@ -19,12 +19,13 @@ const RequestHandlingPage = () => {
   const fetchRequests = async () => {
     try {
       const response = await api.get("/staff/academic/requests");
-      const data = response.data || [];
-      setRequests(data);
+      const data = response.data || response || [];
+      const requests = Array.isArray(data) ? data : [];
+      setRequests(requests);
       
-      const pending = data.filter(r => r.status === "pending").length;
-      const approved = data.filter(r => r.status === "approved").length;
-      const rejected = data.filter(r => r.status === "rejected").length;
+      const pending = requests.filter(r => r.status === "pending").length;
+      const approved = requests.filter(r => r.status === "approved").length;
+      const rejected = requests.filter(r => r.status === "rejected").length;
       
       setStats({ pending, approved, rejected });
     } catch (error) {

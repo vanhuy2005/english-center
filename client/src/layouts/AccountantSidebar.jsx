@@ -59,8 +59,7 @@ export const AccountantSidebar = ({ menuItems = [] }) => {
   };
 
   return (
-    <>
-      <aside className="fixed left-0 top-0 h-screen w-72 bg-white border-r border-gray-200 shadow-lg z-40 flex flex-col">
+    <aside className="fixed left-0 top-0 h-screen w-72 bg-white border-r border-gray-200 shadow-lg z-40 flex flex-col">
         {/* Header */}
         <div className="px-6 py-6 border-b border-gray-200 bg-gradient-to-br from-blue-50 to-white">
           <div className="text-center">
@@ -154,14 +153,13 @@ export const AccountantSidebar = ({ menuItems = [] }) => {
             <span className="flex-1 text-left">Đăng xuất</span>
           </button>
         </div>
-      </aside>
 
-      {/* Change Password Dialog */}
-      <ChangePasswordDialog
-        open={showPasswordDialog}
-        onOpenChange={setShowPasswordDialog}
-      />
-    </>
+        {/* Change Password Dialog */}
+        <ChangePasswordDialog
+          open={showPasswordDialog}
+          onOpenChange={setShowPasswordDialog}
+        />
+      </aside>
   );
 };
 

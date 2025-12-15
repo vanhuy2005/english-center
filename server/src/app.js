@@ -38,6 +38,14 @@ app.use(
 );
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Debug middleware
+app.use((req, res, next) => {
+  console.log(`📝 ${req.method} ${req.originalUrl}`);
+  console.log("Headers:", req.headers.authorization);
+  next();
+});
+
 const path = require("path");
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
@@ -64,12 +72,21 @@ if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
-// Module Routes
-app.use("/api/auth", require("./modules/auth/auth.routes"));
-app.use("/api/students", require("./modules/student/student.routes"));
-app.use("/api/student/requests", require("./modules/student/request.routes"));
-app.use("/api/teachers", require("./modules/teacher/teacher.routes"));
-app.use("/api/courses", require("./modules/course/course.routes"));
+// Import routes
+const authRoutes = require("./modules/auth/auth.routes");
+const staffRoutes = require("./modules/staff/staff.routes");
+const academicRoutes = require("./modules/staff/academic/academic.routes");
+const accountantRoutes = require("./modules/staff/accountant/accountant.routes");
+const courseRoutes = require("./modules/course/course.routes");
+const studentRoutes = require("./modules/student/student.routes");
+
+// Register routes
+app.use("/api/auth", authRoutes);
+app.use("/api/staffs", staffRoutes);
+app.use("/api/staff/academic", academicRoutes);
+app.use("/api/staff/accountant", accountantRoutes);
+app.use("/api/courses", courseRoutes);
+app.use("/api/students", studentRoutes);
 app.use("/api/classes", require("./modules/class/class.routes"));
 app.use("/api/schedules", require("./modules/schedule/schedule.routes"));
 app.use("/api/attendance", require("./modules/attendance/attendance.routes"));
@@ -92,10 +109,6 @@ app.use(
 app.use(
   "/api/staff/academic/requests",
   require("./modules/staff/academic/request.routes")
-);
-app.use(
-  "/api/staff/accountant",
-  require("./modules/staff/accountant/accountant.routes")
 );
 
 // 404 Handler

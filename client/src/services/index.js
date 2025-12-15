@@ -43,7 +43,12 @@ export const studentService = {
   getFinancialRecords: (id) => apiClient.get(`/api/students/${id}/finance`),
 
   // Student self-service APIs
-  getMyCourses: () => apiClient.get("/students/me/courses"),
+  getMyCourses: () =>
+    apiClient.get("/students/me/courses")
+      .catch((error) => {
+        console.error("Error getting my courses:", error);
+        throw error;
+      }), 
   getMyGrades: () => apiClient.get("/students/me/grades"),
   getMyAttendance: () => apiClient.get("/students/me/attendance"),
   getMyTuition: () => apiClient.get("/students/me/tuition"),

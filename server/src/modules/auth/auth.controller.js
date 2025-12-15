@@ -1,9 +1,6 @@
 const Student = require("../../shared/models/Student.model");
 const Staff = require("../../shared/models/Staff.model");
-const {
-  generateToken,
-  generateRefreshToken,
-} = require("../../shared/utils/jwt.util");
+const jwtUtil = require("../../shared/utils/jwt.util");
 const {
   successResponse,
   errorResponse,
@@ -24,7 +21,14 @@ exports.register = async (req, res) => {
     }
 
     // Validate role
-    const allowedRoles = ["student", "teacher", "director", "academic", "accountant", "enrollment"];
+    const allowedRoles = [
+      "student",
+      "teacher",
+      "director",
+      "academic",
+      "accountant",
+      "enrollment",
+    ];
     if (!allowedRoles.includes(role)) {
       return errorResponse(res, "Role không hợp lệ", 400);
     }
@@ -58,14 +62,22 @@ exports.register = async (req, res) => {
         fullName,
         phone,
         staffType: role,
-        staffCode: `NV${role.toUpperCase().slice(0, 2)}${Date.now().toString().slice(-6)}`,
+        staffCode: `NV${role.toUpperCase().slice(0, 2)}${Date.now()
+          .toString()
+          .slice(-6)}`,
         ...otherFields,
       });
     }
 
     // Generate tokens
-    const token = generateToken(user._id);
-    const refreshToken = generateRefreshToken(user._id);
+    const tokenPayload = {
+      id: user._id.toString(),
+      role: role || "student",
+      userType: role === "student" ? "student" : "staff",
+    };
+
+    const token = jwtUtil.generateAccessToken(tokenPayload);
+    const refreshToken = jwtUtil.generateRefreshToken(tokenPayload);
     user.refreshToken = refreshToken;
     await user.save();
 
@@ -94,61 +106,119 @@ exports.login = async (req, res) => {
   try {
     const { phone, password } = req.body;
 
-    // Validate
+    console.log("📞 Login attempt:", { phone });
+
     if (!phone || !password) {
-      return errorResponse(res, "Vui lòng nhập số điện thoại và mật khẩu", 400);
+      return res.status(400).json({
+        success: false,
+        message: "Vui lòng cung cấp số điện thoại và mật khẩu",
+      });
     }
 
     // Try to find in Student first
-    let user = await Student.findOne({ phone }).select("+password +refreshToken");
+    let user = await Student.findOne({ phone }).select(
+      "+password +refreshToken"
+    );
+    let userType = "student";
     let role = "student";
 
-    // If not found, try Staff
+    // If not found in Student, try Staff
     if (!user) {
       user = await Staff.findOne({ phone }).select("+password +refreshToken");
       if (user) {
+        userType = "staff";
         role = user.staffType;
       }
     }
 
     if (!user) {
-      return errorResponse(res, "Số điện thoại hoặc mật khẩu không đúng", 401);
+      return res.status(401).json({
+        success: false,
+        message: "Số điện thoại hoặc mật khẩu không đúng",
+      });
     }
 
     // Check password
-    const isMatch = await user.comparePassword(password);
-    if (!isMatch) {
-      return errorResponse(res, "Số điện thoại hoặc mật khẩu không đúng", 401);
+    const isPasswordMatch = await user.comparePassword(password);
+    if (!isPasswordMatch) {
+      return res.status(401).json({
+        success: false,
+        message: "Số điện thoại hoặc mật khẩu không đúng",
+      });
     }
 
-    // Check if user is active
+    // Check if account is active
     if (user.status !== "active") {
-      return errorResponse(res, "Tài khoản đã bị khóa", 403);
+      return res.status(401).json({
+        success: false,
+        message: "Tài khoản đã bị vô hiệu hóa",
+      });
     }
 
-    // Generate tokens
-    const token = generateToken(user._id);
-    const refreshToken = generateRefreshToken(user._id);
+    // Generate tokens with plain object payload
+    const tokenPayload = {
+      id: user._id.toString(),
+      role,
+      userType,
+    };
+
+    const token = jwtUtil.generateAccessToken(tokenPayload);
+    const refreshToken = jwtUtil.generateRefreshToken(tokenPayload);
 
     // Save refresh token
     user.refreshToken = refreshToken;
     await user.save();
 
-    // Response
-    successResponse(
-      res,
-      {
-        user: user.getPublicProfile(),
-        role,
+    // Build user object with all required fields
+    const userData = {
+      _id: user._id,
+      fullName: user.fullName,
+      email: user.email,
+      phone: user.phone,
+      avatar: user.avatar || "",
+      role, // ⚠️ MUST HAVE
+      userType, // ⚠️ MUST HAVE
+      status: user.status,
+      isFirstLogin: user.isFirstLogin,
+    };
+
+    // Add staff-specific fields
+    if (userType === "staff") {
+      userData.staffCode = user.staffCode;
+      userData.staffType = user.staffType;
+      userData.department = user.department;
+      userData.position = user.position;
+    } else {
+      userData.studentCode = user.studentCode;
+      userData.academicStatus = user.academicStatus;
+    }
+
+    console.log("✅ Login successful:", {
+      userId: user._id,
+      role,
+      userType,
+      hasToken: !!token,
+      hasRefreshToken: !!refreshToken,
+    });
+
+    // ⚠️ IMPORTANT: Response format MUST match client expectation
+    res.status(200).json({
+      success: true,
+      message: "Đăng nhập thành công",
+      data: {
         token,
         refreshToken,
+        user: userData,
         isFirstLogin: user.isFirstLogin,
       },
-      "Đăng nhập thành công"
-    );
+    });
   } catch (error) {
-    console.error("Login Error:", error);
-    errorResponse(res, error.message, 500);
+    console.error("❌ Login error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Lỗi server khi đăng nhập",
+      error: error.message,
+    });
   }
 };
 
@@ -263,17 +333,30 @@ exports.refreshToken = async (req, res) => {
 
     // Find user with refresh token (try both Student and Staff)
     let user = await Student.findOne({ refreshToken }).select("+refreshToken");
+    let userType = "student";
+    let role = "student";
+
     if (!user) {
       user = await Staff.findOne({ refreshToken }).select("+refreshToken");
+      if (user) {
+        userType = "staff";
+        role = user.staffType;
+      }
     }
 
     if (!user) {
       return errorResponse(res, "Invalid refresh token", 401);
     }
 
-    // Generate new tokens
-    const newToken = generateToken(user._id);
-    const newRefreshToken = generateRefreshToken(user._id);
+    // Generate new tokens with proper payload
+    const tokenPayload = {
+      id: user._id.toString(),
+      role,
+      userType,
+    };
+
+    const newToken = jwtUtil.generateAccessToken(tokenPayload);
+    const newRefreshToken = jwtUtil.generateRefreshToken(tokenPayload);
 
     // Update refresh token
     user.refreshToken = newRefreshToken;

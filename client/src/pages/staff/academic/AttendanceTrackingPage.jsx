@@ -22,10 +22,11 @@ const AttendanceTrackingPage = () => {
   const fetchClasses = async () => {
     try {
       const response = await api.get("/staff/academic/classes");
-      setClasses(response.data || []);
-      setLoading(false);
+      const data = response.data || response || [];
+      setClasses(Array.isArray(data) ? data : []);
     } catch (error) {
-      toast.error("Không thể tải danh sách lớp");
+      setClasses([]);
+    } finally {
       setLoading(false);
     }
   };
@@ -33,7 +34,8 @@ const AttendanceTrackingPage = () => {
   const fetchAttendance = async () => {
     try {
       const response = await api.get(`/staff/academic/attendance/${selectedClass}?date=${date}`);
-      setAttendanceData(response.data || []);
+      const data = response.data || response || [];
+      setAttendanceData(Array.isArray(data) ? data : []);
     } catch (error) {
       setAttendanceData([]);
     }

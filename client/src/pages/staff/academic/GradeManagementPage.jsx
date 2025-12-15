@@ -21,10 +21,11 @@ const GradeManagementPage = () => {
   const fetchClasses = async () => {
     try {
       const response = await api.get("/staff/academic/classes");
-      setClasses(response.data || []);
-      setLoading(false);
+      const data = response.data || response || [];
+      setClasses(Array.isArray(data) ? data : []);
     } catch (error) {
-      toast.error("Không thể tải danh sách lớp");
+      setClasses([]);
+    } finally {
       setLoading(false);
     }
   };
@@ -32,7 +33,8 @@ const GradeManagementPage = () => {
   const fetchGrades = async () => {
     try {
       const response = await api.get(`/staff/academic/grades/${selectedClass}`);
-      setGrades(response.data || []);
+      const data = response.data || response || [];
+      setGrades(Array.isArray(data) ? data : []);
     } catch (error) {
       setGrades([]);
     }

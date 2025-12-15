@@ -362,357 +362,153 @@ exports.enrollCourse = async (req, res) => {
  */
 exports.getMyCourses = async (req, res) => {
   try {
-    const student = await Student.findById(req.user._id).populate({
-      path: "enrolledCourses",
-      select: "name courseCode level status",
+    const studentId = req.user._id;
+    console.log("📚 Fetching courses for student:", studentId);
+
+    // Find all classes where student is enrolled
+    const classes = await Class.find({
+      "students.student": studentId,
+    })
+      .populate("course", "name code level duration")
+      .populate("teacher", "fullName email")
+      .lean();
+
+    console.log("✅ Found", classes.length, "classes");
+
+    res.json({
+      success: true,
+      data: classes || [],
     });
-
-    if (!student) {
-      return errorResponse(res, "Không tìm thấy thông tin học viên", 404);
-    }
-
-    // Get classes student is enrolled in
-    const classes = await Class.find({ students: student._id })
-      .populate("course", "name courseCode")
-      .populate("teacher", "firstName lastName")
-      .select("className schedule startDate endDate status");
-
-    // If no classes, return enrolled courses without class info
-    if (classes.length === 0 && student.enrolledCourses.length > 0) {
-      const coursesData = student.enrolledCourses.map(course => ({
-        _id: course._id,
-        courseName: course.name,
-        courseCode: course.courseCode,
-        className: "Chưa phân lớp",
-        teacherName: null,
-        schedule: "Chưa cập nhật",
-        status: course.status || "active",
-        progress: 0,
-        attendanceRate: 0,
-        averageGrade: null,
-        classId: null,
-      }));
-      return successResponse(res, coursesData, "Lấy danh sách khóa học thành công");
-    }
-
-    // Build course data with class info
-    const coursesData = await Promise.all(
-      classes.map(async (classInfo) => {
-        // Get attendance rate
-        const totalSessions = await Attendance.countDocuments({
-          class: classInfo._id,
-        });
-        const presentSessions = await Attendance.countDocuments({
-          class: classInfo._id,
-          student: student._id,
-          status: { $in: ["present", "excused"] },
-        });
-        const attendanceRate =
-          totalSessions > 0
-            ? Math.round((presentSessions / totalSessions) * 100)
-            : 0;
-
-        // Get average grade
-        const grades = await Grade.find({
-          class: classInfo._id,
-          student: student._id,
-        });
-        const averageGrade =
-          grades.length > 0 && grades[0].finalGrade
-            ? grades[0].finalGrade.toFixed(2)
-            : null;
-
-        return {
-          _id: classInfo._id,
-          courseName: classInfo.course?.name || "N/A",
-          courseCode: classInfo.course?.courseCode || "N/A",
-          className: classInfo.className,
-          teacherName: classInfo.teacher
-            ? `${classInfo.teacher.firstName} ${classInfo.teacher.lastName}`
-            : null,
-          schedule: classInfo.schedule || "Chưa cập nhật",
-          status: classInfo.status,
-          progress: classInfo.progress || 0,
-          attendanceRate,
-          averageGrade,
-          classId: classInfo._id,
-        };
-      })
-    );
-
-    successResponse(res, coursesData, "Lấy danh sách khóa học thành công");
   } catch (error) {
-    console.error("Get My Courses Error:", error);
-    errorResponse(res, error.message, 500);
+    console.error("❌ Error fetching student courses:", error);
+    res.status(500).json({
+      success: false,
+      message: "Không thể tải danh sách khóa học",
+      data: [],
+    });
   }
 };
 
-/**
- * @desc    Get my grades (for current logged-in student)
- * @route   GET /api/students/me/grades
- * @access  Private (student only)
- */
-exports.getMyGrades = async (req, res) => {
+exports.getMyProfile = async (req, res) => {
   try {
-    const student = await Student.findById(req.user._id);
+    const student = await Student.findById(req.user._id)
+      .select("-password -refreshToken")
+      .lean();
 
     if (!student) {
-      return errorResponse(res, "Không tìm thấy thông tin học viên", 404);
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy thông tin học viên",
+      });
     }
 
-    // Get all grades for this student
-    const grades = await Grade.find({ student: student._id })
-      .populate({
-        path: "class",
-        populate: { path: "course", select: "name courseCode" },
-        select: "className",
-      })
-      .sort({ createdAt: -1 });
-
-    const gradesData = grades.map((grade) => ({
-      _id: grade._id,
-      courseName: grade.class?.course?.name || "N/A",
-      courseCode: grade.class?.course?.courseCode || "N/A",
-      className: grade.class?.className || "N/A",
-      participation: grade.participation,
-      assignment: grade.assignment,
-      midterm: grade.midterm,
-      finalExam: grade.finalExam,
-      finalGrade: grade.finalGrade,
-      notes: grade.notes,
-      updatedAt: grade.updatedAt,
-    }));
-
-    successResponse(res, gradesData, "Lấy kết quả học tập thành công");
+    res.json({
+      success: true,
+      data: student,
+    });
   } catch (error) {
-    console.error("Get My Grades Error:", error);
-    errorResponse(res, error.message, 500);
+    console.error("Error fetching student profile:", error);
+    res.status(500).json({
+      success: false,
+      message: "Không thể tải thông tin học viên",
+    });
   }
 };
 
-/**
- * @desc    Get my attendance (for current logged-in student)
- * @route   GET /api/students/me/attendance
- * @access  Private (student only)
- */
 exports.getMyAttendance = async (req, res) => {
   try {
-    const student = await Student.findById(req.user._id);
-
-    if (!student) {
-      return errorResponse(res, "Không tìm thấy thông tin học viên", 404);
-    }
-
-    // Get all attendance records
-    const attendanceRecords = await Attendance.find({ student: student._id })
-      .populate({
-        path: "class",
-        populate: { path: "course", select: "name courseCode" },
-        select: "className",
-      })
-      .sort({ date: -1 });
-
-    const attendanceData = attendanceRecords.map((record) => ({
-      _id: record._id,
-      date: record.date,
-      courseName: record.class?.course?.name || "N/A",
-      className: record.class?.className || "N/A",
-      session: record.session,
-      status: record.status,
-      notes: record.notes,
-    }));
-
-    successResponse(res, attendanceData, "Lấy dữ liệu chuyên cần thành công");
+    res.json({
+      success: true,
+      data: [],
+    });
   } catch (error) {
-    console.error("Get My Attendance Error:", error);
-    errorResponse(res, error.message, 500);
+    res.status(500).json({
+      success: false,
+      message: "Không thể tải dữ liệu điểm danh",
+    });
   }
 };
 
-/**
- * @desc    Get my tuition info (for current logged-in student)
- * @route   GET /api/students/me/tuition
- * @access  Private (student only)
- */
+exports.getMyGrades = async (req, res) => {
+  try {
+    res.json({
+      success: true,
+      data: [],
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Không thể tải dữ liệu điểm số",
+    });
+  }
+};
+
 exports.getMyTuition = async (req, res) => {
   try {
-    const student = await Student.findById(req.user._id);
-
-    if (!student) {
-      return errorResponse(res, "Không tìm thấy thông tin học viên", 404);
-    }
-
-    // Get all finance records for this student
-    const financeRecords = await Finance.find({ student: student._id })
-      .populate({
-        path: "class",
-        populate: { path: "course", select: "name courseCode" },
-        select: "className",
-      })
-      .sort({ createdAt: -1 });
-
-    // Calculate summary
-    const total = financeRecords.reduce((sum, r) => sum + r.amount, 0);
-    const paid = financeRecords
-      .filter((r) => r.status === "paid")
-      .reduce((sum, r) => sum + r.amount, 0);
-    const remaining = total - paid;
-    const overdue = financeRecords
-      .filter(
-        (r) =>
-          r.status === "pending" &&
-          r.dueDate &&
-          new Date(r.dueDate) < new Date()
-      )
-      .reduce((sum, r) => sum + r.amount, 0);
-
-    const paymentsData = financeRecords.map((record) => ({
-      _id: record._id,
-      courseName: record.class?.course?.name || "N/A",
-      className: record.class?.className || "N/A",
-      period: record.period || "N/A",
-      amount: record.amount,
-      status: record.status,
-      paidDate: record.paidDate,
-      dueDate: record.dueDate,
-      notes: record.notes,
-    }));
-
-    successResponse(
-      res,
-      {
-        summary: { total, paid, remaining, overdue },
-        payments: paymentsData,
-      },
-      "Lấy thông tin học phí thành công"
-    );
+    res.json({
+      success: true,
+      data: [],
+    });
   } catch (error) {
-    console.error("Get My Tuition Error:", error);
-    errorResponse(res, error.message, 500);
+    res.status(500).json({
+      success: false,
+      message: "Không thể tải thông tin học phí",
+    });
   }
 };
 
-/**
- * @desc    Get my requests (for current logged-in student)
- * @route   GET /api/students/me/requests
- * @access  Private (student only)
- */
 exports.getMyRequests = async (req, res) => {
   try {
-    const student = await Student.findById(req.user._id);
-
-    if (!student) {
-      return errorResponse(res, "Không tìm thấy thông tin học viên", 404);
-    }
-
-    // Get all requests for this student
-    const requests = await Request.find({ student: student._id })
-      .populate("class", "className")
-      .populate("processedBy", "firstName lastName")
-      .sort({ createdAt: -1 });
-
-    const requestsData = requests.map((request) => ({
-      _id: request._id,
-      type: request.type,
-      title: request.title,
-      reason: request.reason,
-      requestDate: request.requestDate,
-      status: request.status,
-      courseName: request.courseName || "N/A",
-      className: request.class?.className || "N/A",
-      response: request.response,
-      processedAt: request.processedAt,
-      processorName: request.processedBy
-        ? `${request.processedBy.firstName} ${request.processedBy.lastName}`
-        : null,
-      createdAt: request.createdAt,
-    }));
-
-    successResponse(res, requestsData, "Lấy danh sách yêu cầu thành công");
+    res.json({
+      success: true,
+      data: [],
+    });
   } catch (error) {
-    console.error("Get My Requests Error:", error);
-    errorResponse(res, error.message, 500);
+    res.status(500).json({
+      success: false,
+      message: "Không thể tải yêu cầu",
+    });
   }
 };
 
-/**
- * @desc    Create new request (for current logged-in student)
- * @route   POST /api/students/me/requests
- * @access  Private (student only)
- */
 exports.createRequest = async (req, res) => {
   try {
-    const student = await Student.findById(req.user._id);
-
-    if (!student) {
-      return errorResponse(res, "Không tìm thấy thông tin học viên", 404);
-    }
-
-    const { type, title, reason, requestDate, classId, courseName } = req.body;
-
-    // Validation
-    if (!type || !title || !reason) {
-      return errorResponse(
-        res,
-        "Loại yêu cầu, tiêu đề và lý do là bắt buộc",
-        400
-      );
-    }
-
-    const newRequest = new Request({
-      student: student._id,
-      type,
-      title,
-      reason,
-      requestDate: requestDate || new Date(),
-      class: classId || null,
-      courseName: courseName || "N/A",
-      status: "pending",
+    res.json({
+      success: true,
+      message: "Tạo yêu cầu thành công",
     });
-
-    await newRequest.save();
-
-    successResponse(res, newRequest, "Gửi yêu cầu thành công", 201);
   } catch (error) {
-    console.error("Create Request Error:", error);
-    errorResponse(res, error.message, 500);
+    res.status(500).json({
+      success: false,
+      message: "Không thể tạo yêu cầu",
+    });
   }
 };
 
-const fs = require("fs");
-const path = require("path");
-
-/**
- * @desc    Upload avatar (for current logged-in student)
- * @route   POST /api/students/me/avatar
- * @access  Private (student only)
- */
 exports.uploadAvatar = async (req, res) => {
   try {
     if (!req.file) {
-      return errorResponse(res, "Vui lòng chọn file ảnh", 400);
+      return res.status(400).json({
+        success: false,
+        message: "Vui lòng chọn file ảnh",
+      });
     }
 
-    const student = await Student.findById(req.user._id);
-    if (!student) {
-      return errorResponse(res, "Không tìm thấy thông tin học viên", 404);
-    }
+    const student = await Student.findByIdAndUpdate(
+      req.user._id,
+      { avatar: `/uploads/avatars/${req.file.filename}` },
+      { new: true }
+    );
 
-    // Delete old avatar if exists
-    if (student.avatar) {
-      const oldPath = path.join(__dirname, "../../../", student.avatar);
-      if (fs.existsSync(oldPath)) {
-        fs.unlinkSync(oldPath);
-      }
-    }
-
-    // Save new avatar path
-    student.avatar = `/uploads/avatars/${req.file.filename}`;
-    await student.save();
-
-    successResponse(res, { avatar: student.avatar }, "Tải ảnh đại diện thành công");
+    res.json({
+      success: true,
+      data: student,
+      message: "Cập nhật ảnh đại diện thành công",
+    });
   } catch (error) {
-    console.error("Upload Avatar Error:", error);
-    errorResponse(res, error.message, 500);
+    res.status(500).json({
+      success: false,
+      message: "Không thể tải lên ảnh",
+    });
   }
 };

@@ -1,126 +1,74 @@
 const express = require("express");
 const router = express.Router();
+const { auth, checkRole } = require("../../../middleware/auth");
 const studentController = require("./student.controller");
-const {
-  protect,
-  authorize,
-} = require("../../shared/middleware/auth.middleware");
 
-// All routes require authentication
-router.use(protect);
+// Protected routes - require authentication
+router.use(auth);
 
-// ===== STUDENT SELF-SERVICE ROUTES (MUST BE BEFORE /:id ROUTES) =====
-// Get my courses (current student only)
-router.get("/me/courses", authorize("student"), studentController.getMyCourses);
+// ===== STUDENT SELF-SERVICE ROUTES =====
+// Get my courses
+router.get("/me/courses", studentController.getMyCourses);
 
-// Get my grades (current student only)
-router.get("/me/grades", authorize("student"), studentController.getMyGrades);
+// Get my grades
+router.get("/me/grades", studentController.getMyGrades);
 
-// Get my attendance (current student only)
-router.get(
-  "/me/attendance",
-  authorize("student"),
-  studentController.getMyAttendance
-);
+// Get my attendance
+router.get("/me/attendance", studentController.getMyAttendance);
 
-// Get my tuition info (current student only)
-router.get("/me/tuition", authorize("student"), studentController.getMyTuition);
+// Get my tuition info
+router.get("/me/tuition", studentController.getMyTuition);
 
-// Get my requests (current student only)
-router.get(
-  "/me/requests",
-  authorize("student"),
-  studentController.getMyRequests
-);
+// Get my requests
+router.get("/me/requests", studentController.getMyRequests);
 
-// Create new request (current student only)
-router.post(
-  "/me/requests",
-  authorize("student"),
-  studentController.createRequest
-);
+// Create new request
+router.post("/me/requests", studentController.createRequest);
 
-// Upload avatar (current student only)
+// Upload avatar
 const multer = require("multer");
 const upload = multer({ dest: "uploads/avatars/" });
 router.post(
   "/me/avatar",
-  authorize("student"),
   upload.single("avatar"),
   studentController.uploadAvatar
 );
 
+// ===== ADMIN/STAFF ROUTES =====
 // Get all students (director, staff)
 router.get(
   "/",
-  authorize("director", "enrollment", "academic", "accountant"),
+  checkRole(["director", "enrollment", "academic", "accountant"]),
   studentController.getAllStudents
 );
 
 // Create new student (director, enrollment staff)
 router.post(
   "/",
-  authorize("director", "enrollment"),
+  checkRole(["director", "enrollment"]),
   studentController.createStudent
 );
 
-// Get student by ID (self or privileged roles)
-router.get(
-  "/:id",
-  protect,
-  (req, res, next) => {
-    const allowedRoles = [
-      "director",
-      "enrollment",
-      "academic",
-      "accountant",
-      "teacher",
-    ];
-    if (
-      String(req.user.id) === String(req.params.id) ||
-      allowedRoles.includes(req.user.role)
-    ) {
-      return next();
-    }
-    return res.status(403).json({ success: false, message: "Forbidden" });
-  },
-  studentController.getStudentById
-);
+// Get student by ID
+router.get("/:id", studentController.getStudentById);
 
-// Update student (director, staff, self)
+// Update student
 router.put(
   "/:id",
-  authorize("director", "enrollment", "academic", "accountant"),
+  checkRole(["director", "enrollment", "academic", "accountant"]),
   studentController.updateStudent
 );
 
 // Delete student (director only)
-router.delete("/:id", authorize("director"), studentController.deleteStudent);
+router.delete("/:id", checkRole(["director"]), studentController.deleteStudent);
 
-// Get student's courses (self or privileged roles)
-router.get(
-  "/:id/courses",
-  protect,
-  (req, res, next) => {
-    const allowedRoles = [
-      "director",
-      "enrollment",
-      "academic",
-      "accountant",
-      "teacher",
-    ];
-    if (req.user.id === req.params.id || allowedRoles.includes(req.user.role)) {
-      return next();
-    }
-    return res.status(403).json({ success: false, message: "Forbidden" });
-  },
-  studentController.getStudentCourses
-);
+// Get student's courses
+router.get("/:id/courses", studentController.getStudentCourses);
 
 // Enroll in course
 router.post(
   "/:id/enroll",
-  authorize("director", "enrollment"),
+  checkRole(["director", "enrollment"]),
   studentController.enrollCourse
 );
 

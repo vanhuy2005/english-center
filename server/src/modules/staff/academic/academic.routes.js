@@ -6,34 +6,32 @@ const {
   authorize,
 } = require("../../../shared/middleware/auth.middleware");
 
-// All routes require authentication and academic staff or director role
+// All routes require authentication
 router.use(protect);
-router.use(authorize("academic", "director"));
 
-// ==================== DASHBOARD ====================
+// Dashboard
 router.get("/dashboard", academicController.getDashboard);
 
-// ==================== CLASS MANAGEMENT ====================
-router.get("/classes", academicController.getClasses);
+// Attendance Management
+router.get("/attendance", academicController.getAttendance);
+router.post("/attendance", academicController.createAttendance);
+router.put("/attendance/:id", academicController.updateAttendance);
 
-// ==================== ATTENDANCE TRACKING ====================
-router.get("/attendance", academicController.getAttendanceData);
-router.post("/attendance/report", academicController.exportAttendanceReport);
-
-// ==================== GRADE MANAGEMENT ====================
+// Grade Management
 router.get("/grades", academicController.getGrades);
 router.put("/grades/:id", academicController.updateGrade);
+router.post("/grades/:id/publish", academicController.publishGrade);
 
-// ==================== STUDENT PROGRESS ====================
-router.get("/students/progress", academicController.getStudentProgress);
-
-// ==================== REQUEST HANDLING ====================
+// Request Management
 router.get("/requests", academicController.getRequests);
-router.put("/requests/:id/approve", academicController.approveRequest);
-router.put("/requests/:id/reject", academicController.rejectRequest);
+router.post("/requests/:id/approve", academicController.approveRequest);
+router.post("/requests/:id/reject", academicController.rejectRequest);
 
-// ==================== REPORTS & STATISTICS ====================
+// Student Management
+router.get("/students", academicController.getStudents);
+router.get("/students/:id", academicController.getStudentDetail);
+
+// Reports
 router.get("/reports/class/:classId", academicController.getClassReport);
-router.get("/statistics", academicController.getStatistics);
 
 module.exports = router;

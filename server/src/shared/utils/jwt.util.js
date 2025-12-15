@@ -14,19 +14,48 @@ exports.generateToken = (id, expiresIn = "7d") => {
  * NOTE: JWT_REFRESH_SECRET must be set in environment for secure refresh tokens.
  * If JWT_REFRESH_SECRET is missing, fallback to JWT_SECRET is NOT recommended and will throw an error.
  */
-exports.generateRefreshToken = (id) => {
-  const refreshSecret = process.env.JWT_REFRESH_SECRET;
-  if (!refreshSecret) {
+exports.generateRefreshToken = (payload) => {
+  const secret =
+    process.env.JWT_REFRESH_SECRET || process.env.REFRESH_TOKEN_SECRET;
+
+  if (!secret) {
     throw new Error(
-      "JWT_REFRESH_SECRET is not set. Please set JWT_REFRESH_SECRET in your environment."
+      "JWT_REFRESH_SECRET or REFRESH_TOKEN_SECRET is not set in environment."
     );
   }
-  if (!id) {
-    throw new Error("User id is required to generate refresh token");
+
+  const expiresIn = process.env.REFRESH_TOKEN_EXPIRES_IN || "30d";
+
+  // Ensure payload is a plain object
+  const plainPayload = {
+    id: payload.id || payload._id,
+    role: payload.role,
+    userType: payload.userType,
+  };
+
+  return jwt.sign(plainPayload, secret, { expiresIn });
+};
+
+/**
+ * Generate Access Token
+ */
+exports.generateAccessToken = (payload) => {
+  const secret = process.env.JWT_SECRET;
+
+  if (!secret) {
+    throw new Error("JWT_SECRET is not set in environment.");
   }
-  return jwt.sign({ id }, refreshSecret, {
-    expiresIn: "30d",
-  });
+
+  const expiresIn = process.env.JWT_EXPIRES_IN || "7d";
+
+  // Ensure payload is a plain object
+  const plainPayload = {
+    id: payload.id || payload._id,
+    role: payload.role,
+    userType: payload.userType,
+  };
+
+  return jwt.sign(plainPayload, secret, { expiresIn });
 };
 
 /**

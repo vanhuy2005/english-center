@@ -1,43 +1,24 @@
 const express = require("express");
 const router = express.Router();
-const {
-  getMyNotifications,
-  getUnreadCount,
-  markAsRead,
-  deleteNotification,
-  createNotification,
-  broadcastNotification,
-} = require("./notification.controller");
-const {
-  protect,
-  authorize,
-} = require("../../shared/middleware/auth.middleware");
-const validateObjectId = require("../../shared/middleware/validateObjectId");
+const { auth } = require("../../../middleware/auth");
+const notificationController = require("./notification.controller");
 
-// All routes require authentication
-router.use(protect);
+// All notification routes require authentication
+router.use(auth);
 
 // Get my notifications
-router.route("/").get(getMyNotifications);
+router.get("/", notificationController.getMyNotifications);
 
-// Get unread count
-router.route("/unread-count").get(getUnreadCount);
+// Mark notification as read
+router.put("/:id/read", notificationController.markAsRead);
 
-// Mark as read
-router.route("/mark-read").patch(markAsRead);
-
-// Create notification (admin/staff only)
-router
-  .route("/create")
-  .post(
-    authorize("director", "academic", "enrollment", "accountant"),
-    createNotification
-  );
-
-// Broadcast notification (director only)
-router.route("/broadcast").post(authorize("director"), broadcastNotification);
+// Mark all as read
+router.put("/read-all", notificationController.markAllAsRead);
 
 // Delete notification
-router.route("/:id").delete(validateObjectId, deleteNotification);
+router.delete("/:id", notificationController.deleteNotification);
+
+// Delete all notifications
+router.delete("/", notificationController.deleteAllNotifications);
 
 module.exports = router;

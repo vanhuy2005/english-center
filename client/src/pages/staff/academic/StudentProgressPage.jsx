@@ -17,14 +17,15 @@ const StudentProgressPage = () => {
   const fetchStudents = async () => {
     try {
       const response = await api.get("/staff/academic/students/progress");
-      const data = response.data || [];
-      setStudents(data);
+      const data = response.data || response || [];
+      const students = Array.isArray(data) ? data : [];
+      setStudents(students);
       
-      const good = data.filter(s => s.average >= 8 && s.attendanceRate >= 80).length;
-      const warning = data.filter(s => (s.average >= 5 && s.average < 8) || (s.attendanceRate >= 60 && s.attendanceRate < 80)).length;
-      const danger = data.filter(s => s.average < 5 || s.attendanceRate < 60).length;
+      const good = students.filter(s => s.average >= 8 && s.attendanceRate >= 80).length;
+      const warning = students.filter(s => (s.average >= 5 && s.average < 8) || (s.attendanceRate >= 60 && s.attendanceRate < 80)).length;
+      const danger = students.filter(s => s.average < 5 || s.attendanceRate < 60).length;
       
-      setStats({ good, warning, danger, total: data.length });
+      setStats({ good, warning, danger, total: students.length });
     } catch (error) {
       toast.error("Không thể tải dữ liệu học viên");
       setStudents([]);
