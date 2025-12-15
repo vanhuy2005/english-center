@@ -68,6 +68,22 @@ export const AuthProvider = ({ children }) => {
     }
 
     setLoading(false);
+
+    // Listen for logout event from API interceptor
+    const handleLogoutEvent = () => {
+      console.log("📤 Logout event received from API interceptor");
+      setToken(null);
+      setUser(null);
+      setRole(null);
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      localStorage.removeItem("role");
+      localStorage.removeItem("refreshToken");
+      window.location.href = "/login";
+    };
+
+    window.addEventListener("auth:logout", handleLogoutEvent);
+    return () => window.removeEventListener("auth:logout", handleLogoutEvent);
   }, []);
 
   const login = async (phone, password) => {

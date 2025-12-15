@@ -201,7 +201,7 @@ const DebtTrackingPage = () => {
         <Card className="bg-yellow-50">
           <div className="text-center">
             <p className="text-sm text-yellow-600 font-medium">
-              Nợ Quá Hạn (>30 ngày)
+              Nợ Quá Hạn (30 ngày)
             </p>
             <p className="text-3xl font-bold text-yellow-900 mt-2">
               {criticalDebtors}

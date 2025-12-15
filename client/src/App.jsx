@@ -459,6 +459,14 @@ function App() {
           }
         />
         <Route
+          path="/accountant/students"
+          element={
+            <ProtectedRoute allowedRoles={["accountant", "director"]}>
+              <StudentFinancePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/accountant/students/:id/payments"
           element={
             <ProtectedRoute allowedRoles={["accountant", "director"]}>

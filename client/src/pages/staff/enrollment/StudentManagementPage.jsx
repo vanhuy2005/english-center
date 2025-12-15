@@ -61,11 +61,11 @@ const StudentManagementPage = () => {
 
       const responseData = response.data?.data || response.data;
       const studentsList = responseData?.students || responseData || [];
-      
+
       console.log("Students list:", studentsList);
-      
+
       setStudents(Array.isArray(studentsList) ? studentsList : []);
-      
+
       if (response.data?.pagination) {
         setPagination((prev) => ({
           ...prev,
@@ -126,7 +126,7 @@ const StudentManagementPage = () => {
     {
       key: "phone",
       label: "Số điện thoại",
-      render: (student) => student.user?.phone || "N/A",
+      render: (student) => student.phone || "N/A",
     },
     {
       key: "academicStatus",
@@ -585,7 +585,7 @@ const EnrollStudentModal = ({ isOpen, onClose, student, onSuccess }) => {
           </p>
           <p className="text-sm">
             <span className="font-medium">Số điện thoại:</span>{" "}
-            {student.user?.phone || "N/A"}
+            {student.phone || "N/A"}
           </p>
         </div>
 

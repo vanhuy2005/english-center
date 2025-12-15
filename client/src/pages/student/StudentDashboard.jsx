@@ -52,26 +52,33 @@ const StudentDashboard = () => {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      const response = await studentService.getMyCourses();
-      const courses = response.data || [];
+      const courses = await studentService.getMyCourses();
+      console.log("📚 Courses received:", courses, "Type:", typeof courses);
+
+      // Ensure courses is an array
+      const coursesArray = Array.isArray(courses) ? courses : [];
 
       // Calculate stats - only count active courses
-      const activeCourses = courses.filter((c) => c.status === "active").length;
-      const completedCourses = courses.filter(
+      const activeCourses = coursesArray.filter(
+        (c) => c.status === "active"
+      ).length;
+      const completedCourses = coursesArray.filter(
         (c) => c.status === "completed"
       ).length;
-      const totalHours = courses.reduce(
+      const totalHours = coursesArray.reduce(
         (sum, c) => sum + (c.totalHours || 0),
         0
       );
       const avgAttendance =
-        courses.length > 0
+        coursesArray.length > 0
           ? Math.round(
-              courses.reduce((sum, c) => sum + (c.attendanceRate || 0), 0) /
-                courses.length
+              coursesArray.reduce(
+                (sum, c) => sum + (c.attendanceRate || 0),
+                0
+              ) / coursesArray.length
             )
           : 0;
-      const gradesData = courses.filter((c) => c.averageGrade);
+      const gradesData = coursesArray.filter((c) => c.averageGrade);
       const avgGrade =
         gradesData.length > 0
           ? (
@@ -134,7 +141,7 @@ const StudentDashboard = () => {
           avgAttendance,
           avgGrade,
         },
-        courses,
+        courses: coursesArray,
         attendanceTrend,
         gradeDistribution,
       });
@@ -164,9 +171,6 @@ const StudentDashboard = () => {
         <h1 className="text-3xl font-bold text-gray-900 mb-2">
           Xin chào, {user?.fullName}!
         </h1>
-        <p className="text-gray-600">
-          Mã học viên: {user?.profile?.studentCode || "N/A"}
-        </p>
       </div>
 
       {/* Stats Cards */}
@@ -176,7 +180,6 @@ const StudentDashboard = () => {
           value={stats.activeCourses}
           icon={<BookOpen className="w-6 h-6" />}
           color="blue"
-          trend="+2 khóa mới"
         />
         <StatsCard
           title="Hoàn Thành"

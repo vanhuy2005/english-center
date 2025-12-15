@@ -20,8 +20,8 @@ const GradeManagementPage = () => {
 
   const fetchClasses = async () => {
     try {
-      const response = await api.get("/staff/academic/classes");
-      const data = response.data || response || [];
+      const response = await api.get("/classes");
+      const data = response.data?.data || response.data || [];
       setClasses(Array.isArray(data) ? data : []);
     } catch (error) {
       setClasses([]);
@@ -55,18 +55,45 @@ const GradeManagementPage = () => {
     { key: "fullName", label: "Họ và tên" },
     { key: "midterm", label: "Giữa kỳ", render: (row) => row.midterm || "-" },
     { key: "final", label: "Cuối kỳ", render: (row) => row.final || "-" },
-    { key: "average", label: "Trung bình", render: (row) => {
-      const avg = row.average || 0;
-      return <span className={avg >= 8 ? "text-green-600 font-semibold" : avg >= 5 ? "text-yellow-600" : "text-red-600"}>{avg.toFixed(1)}</span>;
-    }},
-    { key: "status", label: "Trạng thái", render: (row) => (
-      <Badge variant={row.status === "approved" ? "success" : "warning"}>
-        {row.status === "approved" ? "Đã duyệt" : "Chờ duyệt"}
-      </Badge>
-    )},
-    { key: "actions", label: "Thao tác", render: (row) => (
-      row.status === "pending" && <Button size="sm" onClick={() => handleApprove(row._id)}>Phê duyệt</Button>
-    )}
+    {
+      key: "average",
+      label: "Trung bình",
+      render: (row) => {
+        const avg = row.average || 0;
+        return (
+          <span
+            className={
+              avg >= 8
+                ? "text-green-600 font-semibold"
+                : avg >= 5
+                ? "text-yellow-600"
+                : "text-red-600"
+            }
+          >
+            {avg.toFixed(1)}
+          </span>
+        );
+      },
+    },
+    {
+      key: "status",
+      label: "Trạng thái",
+      render: (row) => (
+        <Badge variant={row.status === "approved" ? "success" : "warning"}>
+          {row.status === "approved" ? "Đã duyệt" : "Chờ duyệt"}
+        </Badge>
+      ),
+    },
+    {
+      key: "actions",
+      label: "Thao tác",
+      render: (row) =>
+        row.status === "pending" && (
+          <Button size="sm" onClick={() => handleApprove(row._id)}>
+            Phê duyệt
+          </Button>
+        ),
+    },
   ];
 
   if (loading) return <Loading fullScreen />;
@@ -87,13 +114,19 @@ const GradeManagementPage = () => {
           >
             <option value="">Chọn lớp học</option>
             {classes.map((cls) => (
-              <option key={cls._id} value={cls._id}>{cls.name}</option>
+              <option key={cls._id} value={cls._id}>
+                {cls.name}
+              </option>
             ))}
           </select>
         </div>
 
-        {selectedClass ? <Table columns={columns} data={grades} /> : (
-          <div className="text-center py-12 text-gray-500">Vui lòng chọn lớp học</div>
+        {selectedClass ? (
+          <Table columns={columns} data={grades} />
+        ) : (
+          <div className="text-center py-12 text-gray-500">
+            Vui lòng chọn lớp học
+          </div>
         )}
       </Card>
     </div>

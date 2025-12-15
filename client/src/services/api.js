@@ -61,30 +61,37 @@ api.interceptors.response.use(
     }
 
     if (error.response?.status === 401) {
+      console.warn("⚠️ Unauthorized (401) - Attempting token refresh...");
       const refreshToken = localStorage.getItem("refreshToken");
 
       if (refreshToken && !error.config._retry) {
         error.config._retry = true;
 
         try {
+          console.log("🔄 Refreshing token...");
           const response = await axios.post(
             `${API_BASE_URL}/auth/refresh-token`,
             { refreshToken }
           );
 
           const { token, refreshToken: newRefreshToken } = response.data.data;
+          console.log("✅ Token refreshed successfully");
           setAuthToken(token);
           localStorage.setItem("refreshToken", newRefreshToken);
 
           error.config.headers.Authorization = `Bearer ${token}`;
           return api(error.config);
         } catch (refreshError) {
+          console.error("❌ Token refresh failed:", refreshError.message);
           setAuthToken(null);
-          window.location.href = "/login";
+          // Dispatch custom event for AuthContext to listen
+          window.dispatchEvent(new CustomEvent("auth:logout"));
         }
       } else {
+        console.warn("❌ No valid refresh token - logging out");
         setAuthToken(null);
-        window.location.href = "/login";
+        // Dispatch custom event for AuthContext to listen
+        window.dispatchEvent(new CustomEvent("auth:logout"));
       }
     }
 

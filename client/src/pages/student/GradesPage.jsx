@@ -30,11 +30,36 @@ const GradesPage = () => {
     try {
       setLoading(true);
       const response = await gradeService.getMyGrades();
-      const gradesData = response.data || [];
+      console.log("📊 Grades response:", response);
+
+      // Handle both response formats: { data: [...] } or just [...]
+      let gradesData = [];
+      if (response.data) {
+        if (Array.isArray(response.data)) {
+          gradesData = response.data;
+        } else if (response.data.data && Array.isArray(response.data.data)) {
+          gradesData = response.data.data;
+        } else if (
+          typeof response.data === "object" &&
+          !Array.isArray(response.data)
+        ) {
+          // Single grade returned as object, wrap in array
+          gradesData = [response.data];
+        }
+      }
+
+      console.log(
+        "✅ Processed grades:",
+        gradesData,
+        "Type:",
+        typeof gradesData
+      );
       setGrades(gradesData);
       calculateStats(gradesData);
     } catch (error) {
+      console.error("❌ Error fetching grades:", error);
       toast.error("Không thể tải điểm!");
+      setGrades([]);
     } finally {
       setLoading(false);
     }

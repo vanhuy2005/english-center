@@ -1,11 +1,6 @@
 import { useState, useEffect } from "react";
 import { notificationService } from "../../services";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@components/common";
+import { Card, CardContent, CardHeader, CardTitle } from "@components/common";
 import { Badge } from "@components/common";
 import { Bell, CheckCircle, AlertCircle, Info, Calendar } from "lucide-react";
 import toast from "react-hot-toast";
@@ -23,9 +18,30 @@ const NotificationsPage = () => {
     try {
       setLoading(true);
       const response = await notificationService.getMyNotifications();
-      setNotifications(response.data || []);
+      console.log("🔔 Notifications response:", response);
+
+      // Handle both response formats: { data: [...] } or just [...]
+      let notificationsData = [];
+      if (response.data) {
+        if (Array.isArray(response.data)) {
+          notificationsData = response.data;
+        } else if (response.data.data && Array.isArray(response.data.data)) {
+          notificationsData = response.data.data;
+        } else if (
+          typeof response.data === "object" &&
+          !Array.isArray(response.data)
+        ) {
+          // Single notification returned as object, wrap in array
+          notificationsData = [response.data];
+        }
+      }
+
+      console.log("✅ Processed notifications:", notificationsData);
+      setNotifications(notificationsData);
     } catch (error) {
+      console.error("❌ Error fetching notifications:", error);
       toast.error("Không thể tải thông báo!");
+      setNotifications([]);
     } finally {
       setLoading(false);
     }
@@ -157,7 +173,9 @@ const NotificationsPage = () => {
                   ? "border-l-4 border-l-blue-600 bg-blue-50"
                   : "hover:shadow-md"
               } transition-shadow cursor-pointer`}
-              onClick={() => !notification.isRead && markAsRead(notification._id)}
+              onClick={() =>
+                !notification.isRead && markAsRead(notification._id)
+              }
             >
               <CardContent className="p-6">
                 <div className="flex items-start gap-4">

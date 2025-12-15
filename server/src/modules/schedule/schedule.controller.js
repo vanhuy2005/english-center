@@ -141,7 +141,10 @@ exports.createSchedule = async (req, res) => {
 
     // Check if teacher exists
     if (scheduleTeacher) {
-      const teacherExists = await Staff.findOne({ _id: scheduleTeacher, staffType: "teacher" });
+      const teacherExists = await Staff.findOne({
+        _id: scheduleTeacher,
+        staffType: "teacher",
+      });
       if (!teacherExists) {
         return res.status(404).json({
           success: false,
@@ -477,33 +480,43 @@ exports.getMySchedules = async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
     const userId = req.user._id;
-    const userRole = req.user.staffType || 'student';
+    const userRole = req.userType || req.role || "student";
+
+    console.log("📅 Getting schedules for user:", userId, "Role:", userRole);
 
     let filter = {};
 
     // Build filter based on role
-    if (userRole === 'teacher') {
+    if (userRole === "teacher" || req.role === "teacher") {
       filter.teacher = userId;
-    } else if (userRole === 'student') {
+    } else if (userRole === "student" || req.role === "student") {
       // Get student's enrolled classes
       const Student = require("../../shared/models/Student.model");
-      const student = await Student.findById(userId).populate('enrolledCourses');
-      
-      if (!student || !student.enrolledCourses || student.enrolledCourses.length === 0) {
+      const student = await Student.findById(userId).populate(
+        "enrolledCourses"
+      );
+
+      if (
+        !student ||
+        !student.enrolledCourses ||
+        student.enrolledCourses.length === 0
+      ) {
+        console.log("📭 Student has no enrolled courses");
         return res.status(200).json({
           success: true,
           data: [],
-          message: "Bạn chưa đăng ký khóa học nào"
+          message: "Bạn chưa đăng ký khóa học nào",
         });
       }
 
       // Get classes for enrolled courses
       const Class = require("../../shared/models/Class.model");
-      const classes = await Class.find({ 
-        course: { $in: student.enrolledCourses }
-      }).select('_id');
+      const classes = await Class.find({
+        course: { $in: student.enrolledCourses },
+      }).select("_id");
 
-      filter.class = { $in: classes.map(c => c._id) };
+      filter.class = { $in: classes.map((c) => c._id) };
+      console.log("📚 Found", classes.length, "classes for student");
     }
 
     // Date range filter
@@ -518,9 +531,11 @@ exports.getMySchedules = async (req, res) => {
       .populate("teacher", "fullName")
       .populate({
         path: "class",
-        populate: { path: "course", select: "name courseCode" }
+        populate: { path: "course", select: "name courseCode" },
       })
       .sort({ date: 1, startTime: 1 });
+
+    console.log("✅ Found", schedules.length, "schedules");
 
     res.status(200).json({
       success: true,

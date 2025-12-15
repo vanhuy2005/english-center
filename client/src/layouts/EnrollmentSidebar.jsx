@@ -26,9 +26,19 @@ export const EnrollmentSidebar = ({ menuItems = [] }) => {
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
 
   const isActive = (path) => {
-    return (
-      location.pathname === path || location.pathname.startsWith(path + "/")
-    );
+    // Exact match
+    if (location.pathname === path) return true;
+
+    // Nested route match - prevent "/" from matching all routes
+    if (
+      path !== "/" &&
+      path !== "" &&
+      location.pathname.startsWith(path + "/")
+    ) {
+      return true;
+    }
+
+    return false;
   };
 
   const handleLogout = () => {

@@ -125,7 +125,7 @@ const ClassManagementPage = () => {
 
   const fetchTeachers = async () => {
     try {
-      const response = await api.get("/teachers");
+      const response = await api.get("/teacher");
       const data = response.data?.data || response.data || [];
       setTeachers(Array.isArray(data) ? data : []);
     } catch (error) {

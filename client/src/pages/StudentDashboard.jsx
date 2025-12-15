@@ -14,12 +14,21 @@ const StudentDashboard = () => {
       console.log("🔄 Fetching dashboard data...");
 
       const coursesData = await getMyCourses();
-      console.log("📊 Courses data:", coursesData);
+      console.log("📊 Raw courses data:", coursesData);
+      console.log("📊 Type:", typeof coursesData);
+      console.log("📊 Is Array:", Array.isArray(coursesData));
 
-      // Ensure array
-      const coursesArray = Array.isArray(coursesData) ? coursesData : [];
+      // Ensure array - handle both array and object responses
+      let coursesArray = [];
+      if (Array.isArray(coursesData)) {
+        coursesArray = coursesData;
+      } else if (coursesData && typeof coursesData === "object") {
+        // If it's an object but not an array, try to extract data
+        coursesArray =
+          coursesData.data || (coursesData.courses ? [coursesData] : []);
+      }
+
       console.log("✅ Courses count:", coursesArray.length);
-
       setCourses(coursesArray);
     } catch (error) {
       console.error("❌ Dashboard error:", error);

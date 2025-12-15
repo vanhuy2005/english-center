@@ -49,11 +49,36 @@ const TuitionPage = () => {
     try {
       setLoading(true);
       const response = await financeService.getMyPayments();
-      const paymentsData = response.data || [];
+      console.log("💰 Payments response:", response);
+
+      // Handle both response formats: { data: [...] } or just [...]
+      let paymentsData = [];
+      if (response.data) {
+        if (Array.isArray(response.data)) {
+          paymentsData = response.data;
+        } else if (response.data.data && Array.isArray(response.data.data)) {
+          paymentsData = response.data.data;
+        } else if (
+          typeof response.data === "object" &&
+          !Array.isArray(response.data)
+        ) {
+          // Single payment returned as object, wrap in array
+          paymentsData = [response.data];
+        }
+      }
+
+      console.log(
+        "✅ Processed payments:",
+        paymentsData,
+        "Type:",
+        typeof paymentsData
+      );
       setPayments(paymentsData);
       calculateStats(paymentsData);
     } catch (error) {
+      console.error("❌ Error fetching payments:", error);
       toast.error("Không thể tải lịch sử thanh toán!");
+      setPayments([]);
     } finally {
       setLoading(false);
     }
@@ -190,8 +215,12 @@ const TuitionPage = () => {
       {/* Header */}
       <div className="mb-8 flex items-center justify-between">
         <div>
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">Lịch Sử Thanh Toán</h1>
-          <p className="text-lg text-gray-600">Danh sách chi tiết các khoản thanh toán</p>
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">
+            Lịch Sử Thanh Toán
+          </h1>
+          <p className="text-lg text-gray-600">
+            Danh sách chi tiết các khoản thanh toán
+          </p>
         </div>
         <button
           onClick={() => setShowPaymentModal(true)}
@@ -416,45 +445,49 @@ const TuitionPage = () => {
             <p className="text-gray-600 mb-6">
               Vui lòng chọn khóa học bạn muốn thanh toán học phí
             </p>
-            
+
             <div className="space-y-3 mb-6">
               {payments
-                .filter(p => p.status === 'pending' || p.remainingAmount > 0)
+                .filter((p) => p.status === "pending" || p.remainingAmount > 0)
                 .map((payment) => (
                   <div
                     key={payment._id}
                     onClick={() => setSelectedPayment(payment)}
                     className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
                       selectedPayment?._id === payment._id
-                        ? 'border-blue-600 bg-blue-50'
-                        : 'border-gray-200 hover:border-blue-300'
+                        ? "border-blue-600 bg-blue-50"
+                        : "border-gray-200 hover:border-blue-300"
                     }`}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
                         <h4 className="font-semibold text-lg text-gray-900">
-                          {payment.course?.name || 'Khóa học'}
+                          {payment.course?.name || "Khóa học"}
                         </h4>
                         <p className="text-sm text-gray-600 mt-1">
-                          Mã: {payment.course?.courseCode || 'N/A'}
+                          Mã: {payment.course?.courseCode || "N/A"}
                         </p>
                       </div>
                       <div className="text-right">
                         <p className="text-xl font-bold text-red-600">
-                          {formatCurrency(payment.remainingAmount || payment.amount)}
+                          {formatCurrency(
+                            payment.remainingAmount || payment.amount
+                          )}
                         </p>
-                        <p className="text-sm text-gray-500 mt-1">
-                          Còn nợ
-                        </p>
+                        <p className="text-sm text-gray-500 mt-1">Còn nợ</p>
                       </div>
                     </div>
                   </div>
                 ))}
-              
-              {payments.filter(p => p.status === 'pending' || p.remainingAmount > 0).length === 0 && (
+
+              {payments.filter(
+                (p) => p.status === "pending" || p.remainingAmount > 0
+              ).length === 0 && (
                 <div className="text-center py-8 text-gray-500">
                   <CheckCircle className="w-16 h-16 mx-auto mb-4 text-green-500" />
-                  <p className="text-lg">Bạn đã thanh toán hết tất cả học phí!</p>
+                  <p className="text-lg">
+                    Bạn đã thanh toán hết tất cả học phí!
+                  </p>
                 </div>
               )}
             </div>
@@ -474,14 +507,14 @@ const TuitionPage = () => {
                   if (selectedPayment) {
                     navigate(`/student/payment/${selectedPayment._id}`);
                   } else {
-                    toast.error('Vui lòng chọn khóa học!');
+                    toast.error("Vui lòng chọn khóa học!");
                   }
                 }}
                 disabled={!selectedPayment}
                 className={`flex-1 px-4 py-3 font-semibold rounded-lg transition-all ${
                   selectedPayment
-                    ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    ? "bg-blue-600 hover:bg-blue-700 text-white"
+                    : "bg-gray-300 text-gray-500 cursor-not-allowed"
                 }`}
               >
                 Tiếp tục thanh toán

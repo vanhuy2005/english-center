@@ -1,11 +1,6 @@
 import { useState, useEffect } from "react";
 import { scheduleService } from "../../services";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@components/common";
+import { Card, CardContent, CardHeader, CardTitle } from "@components/common";
 import { Badge } from "@components/common";
 import {
   Calendar,
@@ -34,9 +29,28 @@ const SchedulePage = () => {
         startDate: getStartDate(),
         endDate: getEndDate(),
       });
-      setSchedules(response.data || []);
+      console.log("📅 Schedules response:", response);
+
+      // Handle both response formats: { data: [...] } or just [...]
+      let schedulesData = [];
+      if (response.data) {
+        if (Array.isArray(response.data)) {
+          schedulesData = response.data;
+        } else if (response.data.data && Array.isArray(response.data.data)) {
+          schedulesData = response.data.data;
+        } else if (
+          typeof response.data === "object" &&
+          !Array.isArray(response.data)
+        ) {
+          // Single schedule returned as object, wrap in array
+          schedulesData = [response.data];
+        }
+      }
+
+      console.log("✅ Processed schedules:", schedulesData);
+      setSchedules(schedulesData);
     } catch (error) {
-      console.error('Fetch schedules error:', error);
+      console.error("❌ Fetch schedules error:", error);
       // Set empty schedules instead of showing error
       setSchedules([]);
       // toast.error("Không thể tải lịch học!");

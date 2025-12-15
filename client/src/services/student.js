@@ -19,8 +19,12 @@ export const getMyCourses = async () => {
     console.warn("⚠️ Unexpected response:", response.data);
     return [];
   } catch (error) {
-    console.error("❌ Error fetching courses:", error.message);
-    throw error;
+    const errorMessage =
+      error?.response?.data?.message ||
+      error?.message ||
+      "Không thể tải danh sách khóa học";
+    console.error("❌ Error fetching courses:", errorMessage);
+    throw new Error(errorMessage);
   }
 };
 

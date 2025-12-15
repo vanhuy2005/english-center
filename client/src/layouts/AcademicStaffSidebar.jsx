@@ -32,9 +32,15 @@ export const AcademicStaffSidebar = ({ menuItems = [] }) => {
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
 
   const isActive = (path) => {
-    return (
-      location.pathname === path || location.pathname.startsWith(path + "/")
-    );
+    if (location.pathname === path) return true;
+    if (
+      path !== "/" &&
+      path !== "" &&
+      location.pathname.startsWith(path + "/")
+    ) {
+      return true;
+    }
+    return false;
   };
 
   const handleLogout = () => {

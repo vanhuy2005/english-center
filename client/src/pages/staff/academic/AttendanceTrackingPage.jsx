@@ -21,8 +21,8 @@ const AttendanceTrackingPage = () => {
 
   const fetchClasses = async () => {
     try {
-      const response = await api.get("/staff/academic/classes");
-      const data = response.data || response || [];
+      const response = await api.get("/classes");
+      const data = response.data?.data || response.data || [];
       setClasses(Array.isArray(data) ? data : []);
     } catch (error) {
       setClasses([]);
@@ -33,7 +33,9 @@ const AttendanceTrackingPage = () => {
 
   const fetchAttendance = async () => {
     try {
-      const response = await api.get(`/staff/academic/attendance/${selectedClass}?date=${date}`);
+      const response = await api.get(
+        `/staff/academic/attendance/${selectedClass}?date=${date}`
+      );
       const data = response.data || response || [];
       setAttendanceData(Array.isArray(data) ? data : []);
     } catch (error) {
@@ -44,12 +46,16 @@ const AttendanceTrackingPage = () => {
   const columns = [
     { key: "studentCode", label: "Mã HV" },
     { key: "fullName", label: "Họ và tên" },
-    { key: "status", label: "Trạng thái", render: (row) => (
-      <Badge variant={row.status === "present" ? "success" : "danger"}>
-        {row.status === "present" ? "Có mặt" : "Vắng"}
-      </Badge>
-    )},
-    { key: "note", label: "Ghi chú" }
+    {
+      key: "status",
+      label: "Trạng thái",
+      render: (row) => (
+        <Badge variant={row.status === "present" ? "success" : "danger"}>
+          {row.status === "present" ? "Có mặt" : "Vắng"}
+        </Badge>
+      ),
+    },
+    { key: "note", label: "Ghi chú" },
   ];
 
   if (loading) return <Loading fullScreen />;
@@ -70,16 +76,25 @@ const AttendanceTrackingPage = () => {
           >
             <option value="">Chọn lớp học</option>
             {classes.map((cls) => (
-              <option key={cls._id} value={cls._id}>{cls.name}</option>
+              <option key={cls._id} value={cls._id}>
+                {cls.name}
+              </option>
             ))}
           </select>
-          <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-48" />
+          <Input
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            className="w-48"
+          />
         </div>
 
         {selectedClass ? (
           <Table columns={columns} data={attendanceData} />
         ) : (
-          <div className="text-center py-12 text-gray-500">Vui lòng chọn lớp học</div>
+          <div className="text-center py-12 text-gray-500">
+            Vui lòng chọn lớp học
+          </div>
         )}
       </Card>
     </div>
