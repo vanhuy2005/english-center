@@ -839,9 +839,11 @@ const EnrollmentModal = ({ isOpen, onClose, student, onSuccess }) => {
       const response = await api.get("/staff/enrollment/classes", {
         params: { status: "upcoming,active" },
       });
-      setClasses(response.data.data || response.data || []);
+      const data = response.data?.data || response.data || [];
+      setClasses(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Error fetching classes:", error);
+      setClasses([]);
       toast.error("Không thể tải danh sách lớp học");
     }
   };
@@ -905,21 +907,25 @@ const EnrollmentModal = ({ isOpen, onClose, student, onSuccess }) => {
             required
           >
             <option value="">-- Chọn lớp học --</option>
-            {classes.map((classItem) => {
-              const availableSlots =
-                (classItem.maxStudents || 30) -
-                (classItem.students?.length || 0);
-              return (
-                <option
-                  key={classItem._id}
-                  value={classItem._id}
-                  disabled={availableSlots === 0}
-                >
-                  {classItem.className} - {classItem.course?.name} (
-                  {availableSlots > 0 ? `Còn ${availableSlots} chỗ` : "Đã đầy"})
-                </option>
-              );
-            })}
+            {Array.isArray(classes) &&
+              classes.map((classItem) => {
+                const availableSlots =
+                  (classItem.maxStudents || 30) -
+                  (classItem.students?.length || 0);
+                return (
+                  <option
+                    key={classItem._id}
+                    value={classItem._id}
+                    disabled={availableSlots === 0}
+                  >
+                    {classItem.className} - {classItem.course?.name} (
+                    {availableSlots > 0
+                      ? `Còn ${availableSlots} chỗ`
+                      : "Đã đầy"}
+                    )
+                  </option>
+                );
+              })}
           </select>
         </div>
 

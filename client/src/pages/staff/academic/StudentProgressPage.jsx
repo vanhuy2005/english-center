@@ -6,7 +6,15 @@ import {
   AlertTriangle,
   CheckCircle,
 } from "lucide-react";
-import { Card, Button, Badge, Loading, Input, Table } from "@components/common";
+import {
+  Card,
+  Button,
+  Badge,
+  Loading,
+  Input,
+  Table,
+  Modal,
+} from "@components/common";
 import api from "@services/api";
 import { toast } from "react-hot-toast";
 
@@ -14,6 +22,8 @@ const StudentProgressPage = () => {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedStudent, setSelectedStudent] = useState(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
   const [stats, setStats] = useState({
     good: 0,
     warning: 0,
@@ -112,8 +122,15 @@ const StudentProgressPage = () => {
     {
       key: "actions",
       label: "Thao tác",
-      render: () => (
-        <Button size="sm" variant="outline">
+      render: (row) => (
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => {
+            setSelectedStudent(row);
+            setShowDetailModal(true);
+          }}
+        >
           Chi tiết
         </Button>
       ),
@@ -181,6 +198,117 @@ const StudentProgressPage = () => {
         </div>
         <Table columns={columns} data={filteredStudents} />
       </Card>
+
+      {/* Detail Modal */}
+      <Modal
+        isOpen={showDetailModal}
+        onClose={() => setShowDetailModal(false)}
+        title="Chi tiết học viên"
+        size="lg"
+      >
+        {selectedStudent && (
+          <div className="space-y-6">
+            {/* Basic Info */}
+            <div>
+              <h3 className="text-md font-semibold mb-3 text-gray-700 border-b pb-2">
+                Thông tin cơ bản
+              </h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-gray-600">Mã HV</p>
+                  <p className="font-medium">{selectedStudent.studentCode}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Họ và tên</p>
+                  <p className="font-medium">{selectedStudent.fullName}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Email</p>
+                  <p className="font-medium">
+                    {selectedStudent.email || "N/A"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Điện thoại</p>
+                  <p className="font-medium">
+                    {selectedStudent.phone || "N/A"}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Academic Performance */}
+            <div>
+              <h3 className="text-md font-semibold mb-3 text-gray-700 border-b pb-2">
+                Kết quả học tập
+              </h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-gray-600">Điểm trung bình</p>
+                  <p className="text-2xl font-bold text-blue-600">
+                    {selectedStudent.average?.toFixed(1) || "0.0"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Tỷ lệ điểm danh</p>
+                  <p className="text-2xl font-bold text-green-600">
+                    {selectedStudent.attendanceRate || 0}%
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Status Assessment */}
+            <div>
+              <h3 className="text-md font-semibold mb-3 text-gray-700 border-b pb-2">
+                Đánh giá tổng thể
+              </h3>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded">
+                  <span className="text-sm text-gray-600">Trạng thái</span>
+                  <Badge
+                    variant={
+                      selectedStudent.average >= 8 &&
+                      selectedStudent.attendanceRate >= 80
+                        ? "success"
+                        : selectedStudent.average < 5 ||
+                          selectedStudent.attendanceRate < 60
+                        ? "danger"
+                        : "warning"
+                    }
+                  >
+                    {selectedStudent.average >= 8 &&
+                    selectedStudent.attendanceRate >= 80
+                      ? "Tốt"
+                      : selectedStudent.average < 5 ||
+                        selectedStudent.attendanceRate < 60
+                      ? "Cần cải thiện"
+                      : "Trung bình"}
+                  </Badge>
+                </div>
+                {(selectedStudent.average < 5 ||
+                  selectedStudent.attendanceRate < 60) && (
+                  <div className="p-3 bg-red-50 rounded border border-red-200">
+                    <p className="text-sm text-red-700">
+                      ⚠️ Học viên cần được theo dõi kỹ hơn và có kế hoạch hỗ trợ
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-2 justify-end pt-4 border-t">
+              <Button
+                variant="outline"
+                onClick={() => setShowDetailModal(false)}
+              >
+                Đóng
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 };

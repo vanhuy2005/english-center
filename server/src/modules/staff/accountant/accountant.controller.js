@@ -136,32 +136,101 @@ exports.getDashboard = async (req, res) => {
 // Get all transactions
 exports.getTransactions = async (req, res) => {
   try {
-    const { status, studentId, courseId, startDate, endDate } = req.query;
+    console.log("📝 getTransactions called with query:", req.query);
+
+    const {
+      status,
+      studentId,
+      courseId,
+      startDate,
+      endDate,
+      type,
+      paymentMethod,
+      search,
+      page = 1,
+      limit = 10,
+    } = req.query;
     const filter = {};
 
+    // Handle different status parameter names
     if (status) filter.status = status;
+    if (type) filter.type = type; // Finance model uses 'type' field
+    if (paymentMethod) filter.paymentMethod = paymentMethod;
     if (studentId) filter.student = studentId;
     if (courseId) filter.course = courseId;
+
     if (startDate || endDate) {
       filter.createdAt = {};
-      if (startDate) filter.createdAt.$gte = new Date(startDate);
-      if (endDate) filter.createdAt.$lte = new Date(endDate);
+      if (startDate) {
+        const start = new Date(startDate);
+        if (!isNaN(start)) filter.createdAt.$gte = start;
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        if (!isNaN(end)) filter.createdAt.$lte = end;
+      }
     }
 
+    console.log("🔍 Filter:", filter);
+    const skip = (parseInt(page) - 1) * parseInt(limit);
     const transactions = await Finance.find(filter)
       .populate("student", "studentCode fullName phone email")
       .populate("course", "name courseCode")
       .populate("createdBy", "fullName")
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    const total = await Finance.countDocuments(filter);
+
+    console.log("✅ Found", transactions.length, "transactions");
 
     return ApiResponse.success(
       res,
-      transactions,
+      {
+        receipts: transactions,
+        total,
+        page: parseInt(page),
+        limit: parseInt(limit),
+      },
       "Lấy danh sách giao dịch thành công"
     );
   } catch (error) {
-    console.error("Get transactions error:", error);
-    return ApiResponse.error(res, "Không thể lấy danh sách giao dịch");
+    console.error("❌ Get transactions error:", {
+      message: error.message,
+      stack: error.stack,
+      name: error.name,
+    });
+    return ApiResponse.error(
+      res,
+      error.message || "Không thể lấy danh sách giao dịch",
+      400
+    );
+  }
+};
+
+// Get transaction by ID
+exports.getTransactionById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const transaction = await Finance.findById(id)
+      .populate("student", "studentCode fullName phone email")
+      .populate("course", "name courseCode")
+      .populate("createdBy", "fullName");
+
+    if (!transaction) {
+      return ApiResponse.notFound(res, "Giao dịch không tồn tại");
+    }
+
+    return ApiResponse.success(
+      res,
+      transaction,
+      "Lấy chi tiết giao dịch thành công"
+    );
+  } catch (error) {
+    console.error("❌ Get transaction by ID error:", error);
+    return ApiResponse.error(res, "Không thể lấy chi tiết giao dịch", 400);
   }
 };
 

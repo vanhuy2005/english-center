@@ -18,19 +18,62 @@ const RevenueReportsPage = () => {
 
   useEffect(() => {
     loadReport();
-  }, [filters]);
+  }, []);
 
   const loadReport = async () => {
     try {
       setLoading(true);
-      const response = await api.get("/api/staff/accountant/reports/revenue", {
+      const response = await api.get("/staff/accountant/reports/financial", {
         params: filters,
       });
       if (response.data.success) {
-        setReportData(response.data.data);
+        const data = response.data.data;
+
+        // Transform data to match expected format
+        const transformedData = {
+          summary: {
+            totalRevenue: data.summary?.totalRevenue || 0,
+            totalRefunds: 0,
+            netRevenue: data.summary?.totalRevenue || 0,
+            receiptCount: data.summary?.totalTransactions || 0,
+          },
+          revenueChart: {
+            labels: (data.revenueByType || []).map(
+              (item) => item._id || "Unknown"
+            ),
+            datasets: [
+              {
+                label: "Doanh Thu",
+                data: (data.revenueByType || []).map((item) => item.total || 0),
+                backgroundColor: ["#10b981", "#3b82f6", "#f59e0b", "#ef4444"],
+              },
+            ],
+          },
+        };
+
+        setReportData(transformedData);
+      } else {
+        setReportData({
+          summary: {
+            totalRevenue: 0,
+            totalRefunds: 0,
+            netRevenue: 0,
+            receiptCount: 0,
+          },
+          revenueChart: { labels: [], datasets: [] },
+        });
       }
     } catch (error) {
-      console.error("Error:", error);
+      console.error("Error loading report:", error);
+      setReportData({
+        summary: {
+          totalRevenue: 0,
+          totalRefunds: 0,
+          netRevenue: 0,
+          receiptCount: 0,
+        },
+        revenueChart: { labels: [], datasets: [] },
+      });
     } finally {
       setLoading(false);
     }

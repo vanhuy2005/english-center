@@ -2,11 +2,20 @@ const mongoose = require("mongoose");
 
 // Validate MongoDB ObjectId
 function validateObjectId(req, res, next) {
-  const { studentId } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(studentId)) {
+  const { id, studentId } = req.params;
+  const idToValidate = id || studentId;
+
+  if (!idToValidate) {
     return res.status(400).json({
       success: false,
-      message: "Invalid studentId format.",
+      message: "Missing ID parameter.",
+    });
+  }
+
+  if (!mongoose.Types.ObjectId.isValid(idToValidate)) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid ID format.",
     });
   }
   next();

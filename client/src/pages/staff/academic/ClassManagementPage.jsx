@@ -125,7 +125,7 @@ const ClassManagementPage = () => {
 
   const fetchTeachers = async () => {
     try {
-      const response = await api.get("/teacher");
+      const response = await api.get("/staffs?staffType=teacher");
       const data = response.data?.data || response.data || [];
       setTeachers(Array.isArray(data) ? data : []);
     } catch (error) {
@@ -345,13 +345,13 @@ const ClassManagementPage = () => {
       )}
 
       {/* Detail Modal */}
-      {showDetailModal && selectedClass && (
-        <Modal
-          isOpen={showDetailModal}
-          onClose={() => setShowDetailModal(false)}
-          title="Chi tiết lớp học"
-          size="lg"
-        >
+      <Modal
+        isOpen={showDetailModal}
+        onClose={() => setShowDetailModal(false)}
+        title="Chi tiết lớp học"
+        size="lg"
+      >
+        {selectedClass && (
           <div className="space-y-6">
             {/* Basic Info */}
             <div>
@@ -392,7 +392,9 @@ const ClassManagementPage = () => {
                 <div>
                   <p className="text-sm text-gray-600">Khóa học</p>
                   <p className="font-medium">
-                    {selectedClass.course?.courseName || "N/A"}
+                    {selectedClass.course?.name ||
+                      selectedClass.course?.courseName ||
+                      "Chưa có"}
                   </p>
                   {selectedClass.course?.courseCode && (
                     <p className="text-xs text-gray-500">
@@ -444,7 +446,11 @@ const ClassManagementPage = () => {
                 <div>
                   <p className="text-sm text-gray-600">Lịch học</p>
                   <p className="font-medium">
-                    {selectedClass.schedule || "Chưa có thông tin"}
+                    {typeof selectedClass.schedule === "string"
+                      ? selectedClass.schedule
+                      : selectedClass.schedule?.dayOfWeek
+                      ? `${selectedClass.schedule.dayOfWeek} ${selectedClass.schedule.startTime}-${selectedClass.schedule.endTime}`
+                      : "Chưa có thông tin"}
                   </p>
                 </div>
                 <div>
@@ -464,22 +470,32 @@ const ClassManagementPage = () => {
                 </h3>
                 <div className="max-h-48 overflow-y-auto bg-gray-50 rounded p-3">
                   <ul className="space-y-2">
-                    {selectedClass.students.map((student, index) => (
-                      <li
-                        key={student._id || index}
-                        className="text-sm flex items-center gap-2"
-                      >
-                        <span className="w-6 text-gray-500">{index + 1}.</span>
-                        <span className="font-medium">
-                          {student.fullName || student}
-                        </span>
-                        {student.studentCode && (
-                          <span className="text-gray-500">
-                            ({student.studentCode})
+                    {selectedClass.students.map((student, index) => {
+                      // Handle both student objects and enrollment objects
+                      const studentData = student.student || student;
+                      const studentName =
+                        studentData?.fullName ||
+                        studentData?.user?.fullName ||
+                        "Học viên";
+                      const studentCode = studentData?.studentCode || "N/A";
+
+                      return (
+                        <li
+                          key={student._id || index}
+                          className="text-sm flex items-center gap-2"
+                        >
+                          <span className="w-6 text-gray-500">
+                            {index + 1}.
                           </span>
-                        )}
-                      </li>
-                    ))}
+                          <span className="font-medium">{studentName}</span>
+                          {studentCode && studentCode !== "N/A" && (
+                            <span className="text-gray-500">
+                              ({studentCode})
+                            </span>
+                          )}
+                        </li>
+                      );
+                    })}
                   </ul>
                 </div>
               </div>
@@ -503,16 +519,21 @@ const ClassManagementPage = () => {
               </Button>
             </div>
           </div>
-        </Modal>
-      )}
+        )}
+        {!selectedClass && (
+          <div className="text-center py-12">
+            <p className="text-gray-500">Đang tải dữ liệu...</p>
+          </div>
+        )}
+      </Modal>
 
       {/* Assign Teacher Modal */}
-      {showAssignModal && selectedClass && (
-        <Modal
-          isOpen={showAssignModal}
-          onClose={() => setShowAssignModal(false)}
-          title="Phân công giáo viên"
-        >
+      <Modal
+        isOpen={showAssignModal}
+        onClose={() => setShowAssignModal(false)}
+        title="Phân công giáo viên"
+      >
+        {selectedClass && (
           <div className="space-y-4">
             <div>
               <p className="text-sm text-gray-600 mb-2">
@@ -544,147 +565,145 @@ const ClassManagementPage = () => {
               </Button>
             </div>
           </div>
-        </Modal>
-      )}
+        )}
+      </Modal>
 
       {/* Create Class Modal */}
-      {showCreateModal && (
-        <Modal
-          isOpen={showCreateModal}
-          onClose={() => setShowCreateModal(false)}
-          title="Tạo lớp học mới"
-          size="lg"
-        >
-          <form onSubmit={handleCreateClass} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <Input
-                label="Tên lớp"
-                required
-                value={newClassForm.className}
-                onChange={(e) =>
-                  setNewClassForm({
-                    ...newClassForm,
-                    className: e.target.value,
-                  })
-                }
-                placeholder="VD: Tiếng Anh Giao Tiếp Cơ Bản"
-              />
-              <Input
-                label="Mã lớp"
-                required
-                value={newClassForm.classCode}
-                onChange={(e) =>
-                  setNewClassForm({
-                    ...newClassForm,
-                    classCode: e.target.value,
-                  })
-                }
-                placeholder="VD: CLS001"
-              />
-              <Select
-                label="Khóa học"
-                required
-                value={newClassForm.course}
-                onChange={(e) =>
-                  setNewClassForm({ ...newClassForm, course: e.target.value })
-                }
-              >
-                <option value="">-- Chọn khóa học --</option>
-                {courses.map((course) => (
-                  <option key={course._id} value={course._id}>
-                    {course.courseName} ({course.courseCode})
-                  </option>
-                ))}
-              </Select>
-              <Select
-                label="Giáo viên"
-                value={newClassForm.teacher}
-                onChange={(e) =>
-                  setNewClassForm({ ...newClassForm, teacher: e.target.value })
-                }
-              >
-                <option value="">-- Chọn giáo viên (tùy chọn) --</option>
-                {teachers.map((teacher) => (
-                  <option key={teacher._id} value={teacher._id}>
-                    {teacher.fullName} ({teacher.staffCode})
-                  </option>
-                ))}
-              </Select>
-              <Input
-                label="Sức chứa"
-                type="number"
-                required
-                value={newClassForm.capacity}
-                onChange={(e) =>
-                  setNewClassForm({
-                    ...newClassForm,
-                    capacity: parseInt(e.target.value),
-                  })
-                }
-                min="1"
-              />
-              <Select
-                label="Trạng thái"
-                value={newClassForm.status}
-                onChange={(e) =>
-                  setNewClassForm({ ...newClassForm, status: e.target.value })
-                }
-              >
-                <option value="scheduled">Sắp khai giảng</option>
-                <option value="ongoing">Đang học</option>
-                <option value="completed">Đã kết thúc</option>
-              </Select>
-              <Input
-                label="Ngày bắt đầu"
-                type="date"
-                required
-                value={newClassForm.startDate}
-                onChange={(e) =>
-                  setNewClassForm({
-                    ...newClassForm,
-                    startDate: e.target.value,
-                  })
-                }
-              />
-              <Input
-                label="Ngày kết thúc"
-                type="date"
-                required
-                value={newClassForm.endDate}
-                onChange={(e) =>
-                  setNewClassForm({ ...newClassForm, endDate: e.target.value })
-                }
-              />
-              <Input
-                label="Lịch học"
-                value={newClassForm.schedule}
-                onChange={(e) =>
-                  setNewClassForm({ ...newClassForm, schedule: e.target.value })
-                }
-                placeholder="VD: T2, T4, T6 - 18h-20h"
-              />
-              <Input
-                label="Phòng học"
-                value={newClassForm.room}
-                onChange={(e) =>
-                  setNewClassForm({ ...newClassForm, room: e.target.value })
-                }
-                placeholder="VD: P101"
-              />
-            </div>
-            <div className="flex gap-2 justify-end">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setShowCreateModal(false)}
-              >
-                Hủy
-              </Button>
-              <Button type="submit">Tạo lớp học</Button>
-            </div>
-          </form>
-        </Modal>
-      )}
+      <Modal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        title="Tạo lớp học mới"
+        size="lg"
+      >
+        <form onSubmit={handleCreateClass} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="Tên lớp"
+              required
+              value={newClassForm.className}
+              onChange={(e) =>
+                setNewClassForm({
+                  ...newClassForm,
+                  className: e.target.value,
+                })
+              }
+              placeholder="VD: Tiếng Anh Giao Tiếp Cơ Bản"
+            />
+            <Input
+              label="Mã lớp"
+              required
+              value={newClassForm.classCode}
+              onChange={(e) =>
+                setNewClassForm({
+                  ...newClassForm,
+                  classCode: e.target.value,
+                })
+              }
+              placeholder="VD: CLS001"
+            />
+            <Select
+              label="Khóa học"
+              required
+              value={newClassForm.course}
+              onChange={(e) =>
+                setNewClassForm({ ...newClassForm, course: e.target.value })
+              }
+            >
+              <option value="">-- Chọn khóa học --</option>
+              {courses.map((course) => (
+                <option key={course._id} value={course._id}>
+                  {course.courseName} ({course.courseCode})
+                </option>
+              ))}
+            </Select>
+            <Select
+              label="Giáo viên"
+              value={newClassForm.teacher}
+              onChange={(e) =>
+                setNewClassForm({ ...newClassForm, teacher: e.target.value })
+              }
+            >
+              <option value="">-- Chọn giáo viên (tùy chọn) --</option>
+              {teachers.map((teacher) => (
+                <option key={teacher._id} value={teacher._id}>
+                  {teacher.fullName} ({teacher.staffCode})
+                </option>
+              ))}
+            </Select>
+            <Input
+              label="Sức chứa"
+              type="number"
+              required
+              value={newClassForm.capacity}
+              onChange={(e) =>
+                setNewClassForm({
+                  ...newClassForm,
+                  capacity: parseInt(e.target.value),
+                })
+              }
+              min="1"
+            />
+            <Select
+              label="Trạng thái"
+              value={newClassForm.status}
+              onChange={(e) =>
+                setNewClassForm({ ...newClassForm, status: e.target.value })
+              }
+            >
+              <option value="scheduled">Sắp khai giảng</option>
+              <option value="ongoing">Đang học</option>
+              <option value="completed">Đã kết thúc</option>
+            </Select>
+            <Input
+              label="Ngày bắt đầu"
+              type="date"
+              required
+              value={newClassForm.startDate}
+              onChange={(e) =>
+                setNewClassForm({
+                  ...newClassForm,
+                  startDate: e.target.value,
+                })
+              }
+            />
+            <Input
+              label="Ngày kết thúc"
+              type="date"
+              required
+              value={newClassForm.endDate}
+              onChange={(e) =>
+                setNewClassForm({ ...newClassForm, endDate: e.target.value })
+              }
+            />
+            <Input
+              label="Lịch học"
+              value={newClassForm.schedule}
+              onChange={(e) =>
+                setNewClassForm({ ...newClassForm, schedule: e.target.value })
+              }
+              placeholder="VD: T2, T4, T6 - 18h-20h"
+            />
+            <Input
+              label="Phòng học"
+              value={newClassForm.room}
+              onChange={(e) =>
+                setNewClassForm({ ...newClassForm, room: e.target.value })
+              }
+              placeholder="VD: P101"
+            />
+          </div>
+          <div className="flex gap-2 justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setShowCreateModal(false)}
+            >
+              Hủy
+            </Button>
+            <Button type="submit">Tạo lớp học</Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };

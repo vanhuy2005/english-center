@@ -255,23 +255,11 @@ export const enrollmentStaffMenu = [
         icon: "🏫",
         description: "Xem sĩ số và tình trạng lớp học",
       },
-      {
-        path: "/enrollment/requests",
-        label: "Yêu Cầu Ghi Danh",
-        icon: "📋",
-        description: "Xem các yêu cầu chuyển lớp, bảo lưu",
-      },
     ],
   },
   {
-    title: "CHỨC NĂNG TRỰC TUYẾN",
+    title: "CHỨ NĂNG TRỰC TUYẾN",
     items: [
-      {
-        path: "/enrollment/students",
-        label: "Thêm Học Viên Mới",
-        icon: "✏️",
-        description: "Đăng ký và tạo hồ sơ học viên mới",
-      },
       {
         path: "/enrollment/requests",
         label: "Xử Lý Yêu Cầu",
@@ -427,12 +415,6 @@ export const accountantMenu = [
         label: "Cập Nhật Học Phí",
         icon: "💳",
         description: "Cập nhật trạng thái thanh toán",
-      },
-      {
-        path: "/accountant/receipts/create",
-        label: "Tạo Phiếu Thu",
-        icon: "📝",
-        description: "Tạo và in phiếu thu mới",
       },
       {
         path: "/accountant/refund",

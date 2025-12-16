@@ -31,6 +31,8 @@ export const Modal = ({
     if (isOpen) {
       document.addEventListener("keydown", handleEsc);
       document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "unset";
     }
     return () => {
       document.removeEventListener("keydown", handleEsc);
@@ -56,20 +58,26 @@ export const Modal = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50 animate-fadeIn"
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black bg-opacity-50"
       onClick={handleOverlayClick}
+      style={{
+        animation: "fadeIn 0.3s ease-out",
+      }}
     >
       <div
         className={clsx(
-          "bg-white rounded-lg shadow-xl w-full animate-slideUp",
+          "bg-white rounded-lg shadow-2xl w-full",
           sizes[size],
           className
         )}
+        style={{
+          animation: "slideUp 0.3s ease-out",
+        }}
       >
         {/* Header */}
         {title && (
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-            <h3 className="text-xl font-semibold text-primary">{title}</h3>
+          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50">
+            <h3 className="text-xl font-semibold text-[#132440]">{title}</h3>
             <button
               onClick={onClose}
               className="text-gray-400 hover:text-gray-600 transition-colors"
@@ -80,7 +88,9 @@ export const Modal = ({
         )}
 
         {/* Content */}
-        <div className="px-6 py-4 max-h-[70vh] overflow-y-auto">{children}</div>
+        <div className="px-6 py-4 max-h-[70vh] overflow-y-auto bg-white text-gray-900">
+          {children || <p className="text-gray-500">Không có nội dung</p>}
+        </div>
 
         {/* Footer */}
         {footer && (

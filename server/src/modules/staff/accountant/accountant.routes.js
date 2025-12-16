@@ -11,6 +11,7 @@ router.get("/dashboard", accountantController.getDashboard);
 
 // ==================== TRANSACTIONS ====================
 router.get("/transactions", accountantController.getTransactions);
+router.get("/transactions/:id", accountantController.getTransactionById);
 router.post("/transactions", accountantController.createTransaction);
 router.put("/transactions/:id", accountantController.updateTransaction);
 

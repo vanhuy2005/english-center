@@ -37,6 +37,20 @@ export default {
         card: "0 2px 8px rgba(19, 36, 64, 0.08)",
         "card-hover": "0 4px 16px rgba(19, 36, 64, 0.12)",
       },
+      keyframes: {
+        slideUp: {
+          "0%": { transform: "translateY(10px)", opacity: "0" },
+          "100%": { transform: "translateY(0)", opacity: "1" },
+        },
+        fadeIn: {
+          "0%": { opacity: "0" },
+          "100%": { opacity: "1" },
+        },
+      },
+      animation: {
+        slideUp: "slideUp 0.3s ease-out",
+        fadeIn: "fadeIn 0.3s ease-out",
+      },
     },
   },
   plugins: [],

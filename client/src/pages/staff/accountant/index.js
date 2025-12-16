@@ -1,12 +1,10 @@
 export { default as AccountantDashboardPage } from "./AccountantDashboardPage";
 export { default as StudentFinancePage } from "./StudentFinancePage";
 export { default as TuitionStatusPage } from "./TuitionStatusPage";
-export { default as TransactionManagementPage } from "./TransactionManagementPage";
+export { default as UpdateTuitionPage } from "./UpdateTuitionPage";
 export { default as TransactionDetailPage } from "./TransactionDetailPage";
 export { default as PaymentManagementPage } from "./PaymentManagementPage";
 export { default as ReceiptManagementPage } from "./ReceiptManagementPage";
 export { default as StudentPaymentHistoryPage } from "./StudentPaymentHistoryPage";
-export { default as FinancialReportPage } from "./FinancialReportPage";
-export { default as UpdateTuitionPage } from "./UpdateTuitionPage";
-export { default as CreateReceiptPage } from "./CreateReceiptPage";
+export { default as RevenueReportsPage } from "./RevenueReportsPage";
 export { default as RefundTuitionPage } from "./RefundTuitionPage";

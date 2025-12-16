@@ -49,6 +49,7 @@ import EnrollPage from "@pages/student/EnrollPage";
 // Enrollment Staff Pages
 import {
   StudentManagementPage,
+  StudentDetailPage,
   RequestManagementPage,
   ClassTrackingPage,
   StatisticsPage,
@@ -59,14 +60,12 @@ import EnrollmentPlaceholderPage from "@pages/staff/enrollment/PlaceholderPage";
 import {
   StudentFinancePage,
   TuitionStatusPage,
-  TransactionManagementPage,
   TransactionDetailPage,
   PaymentManagementPage,
   ReceiptManagementPage,
   StudentPaymentHistoryPage,
-  FinancialReportPage,
+  RevenueReportsPage,
   UpdateTuitionPage,
-  CreateReceiptPage,
   RefundTuitionPage,
 } from "./pages/staff/accountant";
 
@@ -375,6 +374,14 @@ function App() {
           }
         />
         <Route
+          path="/enrollment/requests"
+          element={
+            <ProtectedRoute allowedRoles={["enrollment", "director"]}>
+              <RequestManagementPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/enrollment/students/search"
           element={
             <ProtectedRoute allowedRoles={["enrollment", "director"]}>
@@ -386,7 +393,7 @@ function App() {
           path="/enrollment/students/:id"
           element={
             <ProtectedRoute allowedRoles={["enrollment", "director"]}>
-              <EnrollmentPlaceholderPage title="Chi Tiết Học Viên" />
+              <StudentDetailPage />
             </ProtectedRoute>
           }
         />
@@ -413,14 +420,6 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={["enrollment", "director"]}>
               <EnrollmentPlaceholderPage title="Chi Tiết Lớp Học" />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/enrollment/requests"
-          element={
-            <ProtectedRoute allowedRoles={["enrollment", "director"]}>
-              <RequestManagementPage />
             </ProtectedRoute>
           }
         />
@@ -494,7 +493,7 @@ function App() {
           path="/accountant/reports"
           element={
             <ProtectedRoute allowedRoles={["accountant", "director"]}>
-              <FinancialReportPage />
+              <RevenueReportsPage />
             </ProtectedRoute>
           }
         />
@@ -503,14 +502,6 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={["accountant", "director"]}>
               <UpdateTuitionPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/accountant/create-receipt"
-          element={
-            <ProtectedRoute allowedRoles={["accountant", "director"]}>
-              <CreateReceiptPage />
             </ProtectedRoute>
           }
         />
@@ -526,7 +517,7 @@ function App() {
           path="/accountant/transactions"
           element={
             <ProtectedRoute allowedRoles={["accountant", "director"]}>
-              <TransactionManagementPage />
+              <TransactionDetailPage />
             </ProtectedRoute>
           }
         />

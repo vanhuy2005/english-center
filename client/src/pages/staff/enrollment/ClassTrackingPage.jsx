@@ -10,6 +10,7 @@ import {
   BarChart3,
 } from "lucide-react";
 import { classService } from "@services/classService";
+import api from "@config/api";
 import { useNavigate } from "react-router-dom";
 
 const ClassTrackingPage = () => {
@@ -36,9 +37,10 @@ const ClassTrackingPage = () => {
         search: filters.search,
         status: filters.status,
       });
-      setClasses(data);
+      setClasses(Array.isArray(data) ? data : data?.data || []);
     } catch (error) {
       console.error("Error fetching classes:", error);
+      setClasses([]);
     } finally {
       setLoading(false);
     }
@@ -46,7 +48,7 @@ const ClassTrackingPage = () => {
 
   const fetchCourses = async () => {
     try {
-      const response = await api.get("/courses");
+      const response = await api.get("/api/courses");
       setCourses(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.error("Error fetching courses:", error);
