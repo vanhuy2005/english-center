@@ -49,7 +49,11 @@ const RetentionReportPage = () => {
       setStats(statsRes.data || stats);
       setTrendData(trendRes.data || []);
       setReasonData(reasonRes.data || []);
-      setAtRiskList(atRiskRes.data || []);
+
+      // Handle atRiskList - ensure it's always an array
+      const atRiskListData = atRiskRes?.data?.data || atRiskRes?.data || [];
+      setAtRiskList(Array.isArray(atRiskListData) ? atRiskListData : []);
+
       setCourseAnalysis(courseRes.data || []);
     } catch (error) {
       console.error("Error fetching retention data:", error);

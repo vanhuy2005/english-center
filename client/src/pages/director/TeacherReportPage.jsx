@@ -45,7 +45,12 @@ const TeacherReportPage = () => {
 
       setStats(statsRes.data || stats);
       setPerformanceData(performanceRes.data || []);
-      setTeacherList(teacherListRes.data || []);
+
+      // Handle teacherList - ensure it's always an array
+      const teacherListData =
+        teacherListRes?.data?.data || teacherListRes?.data || [];
+      setTeacherList(Array.isArray(teacherListData) ? teacherListData : []);
+
       setRatingDistribution(ratingRes.data || []);
     } catch (error) {
       console.error("Error fetching teacher data:", error);

@@ -1,11 +1,11 @@
-const Notification = require("./notification.model");
+const Notification = require("../../shared/models/Notification.model");
 
 exports.getMyNotifications = async (req, res) => {
   try {
     const userId = req.user._id;
     const { limit = 20, page = 1, unreadOnly = false } = req.query;
 
-    const query = { userId };
+    const query = { recipient: userId };
     if (unreadOnly === "true") {
       query.isRead = false;
     }
@@ -33,6 +33,47 @@ exports.getMyNotifications = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Không thể tải thông báo",
+    });
+  }
+};
+
+exports.markMultipleAsRead = async (req, res) => {
+  try {
+    const { notificationIds } = req.body;
+
+    if (notificationIds === "all") {
+      // Mark all as read
+      await Notification.updateMany(
+        { recipient: req.user._id, isRead: false },
+        { isRead: true, readAt: new Date() }
+      );
+      return res.json({
+        success: true,
+        message: "Đã đánh dấu tất cả thông báo đã đọc",
+      });
+    }
+
+    if (!Array.isArray(notificationIds)) {
+      return res.status(400).json({
+        success: false,
+        message: "notificationIds phải là một mảng",
+      });
+    }
+
+    await Notification.updateMany(
+      { _id: { $in: notificationIds }, recipient: req.user._id },
+      { isRead: true, readAt: new Date() }
+    );
+
+    res.json({
+      success: true,
+      message: "Đã đánh dấu thông báo đã đọc",
+    });
+  } catch (error) {
+    console.error("Error marking notifications as read:", error);
+    res.status(500).json({
+      success: false,
+      message: "Không thể cập nhật thông báo",
     });
   }
 };

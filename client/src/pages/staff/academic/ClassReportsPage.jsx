@@ -48,14 +48,20 @@ const ClassReportsPage = () => {
       const classData = response.data?.data || response.data;
 
       // Lấy danh sách học viên với điểm
-      const studentIds = classData.students || [];
-      const studentsPromises = studentIds.map((id) =>
-        api.get(`/students/${id}`).catch(() => null)
-      );
-      const studentsResponses = await Promise.all(studentsPromises);
-      const students = studentsResponses
-        .filter((res) => res !== null)
-        .map((res) => res.data?.data || res.data);
+      let students = [];
+      const studentIds = (classData.students || [])
+        .map((student) => (typeof student === "string" ? student : student._id))
+        .filter((id) => id && typeof id === "string" && id.trim().length > 0);
+
+      if (studentIds.length > 0) {
+        const studentsPromises = studentIds.map((id) =>
+          api.get(`/students/${id}`).catch(() => null)
+        );
+        const studentsResponses = await Promise.all(studentsPromises);
+        students = studentsResponses
+          .filter((res) => res !== null)
+          .map((res) => res.data?.data || res.data);
+      }
 
       // Tính toán thống kê
       const stats = calculateStats(classData, students);

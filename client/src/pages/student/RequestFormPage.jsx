@@ -89,13 +89,23 @@ const RequestFormPage = () => {
     try {
       setSubmitting(true);
 
-      await requestService.create({
+      const payload = {
+        student: user._id,
         type: formData.type,
-        class: formData.classId,
-        date: formData.date,
+        startDate: formData.date,
         reason: formData.reason,
-        note: formData.note,
-      });
+      };
+
+      // Only add class if it exists and is not empty/mock
+      if (
+        formData.classId &&
+        formData.classId !== "1" &&
+        formData.classId !== "2"
+      ) {
+        payload.class = formData.classId;
+      }
+
+      await requestService.create(payload);
 
       toast.success("Đã gửi yêu cầu thành công!");
       navigate("/requests");

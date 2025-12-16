@@ -9,7 +9,10 @@ router.use(auth);
 // Get my notifications
 router.get("/", notificationController.getMyNotifications);
 
-// Mark notification as read
+// Mark notifications as read (batch - from client)
+router.patch("/mark-read", notificationController.markMultipleAsRead);
+
+// Mark notification as read (single)
 router.put("/:id/read", notificationController.markAsRead);
 
 // Mark all as read

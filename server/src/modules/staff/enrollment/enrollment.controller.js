@@ -2,6 +2,7 @@ const Student = require("../../../shared/models/Student.model");
 const Class = require("../../../shared/models/Class.model");
 const Course = require("../../../shared/models/Course.model");
 const Request = require("../../../shared/models/Request.model");
+const Notification = require("../../../shared/models/Notification.model");
 const Finance = require("../../../shared/models/Finance.model");
 const {
   successResponse,
@@ -481,8 +482,21 @@ exports.getEnrollmentRequests = async (req, res) => {
         query.type = type;
       }
     } else {
-      query.type = { $in: ["transfer", "pause", "resume"] };
+      // Include all types by default - don't filter by type if not specified
+      query.type = {
+        $in: [
+          "transfer",
+          "pause",
+          "resume",
+          "leave",
+          "makeup",
+          "withdrawal",
+          "course_enrollment",
+        ],
+      };
     }
+
+    console.log("Enrollment requests query:", query);
 
     const skip = (page - 1) * limit;
     const [requests, total] = await Promise.all([
@@ -496,6 +510,8 @@ exports.getEnrollmentRequests = async (req, res) => {
         .limit(parseInt(limit)),
       Request.countDocuments(query),
     ]);
+
+    console.log("Found requests:", requests.length, "Total:", total);
 
     successResponse(
       res,
@@ -522,54 +538,41 @@ exports.getEnrollmentRequests = async (req, res) => {
  * @access  Private (enrollment staff)
  */
 exports.processRequest = async (req, res) => {
-  const mongoose = require("mongoose");
-  const session = await mongoose.startSession();
-  session.startTransaction();
-
   try {
     const { action, note } = req.body; // action: 'approve' or 'reject'
     const requestId = req.params.id;
 
+    console.log("Processing request:", { requestId, action, note });
+
     if (!["approve", "reject"].includes(action)) {
-      await session.abortTransaction();
-      session.endSession();
       return errorResponse(res, "Hành động không hợp lệ", 400);
     }
 
-    const request = await Request.findById(requestId).session(session);
+    const request = await Request.findById(requestId);
     if (!request) {
-      await session.abortTransaction();
-      session.endSession();
       return errorResponse(res, "Không tìm thấy yêu cầu", 404);
     }
 
     if (request.status !== "pending") {
-      await session.abortTransaction();
-      session.endSession();
       return errorResponse(res, "Yêu cầu đã được xử lý", 400);
     }
 
     // Update request status
     request.status = action === "approve" ? "approved" : "rejected";
     request.processedBy = req.user._id;
-    request.processedAt = new Date();
-    if (note) request.note = note;
+    if (note) request.responseNote = note;
 
     // If approved, update student and class accordingly
     if (action === "approve") {
-      const student = await Student.findById(request.student).session(session);
+      const student = await Student.findById(request.student);
       if (!student) {
-        await session.abortTransaction();
-        session.endSession();
         return errorResponse(res, "Không tìm thấy học viên", 404);
       }
 
       if (request.type === "transfer") {
         // Transfer to new class
-        const [oldClass, newClass] = await Promise.all([
-          Class.findById(request.class).session(session),
-          Class.findById(request.targetClass).session(session),
-        ]);
+        const oldClass = await Class.findById(request.class);
+        const newClass = await Class.findById(request.targetClass);
 
         if (oldClass) {
           // Remove from old class
@@ -578,7 +581,7 @@ exports.processRequest = async (req, res) => {
               ? { ...s, status: "dropped" }
               : s
           );
-          await oldClass.save({ session });
+          await oldClass.save();
         }
 
         if (newClass) {
@@ -588,43 +591,68 @@ exports.processRequest = async (req, res) => {
             enrolledDate: new Date(),
             status: "active",
           });
-          await newClass.save({ session });
+          await newClass.save();
         }
       } else if (request.type === "pause") {
         // Pause enrollment
         student.academicStatus = "paused";
-        await student.save({ session });
+        await student.save();
 
-        const classData = await Class.findById(request.class).session(session);
+        const classData = await Class.findById(request.class);
         if (classData) {
           classData.students = classData.students.map((s) =>
             s.student.toString() === student._id.toString()
               ? { ...s, status: "paused" }
               : s
           );
-          await classData.save({ session });
+          await classData.save();
         }
       } else if (request.type === "resume") {
         // Resume enrollment
         student.academicStatus = "active";
-        await student.save({ session });
+        await student.save();
 
-        const classData = await Class.findById(request.class).session(session);
+        const classData = await Class.findById(request.class);
         if (classData) {
           classData.students = classData.students.map((s) =>
             s.student.toString() === student._id.toString()
               ? { ...s, status: "active" }
               : s
           );
-          await classData.save({ session });
+          await classData.save();
         }
       }
     }
 
-    await request.save({ session });
+    await request.save();
 
-    await session.commitTransaction();
-    session.endSession();
+    // Create notification for student
+    const notificationTitle =
+      action === "approve"
+        ? "Yêu cầu của bạn được phê duyệt"
+        : "Yêu cầu của bạn bị từ chối";
+    const notificationMessage =
+      action === "approve"
+        ? `Yêu cầu ${getRequestTypeLabel(
+            request.type
+          )} của bạn đã được phê duyệt.`
+        : `Yêu cầu ${getRequestTypeLabel(request.type)} của bạn bị từ chối.${
+            note ? ` Lý do: ${note}` : ""
+          }`;
+
+    await Notification.createNotification({
+      recipient: request.student,
+      sender: req.user._id,
+      type: "request_response",
+      title: notificationTitle,
+      message: notificationMessage,
+      link: "/requests",
+      relatedModel: "Request",
+      relatedId: request._id,
+      priority: action === "approve" ? "normal" : "high",
+    });
+
+    console.log("Request processed successfully:", request._id);
 
     successResponse(
       res,
@@ -632,12 +660,25 @@ exports.processRequest = async (req, res) => {
       `${action === "approve" ? "Phê duyệt" : "Từ chối"} yêu cầu thành công`
     );
   } catch (error) {
-    await session.abortTransaction();
-    session.endSession();
     console.error("Process Request Error:", error);
+    console.error("Error stack:", error.stack);
     errorResponse(res, error.message, 500);
   }
 };
+
+// Helper function to get request type label
+function getRequestTypeLabel(type) {
+  const labels = {
+    transfer: "đổi lớp",
+    pause: "bảo lưu",
+    resume: "học lại",
+    leave: "xin nghỉ",
+    makeup: "xin học bù",
+    withdrawal: "rút học",
+    course_enrollment: "đăng ký khóa học",
+  };
+  return labels[type] || type;
+}
 
 /**
  * @desc    Get enrollment statistics

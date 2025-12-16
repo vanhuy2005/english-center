@@ -75,41 +75,41 @@ const StudentProgressPage = () => {
     {
       key: "attendanceRate",
       label: "Điểm danh",
-      render: (row) => (
+      render: (value, row) => (
         <span
           className={
-            row.attendanceRate >= 80
+            value >= 80
               ? "text-green-600"
-              : row.attendanceRate >= 60
+              : value >= 60
               ? "text-yellow-600"
               : "text-red-600"
           }
         >
-          {row.attendanceRate}%
+          {value}%
         </span>
       ),
     },
     {
       key: "average",
       label: "Điểm TB",
-      render: (row) => (
+      render: (value, row) => (
         <span
           className={
-            row.average >= 8
+            value >= 8
               ? "text-green-600 font-semibold"
-              : row.average >= 5
+              : value >= 5
               ? "text-yellow-600"
               : "text-red-600"
           }
         >
-          {row.average?.toFixed(1) || "0.0"}
+          {value?.toFixed(1) || "0.0"}
         </span>
       ),
     },
     {
       key: "status",
       label: "Trạng thái",
-      render: (row) => {
+      render: (value, row) => {
         const isGood = row.average >= 8 && row.attendanceRate >= 80;
         const isDanger = row.average < 5 || row.attendanceRate < 60;
         return (

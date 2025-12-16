@@ -119,6 +119,8 @@ exports.createRequest = async (req, res) => {
       priority,
     } = req.body;
 
+    console.log("Request body:", req.body);
+
     if (!student || !type || !reason) {
       return res.status(400).json({
         success: false,
@@ -167,7 +169,6 @@ exports.createRequest = async (req, res) => {
       reason,
       documents,
       priority: priority || "normal",
-      createdBy: req.user._id,
     });
 
     const populatedRequest = await Request.findById(request._id)

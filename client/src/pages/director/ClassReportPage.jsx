@@ -47,7 +47,11 @@ const ClassReportPage = () => {
       setStats(statsRes.data || stats);
       setClassData(classDataRes.data || []);
       setCapacityData(capacityRes.data || []);
-      setClassList(classListRes.data || []);
+
+      // Handle classList - ensure it's always an array
+      const classListData =
+        classListRes?.data?.data || classListRes?.data || [];
+      setClassList(Array.isArray(classListData) ? classListData : []);
     } catch (error) {
       console.error("Error fetching class data:", error);
     } finally {

@@ -68,11 +68,11 @@ const UserManagementPage = () => {
 
       const response = await apiClient.get(`/director/users?${params}`);
 
-      if (response.success) {
-        setUsers(response.data.users || []);
+      if (response.data.success) {
+        setUsers(response.data.data.users || []);
         setPagination((prev) => ({
           ...prev,
-          total: response.data.pagination?.total || 0,
+          total: response.data.data.pagination?.total || 0,
         }));
       }
     } catch (error) {

@@ -459,11 +459,19 @@ exports.getMyTuition = async (req, res) => {
 
 exports.getMyRequests = async (req, res) => {
   try {
+    const Request = require("../../shared/models/Request.model");
+
+    const requests = await Request.find({ student: req.user._id })
+      .populate("class", "name classCode")
+      .populate("targetClass", "name classCode")
+      .sort({ createdAt: -1 });
+
     res.json({
       success: true,
-      data: [],
+      data: requests,
     });
   } catch (error) {
+    console.error("Error fetching requests:", error);
     res.status(500).json({
       success: false,
       message: "Không thể tải yêu cầu",

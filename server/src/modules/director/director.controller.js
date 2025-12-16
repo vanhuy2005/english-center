@@ -104,7 +104,9 @@ exports.createUserAccount = async (req, res) => {
         password: "123456",
         isFirstLogin: true,
         staffType: role,
-        staffCode: `NV${role.toUpperCase().slice(0, 2)}${Date.now().toString().slice(-6)}`,
+        staffCode: `NV${role.toUpperCase().slice(0, 2)}${Date.now()
+          .toString()
+          .slice(-6)}`,
       };
 
       // Add common staff data
@@ -121,7 +123,7 @@ exports.createUserAccount = async (req, res) => {
         if (teacherData.experience) {
           staffProfile.experience = {
             years: teacherData.experience.years || 0,
-            description: teacherData.experience.description || ""
+            description: teacherData.experience.description || "",
           };
         }
       }
@@ -129,8 +131,10 @@ exports.createUserAccount = async (req, res) => {
       // Add other staff-specific data
       if (staffData) {
         if (staffData.position) staffProfile.position = staffData.position;
-        if (staffData.department) staffProfile.department = staffData.department;
-        if (staffData.accessLevel) staffProfile.accessLevel = staffData.accessLevel;
+        if (staffData.department)
+          staffProfile.department = staffData.department;
+        if (staffData.accessLevel)
+          staffProfile.accessLevel = staffData.accessLevel;
       }
 
       profile = await Staff.create(staffProfile);
@@ -144,7 +148,7 @@ exports.createUserAccount = async (req, res) => {
       role: role,
       status: profile.status,
       isFirstLogin: profile.isFirstLogin,
-      createdAt: profile.createdAt
+      createdAt: profile.createdAt,
     };
 
     successResponse(
@@ -180,13 +184,13 @@ exports.getAllUsers = async (req, res) => {
     // Build search query
     const buildQuery = (baseQuery = {}) => {
       const query = { ...baseQuery };
-      if (status && status !== 'all') query.status = status;
+      if (status && status !== "all") query.status = status;
       if (search) {
         query.$or = [
           { fullName: { $regex: search, $options: "i" } },
           { phone: { $regex: search, $options: "i" } },
         ];
-        if (search.includes('@')) {
+        if (search.includes("@")) {
           query.$or.push({ email: { $regex: search, $options: "i" } });
         }
       }
@@ -206,8 +210,8 @@ exports.getAllUsers = async (req, res) => {
 
       // Combine and sort
       const allUsers = [
-        ...students.map(s => ({ ...s.toObject(), role: "student" })),
-        ...staff.map(s => ({ ...s.toObject(), role: s.staffType })),
+        ...students.map((s) => ({ ...s.toObject(), role: "student" })),
+        ...staff.map((s) => ({ ...s.toObject(), role: s.staffType })),
       ].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
       total = allUsers.length;
@@ -221,7 +225,7 @@ exports.getAllUsers = async (req, res) => {
           .limit(parseInt(limit)),
         Student.countDocuments(buildQuery()),
       ]);
-      users = students.map(s => ({ ...s.toObject(), role: "student" }));
+      users = students.map((s) => ({ ...s.toObject(), role: "student" }));
       total = count;
     } else {
       const [staff, count] = await Promise.all([
@@ -232,7 +236,7 @@ exports.getAllUsers = async (req, res) => {
           .limit(parseInt(limit)),
         Staff.countDocuments(buildQuery({ staffType: role })),
       ]);
-      users = staff.map(s => ({ ...s.toObject(), role: s.staffType }));
+      users = staff.map((s) => ({ ...s.toObject(), role: s.staffType }));
       total = count;
     }
 
@@ -273,7 +277,10 @@ exports.getDashboard = async (req, res) => {
       financeStats,
     ] = await Promise.all([
       Student.countDocuments(),
-      Staff.countDocuments({ staffType: "teacher", employmentStatus: "active" }),
+      Staff.countDocuments({
+        staffType: "teacher",
+        employmentStatus: "active",
+      }),
       Course.countDocuments({ status: "active" }),
       Student.countDocuments({ academicStatus: "active" }),
       Student.countDocuments({
@@ -884,8 +891,9 @@ exports.getTopStudents = async (req, res) => {
     const { limit = 10 } = req.query;
 
     // Mock data - In production, calculate from grades and attendance
-    const students = await Student.find({ academicStatus: "active" })
-      .limit(parseInt(limit));
+    const students = await Student.find({ academicStatus: "active" }).limit(
+      parseInt(limit)
+    );
 
     const topStudents = students.map((student, index) => ({
       studentCode: student.studentCode || `SV${1000 + index}`,
@@ -1037,7 +1045,10 @@ exports.getTeacherStats = async (req, res) => {
   try {
     const [totalTeachers, activeTeachers] = await Promise.all([
       Staff.countDocuments({ staffType: "teacher" }),
-      Staff.countDocuments({ staffType: "teacher", employmentStatus: "active" }),
+      Staff.countDocuments({
+        staffType: "teacher",
+        employmentStatus: "active",
+      }),
     ]);
 
     successResponse(
@@ -1106,8 +1117,10 @@ exports.getTopTeachers = async (req, res) => {
   try {
     const { limit = 15 } = req.query;
 
-    const teachers = await Staff.find({ staffType: "teacher", employmentStatus: "active" })
-      .limit(parseInt(limit));
+    const teachers = await Staff.find({
+      staffType: "teacher",
+      employmentStatus: "active",
+    }).limit(parseInt(limit));
 
     const topTeachers = teachers.map((teacher, index) => ({
       teacherCode: teacher.staffCode || `GV${1000 + index}`,
@@ -1255,8 +1268,9 @@ exports.getAtRiskStudents = async (req, res) => {
   try {
     const { limit = 20 } = req.query;
 
-    const students = await Student.find({ academicStatus: "active" })
-      .limit(parseInt(limit));
+    const students = await Student.find({ academicStatus: "active" }).limit(
+      parseInt(limit)
+    );
 
     const atRiskList = students.map((student, index) => ({
       studentCode: student.studentCode || `SV${1000 + index}`,
@@ -1431,6 +1445,34 @@ exports.getDepartmentPerformance = async (req, res) => {
     successResponse(res, data, "Lấy hiệu suất bộ phận thành công");
   } catch (error) {
     console.error("Get Department Performance Error:", error);
+    errorResponse(res, error.message, 500);
+  }
+};
+
+/**
+ * @desc    Delete user account (Director only)
+ * @route   DELETE /api/director/users/:userId
+ * @access  Private (director only)
+ */
+exports.deleteUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    // Try to delete from Student collection first
+    let user = await Student.findByIdAndDelete(userId);
+
+    // If not found in Student, try Staff collection
+    if (!user) {
+      user = await Staff.findByIdAndDelete(userId);
+    }
+
+    if (!user) {
+      return errorResponse(res, "Không tìm thấy người dùng", 404);
+    }
+
+    successResponse(res, null, "Xóa người dùng thành công");
+  } catch (error) {
+    console.error("Delete User Error:", error);
     errorResponse(res, error.message, 500);
   }
 };

@@ -14,18 +14,15 @@ router.get("/dashboard", academicController.getDashboard);
 
 // Attendance Management
 router.get("/attendance", academicController.getAttendance);
+router.get("/attendance/:classId", academicController.getAttendanceByClass);
 router.post("/attendance", academicController.createAttendance);
 router.put("/attendance/:id", academicController.updateAttendance);
 
 // Grade Management
 router.get("/grades", academicController.getGrades);
+router.get("/grades/:classId", academicController.getGradesByClass);
 router.put("/grades/:id", academicController.updateGrade);
 router.post("/grades/:id/publish", academicController.publishGrade);
-
-// Request Management
-router.get("/requests", academicController.getRequests);
-router.post("/requests/:id/approve", academicController.approveRequest);
-router.post("/requests/:id/reject", academicController.rejectRequest);
 
 // Student Management
 router.get("/students", academicController.getStudents);

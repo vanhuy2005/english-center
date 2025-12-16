@@ -19,14 +19,15 @@ const RequestHandlingPage = () => {
   const fetchRequests = async () => {
     try {
       const response = await api.get("/staff/academic/requests");
-      const data = response.data || response || [];
-      const requests = Array.isArray(data) ? data : [];
+      const requestsList =
+        response.data?.requests || response.data?.data?.requests || [];
+      const requests = Array.isArray(requestsList) ? requestsList : [];
       setRequests(requests);
-      
-      const pending = requests.filter(r => r.status === "pending").length;
-      const approved = requests.filter(r => r.status === "approved").length;
-      const rejected = requests.filter(r => r.status === "rejected").length;
-      
+
+      const pending = requests.filter((r) => r.status === "pending").length;
+      const approved = requests.filter((r) => r.status === "approved").length;
+      const rejected = requests.filter((r) => r.status === "rejected").length;
+
       setStats({ pending, approved, rejected });
     } catch (error) {
       toast.error("Không thể tải danh sách yêu cầu");
@@ -44,8 +45,12 @@ const RequestHandlingPage = () => {
 
   const confirmAction = async () => {
     try {
-      await api.put(`/staff/academic/requests/${selectedRequest._id}`, { status: action });
-      toast.success(`Đã ${action === "approved" ? "phê duyệt" : "từ chối"} yêu cầu`);
+      await api.put(`/staff/academic/requests/${selectedRequest._id}`, {
+        status: action,
+      });
+      toast.success(
+        `Đã ${action === "approved" ? "phê duyệt" : "từ chối"} yêu cầu`
+      );
       setShowModal(false);
       fetchRequests();
     } catch (error) {
@@ -54,29 +59,74 @@ const RequestHandlingPage = () => {
   };
 
   const columns = [
-    { key: "studentCode", label: "Mã HV", render: (row) => row.student?.studentCode || "N/A" },
-    { key: "studentName", label: "Học viên", render: (row) => row.student?.fullName || "N/A" },
-    { key: "type", label: "Loại", render: (row) => (
-      <Badge variant="info">{row.type === "leave" ? "Nghỉ học" : row.type === "makeup" ? "Học bù" : "Chuyển lớp"}</Badge>
-    )},
+    {
+      key: "studentCode",
+      label: "Mã HV",
+      render: (value, row) => row.student?.studentCode || "N/A",
+    },
+    {
+      key: "studentName",
+      label: "Học viên",
+      render: (value, row) => row.student?.fullName || "N/A",
+    },
+    {
+      key: "type",
+      label: "Loại",
+      render: (value, row) => (
+        <Badge variant="info">
+          {row.type === "leave"
+            ? "Nghỉ học"
+            : row.type === "makeup"
+            ? "Học bù"
+            : "Chuyển lớp"}
+        </Badge>
+      ),
+    },
     { key: "reason", label: "Lý do" },
-    { key: "status", label: "Trạng thái", render: (row) => (
-      <Badge variant={row.status === "approved" ? "success" : row.status === "rejected" ? "danger" : "warning"}>
-        {row.status === "approved" ? "Đã duyệt" : row.status === "rejected" ? "Từ chối" : "Chờ duyệt"}
-      </Badge>
-    )},
-    { key: "actions", label: "Thao tác", render: (row) => (
-      row.status === "pending" && (
-        <div className="flex gap-2">
-          <Button size="sm" onClick={() => handleAction(row, "approved")} className="bg-green-600 hover:bg-green-700">
-            <Check className="w-4 h-4" />
-          </Button>
-          <Button size="sm" variant="danger" onClick={() => handleAction(row, "rejected")}>
-            <X className="w-4 h-4" />
-          </Button>
-        </div>
-      )
-    )}
+    {
+      key: "status",
+      label: "Trạng thái",
+      render: (value, row) => (
+        <Badge
+          variant={
+            row.status === "approved"
+              ? "success"
+              : row.status === "rejected"
+              ? "danger"
+              : "warning"
+          }
+        >
+          {row.status === "approved"
+            ? "Đã duyệt"
+            : row.status === "rejected"
+            ? "Từ chối"
+            : "Chờ duyệt"}
+        </Badge>
+      ),
+    },
+    {
+      key: "actions",
+      label: "Thao tác",
+      render: (value, row) =>
+        row.status === "pending" && (
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              onClick={() => handleAction(row, "approved")}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              <Check className="w-4 h-4" />
+            </Button>
+            <Button
+              size="sm"
+              variant="danger"
+              onClick={() => handleAction(row, "rejected")}
+            >
+              <X className="w-4 h-4" />
+            </Button>
+          </div>
+        ),
+    },
   ];
 
   if (loading) return <Loading fullScreen />;
@@ -113,12 +163,26 @@ const RequestHandlingPage = () => {
         <Table columns={columns} data={requests} />
       </Card>
 
-      <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="Xác nhận">
+      <Modal
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        title="Xác nhận"
+      >
         <div className="space-y-4">
-          <p>Bạn có chắc chắn muốn {action === "approved" ? "phê duyệt" : "từ chối"} yêu cầu này?</p>
+          <p>
+            Bạn có chắc chắn muốn{" "}
+            {action === "approved" ? "phê duyệt" : "từ chối"} yêu cầu này?
+          </p>
           <div className="flex gap-2 justify-end">
-            <Button variant="outline" onClick={() => setShowModal(false)}>Hủy</Button>
-            <Button onClick={confirmAction} className={action === "approved" ? "bg-green-600" : "bg-red-600"}>Xác nhận</Button>
+            <Button variant="outline" onClick={() => setShowModal(false)}>
+              Hủy
+            </Button>
+            <Button
+              onClick={confirmAction}
+              className={action === "approved" ? "bg-green-600" : "bg-red-600"}
+            >
+              Xác nhận
+            </Button>
           </div>
         </div>
       </Modal>

@@ -27,6 +27,7 @@ import {
 const DirectorDashboard = () => {
   const { t } = useLanguage();
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [stats, setStats] = useState({
     totalStudents: 0,
     totalTeachers: 0,

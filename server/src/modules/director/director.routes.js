@@ -13,6 +13,7 @@ router.use(authorize("director"));
 // User Management
 router.post("/users", directorController.createUserAccount);
 router.get("/users", directorController.getAllUsers);
+router.delete("/users/:userId", directorController.deleteUser);
 
 // Dashboard
 router.get("/dashboard", directorController.getDashboard);

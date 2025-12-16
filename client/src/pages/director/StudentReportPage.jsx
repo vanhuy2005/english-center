@@ -47,7 +47,11 @@ const StudentReportPage = () => {
       setStats(statsRes.data || stats);
       setEnrollmentData(enrollmentRes.data || []);
       setDistributionData(distributionRes.data || []);
-      setTopStudents(topStudentsRes.data || []);
+
+      // Handle topStudents - ensure it's always an array
+      const topStudentsData =
+        topStudentsRes?.data?.data || topStudentsRes?.data || [];
+      setTopStudents(Array.isArray(topStudentsData) ? topStudentsData : []);
     } catch (error) {
       console.error("Error fetching student data:", error);
     } finally {

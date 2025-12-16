@@ -150,6 +150,38 @@ exports.getAttendance = async (req, res) => {
   }
 };
 
+exports.getAttendanceByClass = async (req, res) => {
+  try {
+    const { classId } = req.params;
+    const { date } = req.query;
+
+    const filter = { class: classId };
+
+    if (date) {
+      const startOfDay = new Date(date);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(date);
+      endOfDay.setHours(23, 59, 59, 999);
+      filter.date = { $gte: startOfDay, $lte: endOfDay };
+    }
+
+    const attendance = await Attendance.find(filter)
+      .populate("student", "studentCode fullName email phone")
+      .populate("class", "classCode name")
+      .populate("recordedBy", "fullName")
+      .sort({ date: -1 });
+
+    return ApiResponse.success(
+      res,
+      attendance,
+      "Lấy danh sách điểm danh theo lớp thành công"
+    );
+  } catch (error) {
+    console.error("Get attendance by class error:", error);
+    return ApiResponse.error(res, "Không thể lấy danh sách điểm danh");
+  }
+};
+
 exports.createAttendance = async (req, res) => {
   try {
     const attendance = await Attendance.create({
@@ -213,6 +245,32 @@ exports.getGrades = async (req, res) => {
     return ApiResponse.success(res, grades, "Lấy danh sách điểm thành công");
   } catch (error) {
     console.error("Get grades error:", error);
+    return ApiResponse.error(res, "Không thể lấy danh sách điểm");
+  }
+};
+
+exports.getGradesByClass = async (req, res) => {
+  try {
+    const { classId } = req.params;
+    const { isPublished } = req.query;
+
+    const filter = { class: classId };
+    if (isPublished !== undefined) filter.isPublished = isPublished === "true";
+
+    const grades = await Grade.find(filter)
+      .populate("student", "studentCode fullName email")
+      .populate("class", "classCode name")
+      .populate("course", "name courseCode")
+      .populate("gradedBy", "fullName")
+      .sort({ updatedAt: -1 });
+
+    return ApiResponse.success(
+      res,
+      grades,
+      "Lấy danh sách điểm theo lớp thành công"
+    );
+  } catch (error) {
+    console.error("Get grades by class error:", error);
     return ApiResponse.error(res, "Không thể lấy danh sách điểm");
   }
 };

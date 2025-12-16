@@ -27,13 +27,13 @@ const EnrollPage = () => {
     email: "",
     dateOfBirth: "",
     address: "",
-    note: ""
+    note: "",
   });
   const [consultForm, setConsultForm] = useState({
     fullName: "",
     phone: "",
     email: "",
-    note: ""
+    note: "",
   });
 
   useEffect(() => {
@@ -43,15 +43,17 @@ const EnrollPage = () => {
   const fetchCourses = async () => {
     try {
       setLoading(true);
-      const response = await courseService.getAll({ pageSize: 100, status: 'active' });
-      console.log('Courses response:', response);
-      // Backend trả về paginated response: { data: [...], pagination: {...} }
-      const coursesData = Array.isArray(response?.data) ? response.data : 
-                          Array.isArray(response) ? response : [];
-      setCourses(coursesData);
-      console.log('Courses set:', coursesData);
+      const response = await courseService.getAll({
+        pageSize: 100,
+        status: "active",
+      });
+      console.log("Courses response:", response);
+      // API trả về: { success: true, message, data: [...] }
+      const coursesData = response?.data?.data || response?.data || [];
+      setCourses(Array.isArray(coursesData) ? coursesData : []);
+      console.log("Courses set:", coursesData);
     } catch (error) {
-      console.error('Fetch courses error:', error);
+      console.error("Fetch courses error:", error);
       toast.error("Không thể tải danh sách khóa học!");
       setCourses([]);
     } finally {
@@ -72,20 +74,31 @@ const EnrollPage = () => {
   const handleEnrollSubmit = async (e) => {
     e.preventDefault();
     try {
-      const data = await apiClient.post('/student/requests/course-enrollment', {
+      const data = await apiClient.post("/student/requests/course-enrollment", {
         courseId: selectedCourse._id,
-        reason: enrollForm.note || `Đăng ký khóa học ${selectedCourse.name}`
+        reason: enrollForm.note || `Đăng ký khóa học ${selectedCourse.name}`,
       });
-      
+
       if (data.success) {
-        toast.success(`Đăng ký khóa học thành công! Học phí: ${formatCurrency(data.data.amount)}`);
+        toast.success(
+          `Đăng ký khóa học thành công! Học phí: ${formatCurrency(
+            data.data.amount
+          )}`
+        );
         setShowEnrollModal(false);
-        setEnrollForm({ fullName: "", phone: "", email: "", dateOfBirth: "", address: "", note: "" });
+        setEnrollForm({
+          fullName: "",
+          phone: "",
+          email: "",
+          dateOfBirth: "",
+          address: "",
+          note: "",
+        });
       } else {
         toast.error(data.message || "Đăng ký thất bại!");
       }
     } catch (error) {
-      console.error('Enroll error:', error);
+      console.error("Enroll error:", error);
       toast.error(error.response?.data?.message || "Đăng ký thất bại!");
     }
   };
@@ -297,7 +310,10 @@ const EnrollPage = () => {
             <h3 className="text-xl font-bold text-gray-900 mb-4">
               Đăng ký khóa học: {selectedCourse?.name}
             </h3>
-            <form onSubmit={handleEnrollSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto">
+            <form
+              onSubmit={handleEnrollSubmit}
+              className="space-y-4 max-h-[70vh] overflow-y-auto"
+            >
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Họ và tên <span className="text-red-500">*</span>
@@ -305,7 +321,9 @@ const EnrollPage = () => {
                 <input
                   type="text"
                   value={enrollForm.fullName}
-                  onChange={(e) => setEnrollForm({ ...enrollForm, fullName: e.target.value })}
+                  onChange={(e) =>
+                    setEnrollForm({ ...enrollForm, fullName: e.target.value })
+                  }
                   required
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
                   placeholder="Nhập họ và tên"
@@ -318,7 +336,9 @@ const EnrollPage = () => {
                 <input
                   type="tel"
                   value={enrollForm.phone}
-                  onChange={(e) => setEnrollForm({ ...enrollForm, phone: e.target.value })}
+                  onChange={(e) =>
+                    setEnrollForm({ ...enrollForm, phone: e.target.value })
+                  }
                   required
                   pattern="[0-9]{10,11}"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
@@ -332,7 +352,9 @@ const EnrollPage = () => {
                 <input
                   type="email"
                   value={enrollForm.email}
-                  onChange={(e) => setEnrollForm({ ...enrollForm, email: e.target.value })}
+                  onChange={(e) =>
+                    setEnrollForm({ ...enrollForm, email: e.target.value })
+                  }
                   required
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
                   placeholder="Nhập email"
@@ -345,7 +367,12 @@ const EnrollPage = () => {
                 <input
                   type="date"
                   value={enrollForm.dateOfBirth}
-                  onChange={(e) => setEnrollForm({ ...enrollForm, dateOfBirth: e.target.value })}
+                  onChange={(e) =>
+                    setEnrollForm({
+                      ...enrollForm,
+                      dateOfBirth: e.target.value,
+                    })
+                  }
                   required
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
                 />
@@ -357,7 +384,9 @@ const EnrollPage = () => {
                 <input
                   type="text"
                   value={enrollForm.address}
-                  onChange={(e) => setEnrollForm({ ...enrollForm, address: e.target.value })}
+                  onChange={(e) =>
+                    setEnrollForm({ ...enrollForm, address: e.target.value })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
                   placeholder="Nhập địa chỉ"
                 />
@@ -368,7 +397,9 @@ const EnrollPage = () => {
                 </label>
                 <textarea
                   value={enrollForm.note}
-                  onChange={(e) => setEnrollForm({ ...enrollForm, note: e.target.value })}
+                  onChange={(e) =>
+                    setEnrollForm({ ...enrollForm, note: e.target.value })
+                  }
                   rows={2}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
                   placeholder="Nhập ghi chú nếu có..."
@@ -383,7 +414,10 @@ const EnrollPage = () => {
                 >
                   Hủy
                 </Button>
-                <Button type="submit" className="flex-1 bg-red-600 hover:bg-red-700 text-white">
+                <Button
+                  type="submit"
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                >
                   Xác nhận đăng ký
                 </Button>
               </div>
@@ -407,7 +441,9 @@ const EnrollPage = () => {
                 <input
                   type="text"
                   value={consultForm.fullName}
-                  onChange={(e) => setConsultForm({ ...consultForm, fullName: e.target.value })}
+                  onChange={(e) =>
+                    setConsultForm({ ...consultForm, fullName: e.target.value })
+                  }
                   required
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
                   placeholder="Nhập họ và tên"
@@ -420,7 +456,9 @@ const EnrollPage = () => {
                 <input
                   type="tel"
                   value={consultForm.phone}
-                  onChange={(e) => setConsultForm({ ...consultForm, phone: e.target.value })}
+                  onChange={(e) =>
+                    setConsultForm({ ...consultForm, phone: e.target.value })
+                  }
                   required
                   pattern="[0-9]{10,11}"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
@@ -434,7 +472,9 @@ const EnrollPage = () => {
                 <input
                   type="email"
                   value={consultForm.email}
-                  onChange={(e) => setConsultForm({ ...consultForm, email: e.target.value })}
+                  onChange={(e) =>
+                    setConsultForm({ ...consultForm, email: e.target.value })
+                  }
                   required
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
                   placeholder="Nhập email"
@@ -446,7 +486,9 @@ const EnrollPage = () => {
                 </label>
                 <textarea
                   value={consultForm.note}
-                  onChange={(e) => setConsultForm({ ...consultForm, note: e.target.value })}
+                  onChange={(e) =>
+                    setConsultForm({ ...consultForm, note: e.target.value })
+                  }
                   rows={3}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
                   placeholder="Nhập nội dung cần tư vấn..."
@@ -461,7 +503,10 @@ const EnrollPage = () => {
                 >
                   Hủy
                 </Button>
-                <Button type="submit" className="flex-1 bg-red-600 hover:bg-red-700 text-white">
+                <Button
+                  type="submit"
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                >
                   Gửi yêu cầu
                 </Button>
               </div>

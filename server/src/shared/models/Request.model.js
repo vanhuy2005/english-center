@@ -14,7 +14,15 @@ const requestSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ["leave", "makeup", "transfer", "pause", "resume", "withdrawal", "course_enrollment"],
+      enum: [
+        "leave",
+        "makeup",
+        "transfer",
+        "pause",
+        "resume",
+        "withdrawal",
+        "course_enrollment",
+      ],
       required: [true, "Request type is required"],
     },
     course: {
@@ -59,7 +67,7 @@ const requestSchema = new mongoose.Schema(
     },
     processedBy: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: "Staff",
     },
     approvedDate: {
       type: Date,
@@ -96,16 +104,20 @@ requestSchema.pre("save", function (next) {
       break;
     case "transfer":
       if (!this.targetClass) {
-        return next(new Error("Target class is required for transfer requests"));
+        return next(
+          new Error("Target class is required for transfer requests")
+        );
       }
       break;
     case "leave":
     case "pause":
     case "resume":
-      if (!this.startDate || !this.endDate) {
+      if (!this.startDate) {
         return next(
           new Error(
-            `${this.type.charAt(0).toUpperCase() + this.type.slice(1)} requests require both startDate and endDate`
+            `${
+              this.type.charAt(0).toUpperCase() + this.type.slice(1)
+            } requests require startDate`
           )
         );
       }
@@ -115,7 +127,9 @@ requestSchema.pre("save", function (next) {
         return next(new Error("Class is required for makeup requests"));
       }
       if (!this.startDate) {
-        return next(new Error("Date is required for makeup requests (use startDate)"));
+        return next(
+          new Error("Date is required for makeup requests (use startDate)")
+        );
       }
       break;
   }
