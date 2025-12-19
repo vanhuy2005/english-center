@@ -45,7 +45,7 @@ const EnrollmentStaffDashboard = () => {
             params: { limit: 10, sort: "-createdAt" },
           }),
           api.get("/staff/enrollment/classes", {
-            params: { status: "active,upcoming" },
+            params: { limit: 50 }, // No status filter - get all classes
           }),
           api.get("/staff/enrollment/requests", {
             params: { status: "pending", limit: 10 },
@@ -60,13 +60,44 @@ const EnrollmentStaffDashboard = () => {
         dashboard: dashboardRes.data,
       });
 
-      // Extract data from API responses - backend returns {data: {students: [...], pagination: {...}}}
-      const students =
-        studentsRes.data?.data?.students || studentsRes.data?.students || [];
-      const classes =
-        classesRes.data?.data?.classes || classesRes.data?.classes || [];
-      const requests =
-        requestsRes.data?.data?.requests || requestsRes.data?.requests || [];
+      // Extract data from API responses - backend returns {success: true, data: {students/classes/requests: [...], pagination: {...}}}
+      let students = [];
+      if (studentsRes.data?.data?.students) {
+        students = studentsRes.data.data.students;
+      } else if (Array.isArray(studentsRes.data?.data)) {
+        students = studentsRes.data.data;
+      } else if (Array.isArray(studentsRes.data)) {
+        students = studentsRes.data;
+      }
+
+      let classes = [];
+      console.log("🔍 Classes response structure:", classesRes.data);
+      if (classesRes.data?.data?.classes) {
+        classes = classesRes.data.data.classes;
+        console.log("✅ Classes extracted from data.data.classes");
+      } else if (Array.isArray(classesRes.data?.data)) {
+        classes = classesRes.data.data;
+        console.log("✅ Classes extracted from data.data array");
+      } else if (Array.isArray(classesRes.data)) {
+        classes = classesRes.data;
+        console.log("✅ Classes extracted from data array");
+      }
+      console.log(
+        "📊 Final classes array:",
+        classes,
+        "Length:",
+        classes.length
+      );
+
+      let requests = [];
+      if (requestsRes.data?.data?.requests) {
+        requests = requestsRes.data.data.requests;
+      } else if (Array.isArray(requestsRes.data?.data)) {
+        requests = requestsRes.data.data;
+      } else if (Array.isArray(requestsRes.data)) {
+        requests = requestsRes.data;
+      }
+
       const dashboardStats = dashboardRes.data?.data || dashboardRes.data || {};
 
       console.log("Extracted Data:", {
@@ -93,6 +124,7 @@ const EnrollmentStaffDashboard = () => {
       const enrollmentStats = calculateEnrollmentStatsByMonth(students);
 
       // Calculate class capacity
+      console.log("📊 Raw classes array:", classes, "Length:", classes.length);
       const classesCapacity = classes.map((c) => ({
         _id: c._id,
         className: c.name, // Backend uses 'name' field, not 'className'
@@ -103,6 +135,7 @@ const EnrollmentStaffDashboard = () => {
         status: c.status,
         startDate: c.startDate,
       }));
+      console.log("✅ Processed classesCapacity:", classesCapacity);
 
       setDashboardData({
         stats: dashboardStats.stats || {
@@ -277,13 +310,6 @@ const EnrollmentStaffDashboard = () => {
                         }
                       >
                         Chi tiết
-                      </Button>
-                      <Button
-                        size="small"
-                        variant="secondary"
-                        onClick={() => handleEnrollStudentClick(student)}
-                      >
-                        Ghi danh
                       </Button>
                     </div>
                   </div>
@@ -474,9 +500,6 @@ const EnrollmentStaffDashboard = () => {
                 <th className="px-4 py-3 text-left text-sm font-semibold">
                   Ngày bắt đầu
                 </th>
-                <th className="px-4 py-3 text-left text-sm font-semibold">
-                  Thao tác
-                </th>
               </tr>
             </thead>
             <tbody className="divide-y">
@@ -544,17 +567,6 @@ const EnrollmentStaffDashboard = () => {
                       {new Date(classItem.startDate).toLocaleDateString(
                         "vi-VN"
                       )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <Button
-                        size="small"
-                        variant="primary"
-                        onClick={() =>
-                          navigate(`/enrollment/classes/${classItem._id}`)
-                        }
-                      >
-                        Chi tiết
-                      </Button>
                     </td>
                   </tr>
                 );
@@ -839,10 +851,26 @@ const EnrollmentModal = ({ isOpen, onClose, student, onSuccess }) => {
       const response = await api.get("/staff/enrollment/classes", {
         params: { status: "upcoming,active" },
       });
-      const data = response.data?.data || response.data || [];
-      setClasses(Array.isArray(data) ? data : []);
+
+      console.log("📚 Enrollment Modal - Classes response:", response.data);
+
+      let classList = [];
+      if (response.data?.data?.classes) {
+        classList = response.data.data.classes;
+        console.log("📚 Classes from response.data.data.classes");
+      } else if (Array.isArray(response.data?.data)) {
+        classList = response.data.data;
+        console.log("📚 Classes from response.data.data array");
+      } else if (Array.isArray(response.data)) {
+        classList = response.data;
+        console.log("📚 Classes from response.data array");
+      }
+
+      console.log("📊 Total classes loaded:", classList.length);
+      setClasses(classList);
     } catch (error) {
-      console.error("Error fetching classes:", error);
+      console.error("❌ Error fetching classes:", error);
+      console.error("Error details:", error.response?.data);
       setClasses([]);
       toast.error("Không thể tải danh sách lớp học");
     }

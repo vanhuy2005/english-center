@@ -176,8 +176,10 @@ exports.createUserAccount = async (req, res) => {
 exports.getAllUsers = async (req, res) => {
   try {
     const { role, status, search, page = 1, limit = 20 } = req.query;
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
 
-    const skip = (page - 1) * limit;
+    const skip = (pageNum - 1) * limitNum;
     let users = [];
     let total = 0;
 
@@ -215,14 +217,14 @@ exports.getAllUsers = async (req, res) => {
       ].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
       total = allUsers.length;
-      users = allUsers.slice(skip, skip + parseInt(limit));
+      users = allUsers.slice(skip, skip + limitNum);
     } else if (role === "student") {
       const [students, count] = await Promise.all([
         Student.find(buildQuery())
           .select("-password -refreshToken")
           .sort({ createdAt: -1 })
           .skip(skip)
-          .limit(parseInt(limit)),
+          .limit(limitNum),
         Student.countDocuments(buildQuery()),
       ]);
       users = students.map((s) => ({ ...s.toObject(), role: "student" }));
@@ -233,7 +235,7 @@ exports.getAllUsers = async (req, res) => {
           .select("-password -refreshToken")
           .sort({ createdAt: -1 })
           .skip(skip)
-          .limit(parseInt(limit)),
+          .limit(limitNum),
         Staff.countDocuments(buildQuery({ staffType: role })),
       ]);
       users = staff.map((s) => ({ ...s.toObject(), role: s.staffType }));
@@ -246,9 +248,9 @@ exports.getAllUsers = async (req, res) => {
         users,
         pagination: {
           total,
-          page: parseInt(page),
-          limit: parseInt(limit),
-          totalPages: Math.ceil(total / limit),
+          page: pageNum,
+          limit: limitNum,
+          totalPages: Math.ceil(total / limitNum),
         },
       },
       "Lấy danh sách người dùng thành công"

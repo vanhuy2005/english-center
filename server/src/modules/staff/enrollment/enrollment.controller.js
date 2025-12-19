@@ -192,6 +192,9 @@ exports.getAllStudents = async (req, res) => {
     const skip = (page - 1) * limit;
     const [students, total] = await Promise.all([
       Student.find(query)
+        .select(
+          "studentCode fullName email phone academicStatus enrolledCourses createdAt status"
+        )
         .populate("enrolledCourses", "name courseCode")
         .sort(sort)
         .skip(skip)
@@ -225,30 +228,48 @@ exports.getAllStudents = async (req, res) => {
  */
 exports.getStudentById = async (req, res) => {
   try {
-    const student = await Student.findById(req.params.id)
-      .populate("enrolledCourses", "name courseCode duration")
-      .populate("enrollmentHistory.class", "name startDate endDate");
+    console.log("📚 Getting student:", req.params.id);
+
+    const student = await Student.findById(req.params.id);
 
     if (!student) {
       return errorResponse(res, "Không tìm thấy học viên", 404);
     }
 
-    // Get student's classes with details
-    const classes = await Class.find({
-      "students.student": student._id,
-    })
-      .populate("course", "name courseCode")
-      .populate("teacher", "fullName");
+    console.log("✅ Found student:", student._id);
 
-    // Get financial records
-    const financeRecords = await Finance.find({ student: student._id }).sort({
-      createdAt: -1,
-    });
+    // Get student's classes with details
+    let classes = [];
+    try {
+      classes = await Class.find({
+        "students.student": student._id,
+      })
+        .populate("course", "name courseCode")
+        .populate("teacher", "fullName")
+        .lean();
+      console.log("✅ Found classes:", classes.length);
+    } catch (classError) {
+      console.error("Error fetching classes:", classError);
+      classes = [];
+    }
+
+    // Get financial records (optional, safe to fail)
+    let financeRecords = [];
+    try {
+      financeRecords = await Finance.find({ student: student._id })
+        .sort({ createdAt: -1 })
+        .limit(10)
+        .lean();
+      console.log("✅ Found finance records:", financeRecords.length);
+    } catch (financeError) {
+      console.error("Error fetching finance records:", financeError);
+      financeRecords = [];
+    }
 
     successResponse(
       res,
       {
-        student,
+        student: student.toObject(),
         classes,
         financeRecords,
       },
@@ -298,55 +319,62 @@ exports.updateStudent = async (req, res) => {
  * @access  Private (enrollment staff)
  */
 exports.enrollStudent = async (req, res) => {
-  const mongoose = require("mongoose");
-  const session = await mongoose.startSession();
-  session.startTransaction();
-
   try {
-    const { classId, courseId } = req.body;
+    const { classId } = req.body;
     const studentId = req.params.id;
 
+    console.log("📝 Enrolling student:", { studentId, classId });
+
     if (!classId) {
-      await session.abortTransaction();
-      session.endSession();
       return errorResponse(res, "Vui lòng chọn lớp học", 400);
     }
 
-    // Get student and class
-    const [student, classData] = await Promise.all([
-      Student.findById(studentId).session(session),
-      Class.findById(classId).populate("course").session(session),
-    ]);
+    // Get student and class without session
+    const student = await Student.findById(studentId);
+    const classData = await Class.findById(classId).populate("course");
+
+    console.log("✅ Found student:", student?._id);
+    console.log("✅ Found class:", classData?._id);
 
     if (!student) {
-      await session.abortTransaction();
-      session.endSession();
       return errorResponse(res, "Không tìm thấy học viên", 404);
     }
 
     if (!classData) {
-      await session.abortTransaction();
-      session.endSession();
       return errorResponse(res, "Không tìm thấy lớp học", 404);
+    }
+
+    // Initialize arrays if they don't exist
+    if (!classData.students) {
+      classData.students = [];
+    }
+    if (!student.enrolledCourses) {
+      student.enrolledCourses = [];
+    }
+    if (!student.enrollmentHistory) {
+      student.enrollmentHistory = [];
     }
 
     // Check if class is full
     const currentEnrollment = classData.students.filter(
       (s) => s.status === "active"
     ).length;
+
+    console.log("📊 Class capacity:", {
+      current: currentEnrollment,
+      capacity: classData.capacity,
+    });
+
     if (currentEnrollment >= classData.capacity) {
-      await session.abortTransaction();
-      session.endSession();
       return errorResponse(res, "Lớp học đã đầy", 400);
     }
 
-    // Check if student already enrolled in this class
+    // Check if student already enrolled
     const alreadyEnrolled = classData.students.some(
-      (s) => s.student.toString() === studentId && s.status === "active"
+      (s) => s.student?.toString() === studentId && s.status === "active"
     );
+
     if (alreadyEnrolled) {
-      await session.abortTransaction();
-      session.endSession();
       return errorResponse(res, "Học viên đã được ghi danh vào lớp này", 400);
     }
 
@@ -356,45 +384,53 @@ exports.enrollStudent = async (req, res) => {
       enrolledDate: new Date(),
       status: "active",
     });
-    await classData.save({ session });
+
+    await classData.save();
+    console.log("✅ Student added to class");
 
     // Update student profile
     if (!student.enrolledCourses.includes(classData.course._id)) {
       student.enrolledCourses.push(classData.course._id);
     }
+
     student.academicStatus = "active";
+
     student.enrollmentHistory.push({
       class: classId,
-      course: classData.course._id,
+      course: classData.course?._id || null,
       enrolledDate: new Date(),
       status: "active",
     });
-    await student.save({ session });
 
-    // Create finance record for tuition
-    await Finance.create(
-      [
-        {
+    await student.save();
+    console.log("✅ Student profile updated");
+
+    // Create finance record (optional, non-blocking)
+    try {
+      const tuitionFee = classData.course?.tuitionFee || 0;
+      if (tuitionFee > 0) {
+        await Finance.create({
           student: studentId,
           class: classId,
+          course: classData.course?._id || null,
           type: "tuition",
-          amount: classData.course.tuitionFee || 0,
-          dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+          amount: tuitionFee,
+          paymentMethod: "other",
           status: "pending",
-          description: `Học phí khóa ${classData.course.name} - Lớp ${classData.name}`,
-        },
-      ],
-      { session }
-    );
-
-    await session.commitTransaction();
-    session.endSession();
+          description: `Học phí khóa ${classData.course?.name || "N/A"} - Lớp ${
+            classData.name
+          }`,
+        });
+        console.log("✅ Finance record created");
+      }
+    } catch (financeError) {
+      console.error("⚠️ Error creating finance record:", financeError.message);
+      // Don't fail the enrollment for this
+    }
 
     successResponse(res, { student, class: classData }, "Ghi danh thành công");
   } catch (error) {
-    await session.abortTransaction();
-    session.endSession();
-    console.error("Enroll Student Error:", error);
+    console.error("❌ Enroll Student Error:", error);
     errorResponse(res, error.message, 500);
   }
 };
@@ -418,7 +454,19 @@ exports.getAllClasses = async (req, res) => {
     }
     if (course) query.course = course;
 
+    console.log("📚 getAllClasses - Query:", query);
+    console.log("📚 getAllClasses - Params:", { status, course, page, limit });
+
     const skip = (page - 1) * limit;
+
+    // Debug: Get total count without filter
+    const totalWithoutFilter = await Class.countDocuments({});
+    console.log("📚 Total classes in DB (no filter):", totalWithoutFilter);
+    console.log(
+      "📚 Classes with filter count:",
+      await Class.countDocuments(query)
+    );
+
     const [classes, total] = await Promise.all([
       Class.find(query)
         .populate("course", "name courseCode tuitionFee duration")
@@ -501,10 +549,9 @@ exports.getEnrollmentRequests = async (req, res) => {
     const skip = (page - 1) * limit;
     const [requests, total] = await Promise.all([
       Request.find(query)
-        .populate("student", "studentCode fullName")
-        .populate("student.user", "fullName email phone")
-        .populate("class", "name")
-        .populate("targetClass", "name")
+        .populate("student", "studentCode fullName email phone")
+        .populate("class", "name code")
+        .populate("targetClass", "name code")
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(parseInt(limit)),

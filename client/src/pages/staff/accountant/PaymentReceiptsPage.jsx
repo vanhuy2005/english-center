@@ -21,7 +21,7 @@ const PaymentReceiptsPage = () => {
   const loadReceipts = async () => {
     try {
       setLoading(true);
-      const response = await api.get("/api/staff/accountant/receipts", {
+      const response = await api.get("/staff/accountant/receipts", {
         params: filters,
       });
 
@@ -171,7 +171,7 @@ const PaymentReceiptsPage = () => {
           </div>
         </div>
         <Button
-          onClick={() => navigate("/accountant/receipts/create")}
+          onClick={() => navigate("/accountant/create-receipt")}
           className="flex items-center gap-2"
         >
           <Plus size={18} />

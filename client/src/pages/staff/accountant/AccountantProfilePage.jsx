@@ -17,7 +17,7 @@ const AccountantProfilePage = () => {
     e.preventDefault();
     try {
       setLoading(true);
-      const response = await api.put("/api/auth/profile", formData);
+      const response = await api.put("/auth/profile", formData);
       if (response.data.success) {
         alert("Cập nhật thông tin thành công!");
       }

@@ -1,6 +1,7 @@
 const Finance = require("../../../shared/models/Finance.model");
 const Student = require("../../../shared/models/Student.model");
 const Course = require("../../../shared/models/Course.model");
+const Receipt = require("../../../shared/models/Receipt.model");
 const ApiResponse = require("../../../shared/utils/ApiResponse");
 
 // Dashboard
@@ -377,42 +378,79 @@ exports.getFinancialReport = async (req, res) => {
     if (startDate) dateFilter.$gte = new Date(startDate);
     if (endDate) dateFilter.$lte = new Date(endDate);
 
-    const report = await Finance.aggregate([
+    // Get total revenue (active receipts that are NOT refunds)
+    const revenueData = await Receipt.aggregate([
       ...(Object.keys(dateFilter).length > 0
-        ? [{ $match: { createdAt: dateFilter } }]
-        : []),
+        ? [
+            {
+              $match: {
+                createdAt: dateFilter,
+                status: "active",
+                paymentMethod: { $ne: "refund" },
+              },
+            },
+          ]
+        : [{ $match: { status: "active", paymentMethod: { $ne: "refund" } } }]),
       {
         $group: {
           _id: null,
-          totalRevenue: { $sum: "$paidAmount" },
-          totalPending: {
-            $sum: {
-              $cond: [{ $eq: ["$status", "pending"] }, "$remainingAmount", 0],
-            },
-          },
+          totalRevenue: { $sum: "$amount" },
           totalTransactions: { $sum: 1 },
           avgTransactionAmount: { $avg: "$amount" },
         },
       },
     ]);
 
-    const revenueByType = await Finance.aggregate([
+    // Get refunds
+    const refundData = await Receipt.aggregate([
       ...(Object.keys(dateFilter).length > 0
-        ? [{ $match: { createdAt: dateFilter } }]
-        : []),
+        ? [{ $match: { createdAt: dateFilter, paymentMethod: "refund" } }]
+        : [{ $match: { paymentMethod: "refund" } }]),
       {
         $group: {
-          _id: "$type",
-          total: { $sum: "$paidAmount" },
+          _id: null,
+          totalRefunds: { $sum: "$amount" },
+          refundCount: { $sum: 1 },
+        },
+      },
+    ]);
+
+    // Get revenue by payment method
+    const revenueByType = await Receipt.aggregate([
+      ...(Object.keys(dateFilter).length > 0
+        ? [
+            {
+              $match: {
+                createdAt: dateFilter,
+                status: "active",
+                paymentMethod: { $ne: "refund" },
+              },
+            },
+          ]
+        : [{ $match: { status: "active", paymentMethod: { $ne: "refund" } } }]),
+      {
+        $group: {
+          _id: "$paymentMethod",
+          total: { $sum: "$amount" },
           count: { $sum: 1 },
         },
       },
     ]);
 
+    const totalRevenue = revenueData[0]?.totalRevenue || 0;
+    const totalRefunds = refundData[0]?.totalRefunds || 0;
+    const netRevenue = totalRevenue - totalRefunds;
+
     return ApiResponse.success(
       res,
       {
-        summary: report[0] || {},
+        summary: {
+          totalRevenue,
+          totalRefunds,
+          netRevenue,
+          totalTransactions: revenueData[0]?.totalTransactions || 0,
+          avgTransactionAmount: revenueData[0]?.avgTransactionAmount || 0,
+        },
         revenueByType,
       },
       "Lấy báo cáo tài chính thành công"
@@ -420,5 +458,206 @@ exports.getFinancialReport = async (req, res) => {
   } catch (error) {
     console.error("Get financial report error:", error);
     return ApiResponse.error(res, "Không thể lấy báo cáo tài chính");
+  }
+};
+// Export report
+exports.exportReport = async (req, res) => {
+  try {
+    const { reportType = "revenue", dateFrom = "", dateTo = "" } = req.body;
+
+    const query = {};
+    if (dateFrom && dateTo) {
+      query.createdAt = {
+        $gte: new Date(dateFrom),
+        $lte: new Date(dateTo),
+      };
+    }
+
+    let data = [];
+    let headers = [];
+
+    if (reportType === "revenue") {
+      data = await Finance.find(query)
+        .populate("student", "fullName studentCode")
+        .lean();
+      headers = [
+        "Mã GD",
+        "Học viên",
+        "Số tiền",
+        "Trạng thái",
+        "Ngày thanh toán",
+        "Ngày tạo",
+      ];
+    } else if (reportType === "debt") {
+      data = await Finance.find({ ...query, status: "pending" })
+        .populate("student", "fullName studentCode")
+        .lean();
+      headers = ["Mã GD", "Học viên", "Số tiền còn nợ", "Hạn chót"];
+    } else if (reportType === "receipts") {
+      data = await Receipt.find({ ...query, paymentMethod: { $ne: "refund" } })
+        .populate("student", "fullName studentCode")
+        .lean();
+      headers = ["Mã phiếu", "Học viên", "Số tiền", "Phương thức", "Ngày tạo"];
+    } else if (reportType === "refunds") {
+      data = await Receipt.find({ ...query, paymentMethod: "refund" })
+        .populate("student", "fullName studentCode")
+        .lean();
+      headers = ["Mã phiếu", "Học viên", "Số tiền", "Ngày hoàn"];
+    }
+
+    // Convert data to HTML table format that Excel understands
+    let htmlContent = `
+    <html xmlns:x="urn:schemas-microsoft-com:office:excel">
+      <head>
+        <meta charset="UTF-8">
+        <style>
+          table { border-collapse: collapse; }
+          th, td { border: 1px solid black; padding: 8px; text-align: left; }
+          th { background-color: #4472C4; color: white; font-weight: bold; }
+          tr:nth-child(even) { background-color: #f2f2f2; }
+        </style>
+      </head>
+      <body>
+        <table>
+          <thead>
+            <tr>
+              ${headers.map((header) => `<th>${header}</th>`).join("")}
+            </tr>
+          </thead>
+          <tbody>
+    `;
+
+    // Add data rows
+    if (reportType === "revenue") {
+      data.forEach((row) => {
+        htmlContent += `
+          <tr>
+            <td>${row.transactionCode || ""}</td>
+            <td>${row.student?.fullName || ""}</td>
+            <td>${row.amount || 0}</td>
+            <td>${row.status || ""}</td>
+            <td>${
+              row.paidDate
+                ? new Date(row.paidDate).toLocaleDateString("vi-VN")
+                : ""
+            }</td>
+            <td>${
+              row.createdAt
+                ? new Date(row.createdAt).toLocaleDateString("vi-VN")
+                : ""
+            }</td>
+          </tr>
+        `;
+      });
+    } else if (reportType === "debt") {
+      data.forEach((row) => {
+        htmlContent += `
+          <tr>
+            <td>${row.transactionCode || ""}</td>
+            <td>${row.student?.fullName || ""}</td>
+            <td>${row.remainingAmount || 0}</td>
+            <td>${
+              row.dueDate
+                ? new Date(row.dueDate).toLocaleDateString("vi-VN")
+                : ""
+            }</td>
+          </tr>
+        `;
+      });
+    } else if (reportType === "receipts") {
+      data.forEach((row) => {
+        htmlContent += `
+          <tr>
+            <td>${row.receiptNumber || ""}</td>
+            <td>${row.student?.fullName || ""}</td>
+            <td>${row.amount || 0}</td>
+            <td>${row.paymentMethod || ""}</td>
+            <td>${
+              row.createdAt
+                ? new Date(row.createdAt).toLocaleDateString("vi-VN")
+                : ""
+            }</td>
+          </tr>
+        `;
+      });
+    } else if (reportType === "refunds") {
+      data.forEach((row) => {
+        htmlContent += `
+          <tr>
+            <td>${row.receiptNumber || ""}</td>
+            <td>${row.student?.fullName || ""}</td>
+            <td>${row.amount || 0}</td>
+            <td>${
+              row.createdAt
+                ? new Date(row.createdAt).toLocaleDateString("vi-VN")
+                : ""
+            }</td>
+          </tr>
+        `;
+      });
+    }
+
+    htmlContent += `
+          </tbody>
+        </table>
+      </body>
+    </html>
+    `;
+
+    // Set response headers for Excel file download
+    res.setHeader("Content-Type", "application/vnd.ms-excel; charset=utf-8");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="bao_cao_${reportType}_${Date.now()}.xls"`
+    );
+
+    res.send(htmlContent);
+  } catch (error) {
+    console.error("Export report error:", error);
+    return ApiResponse.error(res, "Không thể xuất báo cáo");
+  }
+};
+
+// Debug: Check receipt data
+exports.checkReceiptData = async (req, res) => {
+  try {
+    const totalReceipts = await Receipt.countDocuments();
+    const activeReceipts = await Receipt.countDocuments({ status: "active" });
+    const refunds = await Receipt.countDocuments({ paymentMethod: "refund" });
+    const nonRefundReceipts = await Receipt.countDocuments({
+      status: "active",
+      paymentMethod: { $ne: "refund" },
+    });
+
+    const totalAmount = await Receipt.aggregate([
+      { $match: { status: "active", paymentMethod: { $ne: "refund" } } },
+      { $group: { _id: null, total: { $sum: "$amount" } } },
+    ]);
+
+    const refundAmount = await Receipt.aggregate([
+      { $match: { paymentMethod: "refund" } },
+      { $group: { _id: null, total: { $sum: "$amount" } } },
+    ]);
+
+    const sampleReceipts = await Receipt.find().limit(5).lean();
+
+    return ApiResponse.success(
+      res,
+      {
+        stats: {
+          totalReceipts,
+          activeReceipts,
+          refunds,
+          nonRefundReceipts,
+          totalAmount: totalAmount[0]?.total || 0,
+          refundAmount: refundAmount[0]?.total || 0,
+        },
+        sampleReceipts,
+      },
+      "Receipt data check"
+    );
+  } catch (error) {
+    console.error("Check receipt data error:", error);
+    return ApiResponse.error(res, "Không thể kiểm tra dữ liệu");
   }
 };

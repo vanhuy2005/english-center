@@ -154,8 +154,7 @@ exports.getAllFinance = async (req, res) => {
     const finances = await Finance.find(query)
       .populate({
         path: "student",
-        select: "studentCode",
-        populate: { path: "user", select: "fullName email" },
+        select: "studentCode fullName",
       })
       .populate("course", "name courseCode")
       .populate("createdBy", "fullName")
@@ -350,17 +349,25 @@ exports.processPayment = async (req, res) => {
 
     // Create notification for student
     const Notification = require("../../shared/models/Notification.model");
-    const notificationMessage = newStatus === "paid" 
-      ? `Thanh toán học phí khóa ${updatedFinance.course?.name || 'học'} thành công. Số tiền: ${amountToPay.toLocaleString('vi-VN')} VNĐ.`
-      : `Đã nhận thanh toán ${amountToPay.toLocaleString('vi-VN')} VNĐ cho khóa ${updatedFinance.course?.name || 'học'}. Còn lại: ${remaining.toLocaleString('vi-VN')} VNĐ.`;
-    
+    const notificationMessage =
+      newStatus === "paid"
+        ? `Thanh toán học phí khóa ${
+            updatedFinance.course?.name || "học"
+          } thành công. Số tiền: ${amountToPay.toLocaleString("vi-VN")} VNĐ.`
+        : `Đã nhận thanh toán ${amountToPay.toLocaleString(
+            "vi-VN"
+          )} VNĐ cho khóa ${
+            updatedFinance.course?.name || "học"
+          }. Còn lại: ${remaining.toLocaleString("vi-VN")} VNĐ.`;
+
     await Notification.create({
       recipient: updatedFinance.student._id || updatedFinance.student,
       type: "system",
-      title: newStatus === "paid" ? "Thanh toán thành công" : "Đã nhận thanh toán",
+      title:
+        newStatus === "paid" ? "Thanh toán thành công" : "Đã nhận thanh toán",
       message: notificationMessage,
       link: "/student/tuition",
-      priority: "normal"
+      priority: "normal",
     });
 
     successResponse(res, updatedFinance, "Xử lý thanh toán thành công");

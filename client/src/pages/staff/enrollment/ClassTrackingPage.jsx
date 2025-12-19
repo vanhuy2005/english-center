@@ -19,7 +19,7 @@ const ClassTrackingPage = () => {
   const [filters, setFilters] = useState({
     search: "",
     courseId: "",
-    status: "active",
+    status: "",
   });
   const [courses, setCourses] = useState([]);
   const navigate = useNavigate();
@@ -32,12 +32,22 @@ const ClassTrackingPage = () => {
   const fetchClasses = async () => {
     setLoading(true);
     try {
-      // Use service method instead of direct api call
-      const data = await classService.getClasses({
+      const response = await classService.getClasses({
         search: filters.search,
         status: filters.status,
       });
-      setClasses(Array.isArray(data) ? data : data?.data || []);
+      console.log("📚 Fetched classes response:", response);
+
+      // Backend returns { success: true, data: { classes, pagination } }
+      // classService returns response.data
+      const classList = response?.data?.classes || response?.classes || [];
+
+      console.log(
+        "📚 Processed classes list:",
+        classList,
+        `Count: ${classList.length}`
+      );
+      setClasses(classList);
     } catch (error) {
       console.error("Error fetching classes:", error);
       setClasses([]);
@@ -48,7 +58,7 @@ const ClassTrackingPage = () => {
 
   const fetchCourses = async () => {
     try {
-      const response = await api.get("/api/courses");
+      const response = await api.get("/courses");
       setCourses(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.error("Error fetching courses:", error);
@@ -141,30 +151,31 @@ const ClassTrackingPage = () => {
       {/* Class List */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {classes.map((classItem) => {
+          // Handle different data structures
+          const enrolledCount =
+            classItem.currentEnrollment || classItem.students?.length || 0;
+          const capacity = classItem.capacity || 0;
           const capacityStatus = getCapacityStatus(
-            classItem.enrolledCount,
-            classItem.capacity
+            enrolledCount,
+            capacity || 1
           );
           const statusBadge = getStatusBadge(classItem.status);
-          const percentage = (
-            (classItem.enrolledCount / classItem.capacity) *
-            100
-          ).toFixed(0);
+          const percentage =
+            capacity > 0 ? ((enrolledCount / capacity) * 100).toFixed(0) : 0;
 
           return (
             <Card
               key={classItem._id}
-              className="p-6 hover:shadow-lg transition-all cursor-pointer"
-              onClick={() => navigate(`/classes/${classItem._id}`)}
+              className="p-6 hover:shadow-lg transition-all"
             >
               {/* Class Header */}
               <div className="flex justify-between items-start mb-4">
                 <div>
                   <h3 className="text-lg font-semibold text-[#132440]">
-                    {classItem.name}
+                    {classItem.name || "N/A"}
                   </h3>
                   <p className="text-sm text-gray-600">
-                    {classItem.course?.name || "N/A"}
+                    {classItem.course?.name || classItem.courseCode || "N/A"}
                   </p>
                 </div>
                 <Badge color={statusBadge.color}>{statusBadge.label}</Badge>
@@ -179,8 +190,20 @@ const ClassTrackingPage = () => {
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Lịch học:</span>
-                  <span className="font-medium">{classItem.schedule}</span>
+                  <span className="text-gray-600">Mã lớp:</span>
+                  <span className="font-medium">
+                    {classItem.code || classItem.classCode || "N/A"}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Ngày bắt đầu:</span>
+                  <span className="font-medium">
+                    {classItem.startDate
+                      ? new Date(classItem.startDate).toLocaleDateString(
+                          "vi-VN"
+                        )
+                      : "N/A"}
+                  </span>
                 </div>
               </div>
 
@@ -190,7 +213,7 @@ const ClassTrackingPage = () => {
                   <span className="text-gray-600">Sĩ số:</span>
                   <div className="flex items-center gap-2">
                     <span className="font-semibold text-[#132440]">
-                      {classItem.enrolledCount}/{classItem.capacity}
+                      {enrolledCount}/{capacity}
                     </span>
                     <Badge color={capacityStatus.color} size="sm">
                       {capacityStatus.label}
@@ -222,12 +245,12 @@ const ClassTrackingPage = () => {
                   <span className="text-sm text-gray-600">Chỗ trống:</span>
                   <span
                     className={`text-lg font-bold ${
-                      classItem.capacity - classItem.enrolledCount === 0
+                      capacity - enrolledCount <= 0
                         ? "text-red-500"
                         : "text-green-500"
                     }`}
                   >
-                    {classItem.capacity - classItem.enrolledCount}
+                    {Math.max(0, capacity - enrolledCount)}
                   </span>
                 </div>
               </div>
@@ -265,22 +288,28 @@ const ClassTrackingPage = () => {
             </div>
             <div className="text-center p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-lg">
               <div className="text-2xl font-bold text-green-600">
-                {classes.reduce((sum, c) => sum + c.enrolledCount, 0)}
+                {classes.reduce((sum, c) => {
+                  const enrolled =
+                    c.currentEnrollment || c.students?.length || 0;
+                  return sum + enrolled;
+                }, 0)}
               </div>
               <div className="text-sm text-gray-600">Tổng học viên</div>
             </div>
             <div className="text-center p-4 bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg">
               <div className="text-2xl font-bold text-purple-600">
-                {classes.reduce((sum, c) => sum + c.capacity, 0)}
+                {classes.reduce((sum, c) => sum + (c.capacity || 0), 0)}
               </div>
               <div className="text-sm text-gray-600">Tổng sức chứa</div>
             </div>
             <div className="text-center p-4 bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg">
               <div className="text-2xl font-bold text-orange-600">
-                {classes.reduce(
-                  (sum, c) => sum + (c.capacity - c.enrolledCount),
-                  0
-                )}
+                {classes.reduce((sum, c) => {
+                  const enrolled =
+                    c.currentEnrollment || c.students?.length || 0;
+                  const capacity = c.capacity || 0;
+                  return sum + Math.max(0, capacity - enrolled);
+                }, 0)}
               </div>
               <div className="text-sm text-gray-600">Chỗ trống</div>
             </div>

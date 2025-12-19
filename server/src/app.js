@@ -110,6 +110,7 @@ app.use(
   "/api/staff/academic/requests",
   require("./modules/staff/academic/request.routes")
 );
+app.use("/api/receipts", require("../routes/receipts"));
 
 // 404 Handler
 app.use((req, res) => {

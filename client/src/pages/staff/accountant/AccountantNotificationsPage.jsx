@@ -14,7 +14,7 @@ const AccountantNotificationsPage = () => {
   const loadNotifications = async () => {
     try {
       setLoading(true);
-      const response = await api.get("/api/notifications");
+      const response = await api.get("/notifications");
       if (response.data.success) {
         setNotifications(response.data.data || []);
       }

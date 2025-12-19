@@ -122,7 +122,7 @@ const UserManagementPage = () => {
 
     try {
       const response = await apiClient.delete(`/director/users/${userId}`);
-      if (response.success) {
+      if (response.data.success) {
         toast.success("Xóa người dùng thành công");
         fetchUsers();
       }

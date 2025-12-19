@@ -17,6 +17,12 @@ router.post("/refresh-token", refreshLimiter, authController.refreshToken);
 router.use(protect);
 router.post("/logout", authController.logout);
 router.get("/me", authController.getMe);
+router.put("/me", authController.updateMe);
 router.put("/change-password", authController.changePassword);
+
+// Avatar upload
+const multer = require("multer");
+const upload = multer({ dest: "uploads/avatars/" });
+router.post("/avatar", upload.single("avatar"), authController.uploadAvatar);
 
 module.exports = router;

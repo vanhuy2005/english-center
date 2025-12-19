@@ -47,21 +47,25 @@ const ClassReportsPage = () => {
       const response = await api.get(`/classes/${classId}`);
       const classData = response.data?.data || response.data;
 
-      // Lấy danh sách học viên với điểm
-      let students = [];
-      const studentIds = (classData.students || [])
-        .map((student) => (typeof student === "string" ? student : student._id))
-        .filter((id) => id && typeof id === "string" && id.trim().length > 0);
+      console.log("Class data:", classData);
+      console.log("Students in class:", classData.students);
 
-      if (studentIds.length > 0) {
-        const studentsPromises = studentIds.map((id) =>
-          api.get(`/students/${id}`).catch(() => null)
-        );
-        const studentsResponses = await Promise.all(studentsPromises);
-        students = studentsResponses
-          .filter((res) => res !== null)
-          .map((res) => res.data?.data || res.data);
+      // Danh sách học viên - structure: students[{student: {...}, status: "...", enrolledDate: ...}]
+      let students = [];
+      if (Array.isArray(classData.students)) {
+        students = classData.students
+          .map((item) => {
+            // Lấy student data từ nested field hoặc fallback
+            const studentData = item?.student || item;
+            return {
+              ...studentData,
+              enrollmentStatus: item?.status || "active", // Save enrollment status
+            };
+          })
+          .filter((s) => s && s._id); // Filter out null/undefined
       }
+
+      console.log("Processed students:", students);
 
       // Tính toán thống kê
       const stats = calculateStats(classData, students);
@@ -76,7 +80,10 @@ const ClassReportsPage = () => {
 
   const calculateStats = (classData, students) => {
     const totalStudents = students.length;
-    const activeStudents = students.filter((s) => s.status === "active").length;
+    // Lọc học viên đang học (có thể từ status field hoặc enrollmentStatus)
+    const activeStudents = students.filter(
+      (s) => s.enrollmentStatus === "active" || s.status === "active"
+    ).length;
 
     // Giả sử có điểm trong database (cần model Score hoặc field score trong Student)
     // Đây là mock data, bạn cần thay đổi theo cấu trúc database thực tế
@@ -125,7 +132,10 @@ const ClassReportsPage = () => {
       const data = [
         ["BÁO CÁO THỐNG KÊ LỚP HỌC"],
         [],
-        ["Tên lớp:", classStats.classInfo.className],
+        [
+          "Tên lớp:",
+          classStats.classInfo.name || classStats.classInfo.className,
+        ],
         ["Mã lớp:", classStats.classInfo.classCode],
         ["Khóa học:", classStats.course?.name || "N/A"],
         ["Giáo viên:", classStats.teacher?.fullName || "Chưa phân công"],
@@ -184,7 +194,9 @@ const ClassReportsPage = () => {
       printWindow.document.write(`
         <html>
           <head>
-            <title>Báo cáo lớp học - ${classStats.classInfo.className}</title>
+            <title>Báo cáo lớp học - ${
+              classStats.classInfo.name || classStats.classInfo.className
+            }</title>
             <style>
               body {
                 font-family: Arial, sans-serif;
@@ -263,7 +275,7 @@ const ClassReportsPage = () => {
               <div class="info-row">
                 <span class="info-label">Tên lớp:</span>
                 <span class="info-value">${
-                  classStats.classInfo.className
+                  classStats.classInfo.name || classStats.classInfo.className
                 }</span>
               </div>
               <div class="info-row">
@@ -389,7 +401,7 @@ const ClassReportsPage = () => {
           <option value="">-- Vui lòng chọn lớp học --</option>
           {classes.map((cls) => (
             <option key={cls._id} value={cls._id}>
-              {cls.className} ({cls.classCode})
+              {cls.name || cls.className} ({cls.classCode || "N/A"})
             </option>
           ))}
         </Select>
@@ -470,7 +482,9 @@ const ClassReportsPage = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <p className="text-sm text-gray-600">Tên lớp</p>
-                <p className="font-medium">{classStats.classInfo.className}</p>
+                <p className="font-medium">
+                  {classStats.classInfo.name || classStats.classInfo.className}
+                </p>
               </div>
               <div>
                 <p className="text-sm text-gray-600">Mã lớp</p>

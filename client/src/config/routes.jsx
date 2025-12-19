@@ -57,7 +57,8 @@ import AcademicStatisticsPage from "@pages/staff/academic/AcademicStatisticsPage
 import AccountantDashboardPage from "@pages/staff/accountant/AccountantDashboardPage";
 import TuitionManagementPage from "@pages/staff/accountant/TuitionManagementPage";
 import PaymentReceiptsPage from "@pages/staff/accountant/PaymentReceiptsPage";
-
+import CreateReceiptPage from "@pages/staff/accountant/CreateReceiptPage";
+import TuitionStatusPage from "@pages/staff/accountant/TuitionStatusPage";
 import DebtTrackingPage from "@pages/staff/accountant/DebtTrackingPage";
 import RefundProcessingPage from "@pages/staff/accountant/RefundProcessingPage";
 import RevenueReportsPage from "@pages/staff/accountant/RevenueReportsPage";
@@ -186,8 +187,9 @@ export const roleRoutes = {
   accountant: [
     { path: "/dashboard", element: <AccountantDashboardPage /> },
     { path: "/accountant/tuition", element: <TuitionManagementPage /> },
+    { path: "/accountant/tuition-status", element: <TuitionStatusPage /> },
     { path: "/accountant/receipts", element: <PaymentReceiptsPage /> },
-
+    { path: "/accountant/create-receipt", element: <CreateReceiptPage /> },
     { path: "/accountant/debt", element: <DebtTrackingPage /> },
     { path: "/accountant/refund", element: <RefundProcessingPage /> },
     { path: "/accountant/reports", element: <RevenueReportsPage /> },

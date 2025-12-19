@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@contexts/AuthContext";
 import api from "@services/api";
+import { receiptService } from "@services/receiptService";
 import { Card, Loading } from "@components/common";
 import {
   DollarSign,
@@ -39,14 +40,67 @@ const AccountantDashboardPage = () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await api.get("/staff/accountant/dashboard");
-      if (response.data.success) {
-        setDashboardData(response.data.data);
+
+      // Fetch 5 recent receipts specifically for dashboard
+      let recentReceipts = [];
+      try {
+        const recentResponse = await receiptService.getRecentReceipts();
+        recentReceipts = recentResponse.receipts || [];
+        console.log("💰 Recent receipts loaded:", recentReceipts);
+      } catch (recentError) {
+        console.warn("Failed to load recent receipts:", recentError);
       }
+
+      // Fetch receipts from the receipts API with proper population (for stats)
+      const response = await receiptService.getReceipts({
+        limit: 10,
+        sort: "-createdAt",
+      });
+
+      const receipts = response.data || [];
+
+      // Calculate stats from receipts
+      const totalRevenue = receipts.reduce(
+        (sum, r) => sum + (r.amount || 0),
+        0
+      );
+      const monthRevenue = receipts
+        .filter((r) => {
+          const receiptDate = new Date(r.createdAt);
+          const today = new Date();
+          return (
+            receiptDate.getMonth() === today.getMonth() &&
+            receiptDate.getFullYear() === today.getFullYear()
+          );
+        })
+        .reduce((sum, r) => sum + (r.amount || 0), 0);
+
+      setDashboardData((prev) => ({
+        ...prev,
+        stats: {
+          totalRevenue,
+          monthRevenue,
+          pendingPayments: receipts.filter((r) => r.status === "pending")
+            .length,
+          overduePayments: receipts.filter((r) => r.status === "overdue")
+            .length,
+        },
+        recentTransactions: recentReceipts.map((r) => ({
+          _id: r._id,
+          transactionCode: r.receiptNumber || r._id,
+          student: r.student,
+          class: r.class,
+          amount: r.amount,
+          status: r.status || "pending",
+          createdAt: r.createdAt,
+          paymentMethod: r.paymentMethod,
+          createdBy: r.createdBy,
+        })),
+      }));
     } catch (error) {
-      console.warn("Dashboard data not available:", error);
-      setError(error.response?.status === 404 ? "endpoint_not_found" : "error");
-      // Keep default mock data
+      console.warn("Failed to load dashboard data:", error);
+      setError("error");
+      // Keep default state
     } finally {
       setLoading(false);
     }
@@ -225,13 +279,13 @@ const AccountantDashboardPage = () => {
                   Học Viên
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Khóa Học
+                  Lớp Học
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Số Tiền
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Trạng Thái
+                  Phương Thức
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Ngày
@@ -241,13 +295,7 @@ const AccountantDashboardPage = () => {
             <tbody className="bg-white divide-y divide-gray-200">
               {recentTransactions && recentTransactions.length > 0 ? (
                 recentTransactions.map((transaction) => (
-                  <tr
-                    key={transaction._id}
-                    className="hover:bg-gray-50 cursor-pointer"
-                    onClick={() =>
-                      navigate(`/accountant/transactions/${transaction._id}`)
-                    }
-                  >
+                  <tr key={transaction._id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       {transaction.transactionCode}
                     </td>
@@ -255,26 +303,22 @@ const AccountantDashboardPage = () => {
                       {transaction.student?.fullName || "N/A"}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {transaction.course?.name || "N/A"}
+                      {transaction.class?.name || "N/A"}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
                       {formatCurrency(transaction.amount)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span
-                        className={`px-2 py-1 text-xs rounded-full ${
-                          transaction.status === "paid"
-                            ? "bg-green-100 text-green-700"
-                            : transaction.status === "pending"
-                            ? "bg-yellow-100 text-yellow-700"
-                            : "bg-red-100 text-red-700"
-                        }`}
-                      >
-                        {transaction.status === "paid" && "Đã thanh toán"}
-                        {transaction.status === "pending" && "Chờ thanh toán"}
-                        {transaction.status === "partial" &&
-                          "Thanh toán một phần"}
-                        {transaction.status === "overdue" && "Quá hạn"}
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                        {transaction.paymentMethod === "cash"
+                          ? "Tiền mặt"
+                          : transaction.paymentMethod === "bank_transfer"
+                          ? "Chuyển khoản"
+                          : transaction.paymentMethod === "credit_card"
+                          ? "Thẻ tín dụng"
+                          : transaction.paymentMethod === "momo"
+                          ? "MoMo"
+                          : "Khác"}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">

@@ -53,9 +53,19 @@ const RequestManagementPage = () => {
         },
       });
 
-      const responseData = response.data.data || response.data;
-      setRequests(responseData.requests || responseData);
-      if (response.data.pagination) {
+      console.log("Full API Response:", response.data);
+      const responseData = response.data?.data || response.data;
+      console.log("Response Data:", responseData);
+
+      // Handle the response correctly
+      const requestsList = Array.isArray(responseData)
+        ? responseData
+        : responseData?.requests || responseData || [];
+
+      console.log("Requests list:", requestsList);
+      setRequests(requestsList);
+
+      if (response.data?.pagination) {
         setPagination((prev) => ({
           ...prev,
           ...response.data.pagination,
@@ -64,6 +74,7 @@ const RequestManagementPage = () => {
     } catch (error) {
       console.error("Error fetching requests:", error);
       toast.error("Không thể tải danh sách yêu cầu");
+      setRequests([]);
     } finally {
       setLoading(false);
     }
@@ -150,44 +161,53 @@ const RequestManagementPage = () => {
     {
       key: "student",
       label: "Học viên",
-      render: (request) => (
-        <div>
-          <p className="font-medium">
-            {request.student?.fullName || request.student?.user?.fullName}
-          </p>
-          <p className="text-sm text-gray-600">
-            {request.student?.studentCode}
-          </p>
-        </div>
-      ),
+      render: (fieldValue, request) => {
+        if (!request?.student) return "N/A";
+        const studentName =
+          request.student?.fullName ||
+          request.student?.user?.fullName ||
+          "Không rõ";
+        const studentCode = request.student?.studentCode || "N/A";
+
+        return (
+          <div>
+            <p className="font-medium">{studentName}</p>
+            <p className="text-sm text-gray-600">{studentCode}</p>
+          </div>
+        );
+      },
     },
     {
       key: "type",
       label: "Loại yêu cầu",
-      render: (request) => (
-        <Badge variant={getTypeVariant(request.type)}>
-          {getTypeLabel(request.type)}
+      render: (fieldValue, request) => (
+        <Badge variant={getTypeVariant(request?.type)}>
+          {getTypeLabel(request?.type)}
         </Badge>
       ),
     },
     {
       key: "class",
       label: "Lớp học",
-      render: (request) => (
-        <div>
-          <p className="text-sm">{request.class?.name || "N/A"}</p>
-          {request.type === "transfer" && request.targetClass && (
-            <p className="text-xs text-gray-600">
-              → {request.targetClass.name}
-            </p>
-          )}
-        </div>
-      ),
+      render: (fieldValue, request) => {
+        if (!request) return "N/A";
+        const className = request.class?.name || "N/A";
+        const targetClassName = request.targetClass?.name;
+
+        return (
+          <div>
+            <p className="text-sm">{className}</p>
+            {request.type === "transfer" && targetClassName && (
+              <p className="text-xs text-gray-600">→ {targetClassName}</p>
+            )}
+          </div>
+        );
+      },
     },
     {
       key: "reason",
       label: "Lý do",
-      render: (request) => (
+      render: (fieldValue, request) => (
         <p className="text-sm text-gray-600 line-clamp-2 max-w-xs">
           {request.reason || "Không có"}
         </p>
@@ -196,7 +216,7 @@ const RequestManagementPage = () => {
     {
       key: "status",
       label: "Trạng thái",
-      render: (request) => (
+      render: (fieldValue, request) => (
         <Badge variant={getStatusVariant(request.status)}>
           {getStatusLabel(request.status)}
         </Badge>
@@ -205,14 +225,20 @@ const RequestManagementPage = () => {
     {
       key: "createdAt",
       label: "Ngày tạo",
-      render: (request) =>
-        new Date(request.createdAt).toLocaleDateString("vi-VN"),
+      render: (fieldValue, request) => {
+        if (!request?.createdAt) return "N/A";
+        const date = new Date(request.createdAt);
+        return isNaN(date.getTime())
+          ? "Invalid Date"
+          : date.toLocaleDateString("vi-VN");
+      },
     },
     {
       key: "actions",
       label: "Thao tác",
-      render: (request) =>
-        request.status === "pending" ? (
+      render: (fieldValue, request) => {
+        if (!request) return "N/A";
+        return request.status === "pending" ? (
           <div className="flex gap-2">
             <Button
               size="small"
@@ -236,7 +262,8 @@ const RequestManagementPage = () => {
             {request.processedAt &&
               new Date(request.processedAt).toLocaleDateString("vi-VN")}
           </span>
-        ),
+        );
+      },
     },
   ];
 

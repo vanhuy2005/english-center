@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, Button, Loading, Table, Badge, Modal } from "@components/common";
-import { classService } from "@services";
+import { classService, studentService } from "@services";
 import toast from "react-hot-toast";
 import { useAuth, useLanguage } from "@hooks";
 
@@ -18,6 +18,9 @@ const ClassDetailPage = () => {
   const [classData, setClassData] = useState(null);
   const [students, setStudents] = useState([]);
   const [showAddStudentModal, setShowAddStudentModal] = useState(false);
+  const [availableStudents, setAvailableStudents] = useState([]);
+  const [selectedStudent, setSelectedStudent] = useState("");
+  const [addingStudent, setAddingStudent] = useState(false);
 
   useEffect(() => {
     fetchClassData();
@@ -26,12 +29,13 @@ const ClassDetailPage = () => {
   const fetchClassData = async () => {
     try {
       setLoading(true);
-      const [classRes, studentsRes] = await Promise.all([
-        classService.getById(id),
-        classService.getStudents(id),
-      ]);
+      const classRes = await classService.getById(id);
       setClassData(classRes.data);
-      setStudents(studentsRes.data || []);
+      // Lấy students từ classData.students (đã populate từ API)
+      const studentsList = (classRes.data?.students || [])
+        .map((item) => item.student)
+        .filter(Boolean);
+      setStudents(studentsList);
     } catch (error) {
       console.error("Error fetching class data:", error);
       toast.error("Không thể tải thông tin lớp học");
@@ -52,6 +56,66 @@ const ClassDetailPage = () => {
     } catch (error) {
       console.error("Error removing student:", error);
       toast.error("Không thể xóa học viên");
+    }
+  };
+
+  const handleOpenAddStudentModal = async () => {
+    try {
+      const res = await studentService.getAll({ pageSize: 1000 });
+      console.log("API Response:", res);
+      console.log("res.data:", res.data);
+      console.log("res.data type:", typeof res.data);
+      console.log("res.data?.data:", res.data?.data);
+
+      // Xử lý response - có thể là res.data hoặc res.data.data tùy vào API structure
+      const allStudents = Array.isArray(res.data)
+        ? res.data
+        : Array.isArray(res.data?.data)
+        ? res.data.data
+        : [];
+
+      const existingIds = students.map((s) => s._id);
+      const filtered = allStudents.filter((s) => !existingIds.includes(s._id));
+
+      console.log("Total students:", allStudents.length);
+      console.log("Existing in class:", existingIds.length);
+      console.log("Available to add:", filtered.length);
+
+      setAvailableStudents(filtered);
+      if (filtered.length === 0) {
+        if (allStudents.length === 0) {
+          toast.error("Không có học viên nào trong hệ thống");
+        } else {
+          toast.error("Tất cả học viên đã thuộc lớp này");
+        }
+        return;
+      }
+      setShowAddStudentModal(true);
+    } catch (error) {
+      console.error("Error loading available students:", error);
+      toast.error("Không thể tải danh sách học viên");
+    }
+  };
+
+  const handleAddStudent = async () => {
+    if (!selectedStudent) {
+      toast.error("Vui lòng chọn học viên");
+      return;
+    }
+
+    setAddingStudent(true);
+    try {
+      await classService.addStudent(id, selectedStudent);
+      toast.success("Đã thêm học viên vào lớp!");
+      setSelectedStudent("");
+      setShowAddStudentModal(false);
+      // Đồng bộ dữ liệu sau khi thêm
+      await fetchClassData();
+    } catch (error) {
+      console.error("Error adding student:", error);
+      toast.error(error?.response?.data?.message || "Không thể thêm học viên");
+    } finally {
+      setAddingStudent(false);
     }
   };
 
@@ -179,14 +243,16 @@ const ClassDetailPage = () => {
           <div className="space-y-3">
             <div>
               <span className="text-sm text-gray-600">Khóa học:</span>
-              <p className="font-medium">{classData.course?.name || "N/A"}</p>
+              <p className="font-medium">
+                {classData.course?.name || "Chưa có"}
+              </p>
             </div>
             <div>
               <span className="text-sm text-gray-600">Giáo viên:</span>
               <p className="font-medium">
                 {classData.teacher?.fullName ||
                   classData.teacher?.user?.fullName ||
-                  "Chưa phân công"}
+                  "Chưa có"}
               </p>
             </div>
             <div>
@@ -202,20 +268,26 @@ const ClassDetailPage = () => {
             <div>
               <span className="text-sm text-gray-600">Ngày khai giảng:</span>
               <p className="font-medium">
-                {new Date(classData.startDate).toLocaleDateString("vi-VN")}
+                {classData.startDate && !isNaN(new Date(classData.startDate))
+                  ? new Date(classData.startDate).toLocaleDateString("vi-VN")
+                  : "Chưa có"}
               </p>
             </div>
             <div>
               <span className="text-sm text-gray-600">Ngày kết thúc:</span>
               <p className="font-medium">
-                {new Date(classData.endDate).toLocaleDateString("vi-VN")}
+                {classData.endDate && !isNaN(new Date(classData.endDate))
+                  ? new Date(classData.endDate).toLocaleDateString("vi-VN")
+                  : "Chưa có"}
               </p>
             </div>
             <div>
               <span className="text-sm text-gray-600">Lịch học:</span>
               <p className="font-medium">
-                {classData.schedule?.map((s) => s.dayOfWeek).join(", ") ||
-                  "Chưa có"}
+                {Array.isArray(classData.schedule) &&
+                classData.schedule.length > 0
+                  ? classData.schedule.map((s) => s.dayOfWeek).join(", ")
+                  : "Chưa có"}
               </p>
             </div>
           </div>
@@ -227,13 +299,16 @@ const ClassDetailPage = () => {
             <div>
               <span className="text-sm text-gray-600">Số học viên:</span>
               <p className="text-2xl font-bold text-primary">
-                {students.length}/{classData.maxStudents}
+                {students.length}/{classData.maxStudents || 0}
               </p>
             </div>
             <div>
               <span className="text-sm text-gray-600">Tỷ lệ lấp đầy:</span>
               <p className="text-lg font-semibold">
-                {Math.round((students.length / classData.maxStudents) * 100)}%
+                {classData.maxStudents && classData.maxStudents > 0
+                  ? Math.round((students.length / classData.maxStudents) * 100)
+                  : 0}
+                %
               </p>
             </div>
           </div>
@@ -265,14 +340,77 @@ const ClassDetailPage = () => {
           {(role === "director" || role === "enrollment") && (
             <Button
               size="sm"
-              onClick={() => setShowAddStudentModal(true)}
-              disabled={students.length >= classData.maxStudents}
+              onClick={handleOpenAddStudentModal}
+              disabled={
+                classData?.maxStudents > 0 &&
+                students.length >= classData.maxStudents
+              }
             >
               + Thêm học viên
             </Button>
           )}
         </div>
         <Table columns={studentColumns} data={students} />
+        <Modal
+          open={showAddStudentModal}
+          onClose={() => {
+            setShowAddStudentModal(false);
+            setSelectedStudent("");
+          }}
+        >
+          <div className="p-6 min-w-[400px]">
+            <h2 className="text-xl font-bold mb-4">Thêm học viên vào lớp</h2>
+            {availableStudents.length === 0 ? (
+              <p className="text-gray-600 mb-4">
+                Tất cả học viên đã thuộc lớp này hoặc không có học viên khả
+                dụng.
+              </p>
+            ) : (
+              <>
+                <label className="block text-sm font-medium mb-2">
+                  Chọn học viên:
+                </label>
+                <select
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg mb-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  value={selectedStudent}
+                  onChange={(e) => setSelectedStudent(e.target.value)}
+                  disabled={addingStudent}
+                >
+                  <option value="">-- Chọn học viên --</option>
+                  {availableStudents.map((student) => (
+                    <option key={student._id} value={student._id}>
+                      {student.fullName || student.user?.fullName} (
+                      {student.studentCode})
+                    </option>
+                  ))}
+                </select>
+              </>
+            )}
+            <div className="mt-6 flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowAddStudentModal(false);
+                  setSelectedStudent("");
+                }}
+                disabled={addingStudent}
+              >
+                Đóng
+              </Button>
+              <Button
+                onClick={handleAddStudent}
+                disabled={
+                  addingStudent ||
+                  !selectedStudent ||
+                  availableStudents.length === 0
+                }
+                loading={addingStudent}
+              >
+                {addingStudent ? "Đang thêm..." : "Thêm học viên"}
+              </Button>
+            </div>
+          </div>
+        </Modal>
       </Card>
     </div>
   );

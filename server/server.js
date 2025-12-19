@@ -13,13 +13,13 @@ let server;
 
     // Import routes
     const authRoutes = require("./routes/auth");
-    const receiptRoutes = require("./routes/receipts");
     const staffRoutes = require("./routes/staff");
+    const receiptsRoutes = require("./routes/receipts");
 
     // Use routes
     app.use("/api/auth", authRoutes);
-    app.use("/api/receipts", receiptRoutes);
     app.use("/api/staff", staffRoutes);
+    app.use("/api/receipts", receiptsRoutes);
 
     server = app.listen(PORT, () => {
       console.log(` Server running on port ${PORT}`);

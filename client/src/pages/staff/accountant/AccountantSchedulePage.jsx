@@ -14,7 +14,7 @@ const AccountantSchedulePage = () => {
   const loadSchedules = async () => {
     try {
       setLoading(true);
-      const response = await api.get("/api/staff/accountant/schedule");
+      const response = await api.get("/staff/accountant/schedule");
       if (response.data.success) {
         setSchedules(response.data.data || []);
       }

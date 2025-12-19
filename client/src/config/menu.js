@@ -411,12 +411,6 @@ export const accountantMenu = [
     title: "CHỨC NĂNG TRỰC TUYẾN",
     items: [
       {
-        path: "/accountant/payments",
-        label: "Cập Nhật Học Phí",
-        icon: "💳",
-        description: "Cập nhật trạng thái thanh toán",
-      },
-      {
         path: "/accountant/refund",
         label: "Hoàn Học Phí",
         icon: "↩️",

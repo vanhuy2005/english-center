@@ -1,3 +1,37 @@
+/**
+ * @desc    Get all students in a class
+ * @route   GET /api/classes/:id/students
+ * @access  Private (director, enrollment, academic, teacher)
+ */
+exports.getClassStudents = async (req, res) => {
+  try {
+    const classData = await Class.findById(req.params.id).populate({
+      path: "students.student",
+      select: "studentCode fullName email phone status",
+    });
+    if (!classData) {
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy lớp học",
+      });
+    }
+    // Flatten students array and return only student info
+    const students = (classData.students || [])
+      .map((s) => s.student)
+      .filter(Boolean);
+    res.status(200).json({
+      success: true,
+      data: students,
+    });
+  } catch (error) {
+    console.error("Error fetching class students:", error);
+    res.status(500).json({
+      success: false,
+      message: "Lỗi khi lấy danh sách học viên của lớp",
+      error: error.message,
+    });
+  }
+};
 const Class = require("../../shared/models/Class.model");
 const Student = require("../../shared/models/Student.model");
 const Staff = require("../../shared/models/Staff.model");
@@ -43,7 +77,10 @@ exports.getAllClasses = async (req, res) => {
     const classes = await Class.find(filter)
       .populate("course", "name courseCode level fee duration")
       .populate("teacher", "fullName email phone specialization")
-      .populate("students", "studentCode fullName email phone")
+      .populate({
+        path: "students.student",
+        select: "studentCode fullName email phone status",
+      })
       .sort(sort)
       .skip(skip)
       .limit(parseInt(limit));
@@ -81,10 +118,10 @@ exports.getClassById = async (req, res) => {
     const classData = await Class.findById(req.params.id)
       .populate("course", "name courseCode level fee duration description")
       .populate("teacher", "fullName email phone specialization experience")
-      .populate(
-        "students",
-        "studentCode fullName email phone dateOfBirth address"
-      );
+      .populate({
+        path: "students.student",
+        select: "studentCode fullName email phone dateOfBirth address status",
+      });
 
     if (!classData) {
       return res.status(404).json({
@@ -146,7 +183,10 @@ exports.createClass = async (req, res) => {
 
     // Check if teacher exists (if provided)
     if (teacher) {
-      const teacherExists = await Staff.findOne({ _id: teacher, staffType: "teacher" });
+      const teacherExists = await Staff.findOne({
+        _id: teacher,
+        staffType: "teacher",
+      });
       if (!teacherExists) {
         return res.status(404).json({
           success: false,
@@ -220,7 +260,10 @@ exports.updateClass = async (req, res) => {
 
     // Check if teacher exists (if provided)
     if (teacher && teacher !== classData.teacher?.toString()) {
-      const teacherExists = await Staff.findOne({ _id: teacher, staffType: "teacher" });
+      const teacherExists = await Staff.findOne({
+        _id: teacher,
+        staffType: "teacher",
+      });
       if (!teacherExists) {
         return res.status(404).json({
           success: false,

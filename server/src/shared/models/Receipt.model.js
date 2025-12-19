@@ -9,7 +9,7 @@ const receiptSchema = new mongoose.Schema(
     receiptNumber: {
       type: String,
       unique: true,
-      required: true,
+      sparse: true,
     },
     student: {
       type: mongoose.Schema.Types.ObjectId,
@@ -27,7 +27,7 @@ const receiptSchema = new mongoose.Schema(
     },
     paymentMethod: {
       type: String,
-      enum: ["cash", "bank_transfer", "credit_card", "momo", "other"],
+      enum: ["cash", "bank_transfer", "credit_card", "momo", "refund", "other"],
       required: true,
     },
     description: {
@@ -45,7 +45,7 @@ const receiptSchema = new mongoose.Schema(
     },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: "Staff",
       required: true,
     },
   },
@@ -64,17 +64,33 @@ receiptSchema.pre("save", async function (next) {
       const year = date.getFullYear();
       const month = String(date.getMonth() + 1).padStart(2, "0");
       const counterId = `receipt_${year}${month}`;
+
       const counter = await Counter.findByIdAndUpdate(
         counterId,
         { $inc: { seq: 1 } },
         { new: true, upsert: true }
       );
-      this.receiptNumber = `RCP${year}${month}${String(counter.seq).padStart(
-        4,
-        "0"
-      )}`;
+
+      if (counter && counter.seq) {
+        this.receiptNumber = `RCP${year}${month}${String(counter.seq).padStart(
+          4,
+          "0"
+        )}`;
+      } else {
+        // Fallback if counter creation fails
+        this.receiptNumber = `RCP${year}${month}${Date.now()
+          .toString()
+          .slice(-4)}`;
+      }
     } catch (err) {
-      return next(err);
+      console.error("Error generating receipt number:", err);
+      // Fallback: generate receipt number from timestamp
+      const date = new Date();
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      this.receiptNumber = `RCP${year}${month}${Date.now()
+        .toString()
+        .slice(-4)}`;
     }
   }
   next();

@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import {
   Card,
   Table,
@@ -10,6 +10,7 @@ import {
   Statistic,
   Row,
   Col,
+  message,
 } from "antd";
 import {
   SearchOutlined,
@@ -19,62 +20,63 @@ import {
   WarningOutlined,
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
+import { financeService } from "@services/index";
 
 const { Search } = Input;
 
 const TuitionStatusPage = () => {
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [searchText, setSearchText] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [data, setData] = useState([]);
 
-  // Mock data
-  const mockData = [
-    {
-      id: 1,
-      studentId: "HV001",
-      studentName: "Nguyễn Văn A",
-      class: "ENG-101",
-      totalAmount: 5000000,
-      paidAmount: 5000000,
-      remainingAmount: 0,
-      status: "paid",
-      dueDate: "2024-01-15",
-    },
-    {
-      id: 2,
-      studentId: "HV002",
-      studentName: "Trần Thị B",
-      class: "ENG-102",
-      totalAmount: 5000000,
-      paidAmount: 2500000,
-      remainingAmount: 2500000,
-      status: "partial",
-      dueDate: "2024-01-20",
-    },
-    {
-      id: 3,
-      studentId: "HV003",
-      studentName: "Lê Văn C",
-      class: "ENG-103",
-      totalAmount: 5000000,
-      paidAmount: 0,
-      remainingAmount: 5000000,
-      status: "unpaid",
-      dueDate: "2024-01-10",
-    },
-    {
-      id: 4,
-      studentId: "HV004",
-      studentName: "Phạm Thị D",
-      class: "ENG-101",
-      totalAmount: 5000000,
-      paidAmount: 0,
-      remainingAmount: 5000000,
-      status: "overdue",
-      dueDate: "2023-12-30",
-    },
-  ];
+  // Fetch data from API
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const response = await financeService.getAll({ limit: 100 });
+        console.log("Finance response:", response);
+
+        // Handle different response structures
+        let financeData = [];
+        if (Array.isArray(response?.data)) {
+          financeData = response.data;
+        } else if (Array.isArray(response?.data?.data)) {
+          financeData = response.data.data;
+        } else if (Array.isArray(response)) {
+          financeData = response;
+        }
+
+        console.log("Processed financeData:", financeData);
+
+        // Transform API data to match table structure
+        const transformedData = financeData.map((item) => ({
+          id: item._id,
+          studentId: item.student?.studentId || item.student?._id,
+          studentName: item.student?.fullName || "Unknown",
+          class: item.course?.courseCode || "N/A",
+          totalAmount: item.amount || 0,
+          paidAmount: item.paidAmount || 0,
+          remainingAmount: item.remainingAmount || 0,
+          status: item.status || "pending",
+          dueDate: item.dueDate
+            ? new Date(item.dueDate).toLocaleDateString("vi-VN")
+            : "N/A",
+        }));
+
+        setData(transformedData);
+      } catch (error) {
+        console.error("Error fetching tuition data:", error);
+        message.error("Không thể tải dữ liệu học phí");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat("vi-VN", {
@@ -108,15 +110,15 @@ const TuitionStatusPage = () => {
   const handleCreateReceipt = useCallback(
     (studentId) => {
       try {
-        if (studentId) {
-          navigate("/accountant/create-receipt", {
-            state: { studentId },
-          });
-        } else {
-          navigate("/accountant/create-receipt");
-        }
+        navigate("/accountant/create-receipt", {
+          state: {
+            studentId: studentId || null,
+            returnToTuition: true,
+          },
+        });
       } catch (error) {
         console.error("Navigation error:", error);
+        message.error("Không thể chuyển trang");
       }
     },
     [navigate]
@@ -237,11 +239,21 @@ const TuitionStatusPage = () => {
 
   // Statistics
   const stats = {
-    total: mockData.reduce((sum, item) => sum + item.totalAmount, 0),
-    paid: mockData.reduce((sum, item) => sum + item.paidAmount, 0),
-    remaining: mockData.reduce((sum, item) => sum + item.remainingAmount, 0),
-    overdue: mockData.filter((item) => item.status === "overdue").length,
+    total: data.reduce((sum, item) => sum + item.totalAmount, 0),
+    paid: data.reduce((sum, item) => sum + item.paidAmount, 0),
+    remaining: data.reduce((sum, item) => sum + item.remainingAmount, 0),
+    overdue: data.filter((item) => item.status === "overdue").length,
   };
+
+  // Filter data based on search and status
+  const filteredData = data.filter((item) => {
+    const matchSearch =
+      searchText === "" ||
+      item.studentId.toLowerCase().includes(searchText.toLowerCase()) ||
+      item.studentName.toLowerCase().includes(searchText.toLowerCase());
+    const matchStatus = statusFilter === "all" || item.status === statusFilter;
+    return matchSearch && matchStatus;
+  });
 
   return (
     <div className="p-6">
@@ -341,12 +353,12 @@ const TuitionStatusPage = () => {
       <Card>
         <Table
           columns={columns}
-          dataSource={mockData}
+          dataSource={filteredData}
           rowKey="id"
           loading={loading}
           scroll={{ x: 1400 }}
           pagination={{
-            total: mockData.length,
+            total: filteredData.length,
             pageSize: 10,
             showSizeChanger: true,
             showTotal: (total) => `Tổng ${total} học viên`,

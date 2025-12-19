@@ -269,6 +269,122 @@ exports.getMe = async (req, res) => {
 };
 
 /**
+ * @desc    Update user profile
+ * @route   PUT /api/auth/me
+ * @access  Private
+ */
+exports.updateMe = async (req, res) => {
+  try {
+    const user = req.user;
+    const { fullName, email, phone, address, dateOfBirth } = req.body;
+
+    console.log("📝 UpdateMe request body:", req.body);
+    console.log(
+      "📝 Current user values - fullName:",
+      user.fullName,
+      "phone:",
+      user.phone,
+      "email:",
+      user.email
+    );
+
+    let hasChanges = false;
+
+    // Update allowed fields only if they are provided, not empty, and different from current
+    const trimmedFullName = fullName ? fullName.trim() : "";
+    if (trimmedFullName && trimmedFullName !== user.fullName) {
+      user.fullName = trimmedFullName;
+      hasChanges = true;
+      console.log("✏️ Updating fullName to:", trimmedFullName);
+    }
+
+    const trimmedEmail = email ? email.trim() : "";
+    if (trimmedEmail && trimmedEmail !== user.email) {
+      // Validate email format before updating
+      const emailRegex = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.[A-Za-z]{2,})+$/;
+      if (!emailRegex.test(trimmedEmail)) {
+        return errorResponse(res, "Email không hợp lệ", 400);
+      }
+      user.email = trimmedEmail;
+      hasChanges = true;
+      console.log("✏️ Updating email to:", trimmedEmail);
+    }
+
+    const trimmedPhone = phone ? phone.trim() : "";
+    if (trimmedPhone && trimmedPhone !== user.phone) {
+      // Validate phone format before updating
+      const phoneRegex = /^[0-9]{10,11}$/;
+      if (!phoneRegex.test(trimmedPhone)) {
+        return errorResponse(res, "Số điện thoại phải có 10-11 chữ số", 400);
+      }
+      user.phone = trimmedPhone;
+      hasChanges = true;
+      console.log("✏️ Updating phone to:", trimmedPhone);
+    }
+
+    const trimmedAddress = address ? address.trim() : "";
+    if (trimmedAddress !== (user.address || "")) {
+      user.address = trimmedAddress;
+      hasChanges = true;
+      console.log("✏️ Updating address to:", trimmedAddress);
+    }
+
+    if (dateOfBirth) {
+      const currentDateOfBirth = user.dateOfBirth
+        ? user.dateOfBirth.toISOString().split("T")[0]
+        : "";
+      if (dateOfBirth !== currentDateOfBirth) {
+        user.dateOfBirth = dateOfBirth;
+        hasChanges = true;
+        console.log("✏️ Updating dateOfBirth to:", dateOfBirth);
+      }
+    }
+
+    if (!hasChanges) {
+      console.log("⚠️ No changes detected");
+      const profile = user.getPublicProfile();
+      profile.avatar = user.avatar;
+      return successResponse(res, { user: profile }, "Không có thay đổi nào");
+    }
+
+    await user.save();
+    console.log("✅ User updated successfully");
+
+    const profile = user.getPublicProfile();
+    profile.avatar = user.avatar;
+
+    successResponse(res, { user: profile }, "Cập nhật thông tin thành công");
+  } catch (error) {
+    console.error("❌ UpdateMe Error:", error.message);
+    console.error("Error details:", {
+      name: error.name,
+      code: error.code,
+      keyValue: error.keyValue,
+      errors: error.errors ? Object.keys(error.errors) : "none",
+    });
+
+    // Handle specific validation errors
+    if (error.name === "ValidationError") {
+      const messages = Object.values(error.errors)
+        .map((err) => err.message)
+        .join(", ");
+      console.error("Validation errors:", messages);
+      return errorResponse(res, messages, 400);
+    }
+
+    // Handle duplicate key errors
+    if (error.code === 11000) {
+      const field = Object.keys(error.keyValue)[0];
+      const msg = `${field} này đã được sử dụng`;
+      console.error("Duplicate error:", msg);
+      return errorResponse(res, msg, 400);
+    }
+
+    errorResponse(res, error.message || "Lỗi cập nhật thông tin", 500);
+  }
+};
+
+/**
  * @desc    Change password (for first login or anytime)
  * @route   PUT /api/auth/change-password
  * @access  Private
@@ -373,5 +489,44 @@ exports.refreshToken = async (req, res) => {
   } catch (error) {
     console.error("Refresh Token Error:", error);
     errorResponse(res, error.message, 500);
+  }
+};
+
+/**
+ * @desc    Upload user avatar
+ * @route   POST /api/auth/avatar
+ * @access  Private
+ */
+exports.uploadAvatar = async (req, res) => {
+  try {
+    console.log("=== AVATAR UPLOAD DEBUG (AUTH) ===");
+    console.log("req.user:", {
+      _id: req.user._id,
+      fullName: req.user.fullName,
+      studentCode: req.user.studentCode,
+      staffCode: req.user.staffCode,
+    });
+
+    if (!req.file) {
+      return errorResponse(res, "Vui lòng chọn file ảnh", 400);
+    }
+
+    const avatarPath = `/uploads/avatars/${req.file.filename}`;
+    console.log("Avatar path:", avatarPath);
+    console.log("User ID:", req.user._id);
+
+    // Update avatar for current user (works for both Student and Staff)
+    req.user.avatar = avatarPath;
+    await req.user.save();
+
+    console.log("✅ Avatar updated successfully");
+
+    const profile = req.user.getPublicProfile();
+    profile.avatar = req.user.avatar;
+
+    successResponse(res, profile, "Tải ảnh đại diện thành công");
+  } catch (error) {
+    console.error("Avatar upload error:", error);
+    errorResponse(res, "Không thể tải lên ảnh: " + error.message, 500);
   }
 };

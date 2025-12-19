@@ -18,15 +18,20 @@ const ExportReportsPage = () => {
         { responseType: "blob" }
       );
 
+      // Get the filename for Excel format
+      const fileName = `bao_cao_${filters.reportType}_${Date.now()}.xls`;
+
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement("a");
       link.href = url;
-      link.setAttribute("download", `report-${Date.now()}.xlsx`);
+      link.setAttribute("download", fileName);
       document.body.appendChild(link);
       link.click();
       link.remove();
+      window.URL.revokeObjectURL(url);
     } catch (error) {
-      alert("Có lỗi xảy ra khi xuất báo cáo!");
+      console.error("Export error:", error);
+      alert("Có lỗi xảy ra khi xuất báo cáo: " + error.message);
     }
   };
 

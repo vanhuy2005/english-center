@@ -115,13 +115,6 @@ const ClassListPage = () => {
       header: "Thao tác",
       accessor: (row) => (
         <div className="flex gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => navigate(`/classes/${row._id}`)}
-          >
-            Chi tiết
-          </Button>
           {role === "director" && (
             <Button
               size="sm"

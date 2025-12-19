@@ -10,6 +10,11 @@ import {
   DatePicker,
   Modal,
   message,
+  Tabs,
+  Row,
+  Col,
+  Statistic,
+  Spin,
 } from "antd";
 import {
   FileTextOutlined,
@@ -17,12 +22,36 @@ import {
   PrinterOutlined,
   SearchOutlined,
   PlusOutlined,
+  DownloadOutlined,
 } from "@ant-design/icons";
+import {
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as ChartTooltip,
+  Legend,
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+} from "recharts";
 import { useNavigate } from "react-router-dom";
 import { receiptService } from "@services/receiptService";
 import dayjs from "dayjs";
 
 const { RangePicker } = DatePicker;
+const COLORS = [
+  "#1890ff",
+  "#52c41a",
+  "#faad14",
+  "#f5222d",
+  "#722ed1",
+  "#13c2c2",
+];
 
 const ReceiptManagementPage = () => {
   const navigate = useNavigate();
@@ -31,7 +60,10 @@ const ReceiptManagementPage = () => {
   const [statistics, setStatistics] = useState({
     totalAmount: 0,
     totalReceipts: 0,
+    byMethod: [],
   });
+  const [detailedData, setDetailedData] = useState([]);
+  const [dailyData, setDailyData] = useState([]);
   const [searchText, setSearchText] = useState("");
   const [typeFilter, setTypeFilter] = useState(null);
   const [methodFilter, setMethodFilter] = useState(null);
@@ -43,6 +75,7 @@ const ReceiptManagementPage = () => {
   });
   const [selectedReceipt, setSelectedReceipt] = useState(null);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
+  const [activeTab, setActiveTab] = useState("list");
 
   const typeLabels = {
     tuition: "Học phí",
@@ -53,8 +86,11 @@ const ReceiptManagementPage = () => {
 
   const methodLabels = {
     cash: "Tiền mặt",
-    transfer: "Chuyển khoản",
-    card: "Thẻ",
+    bank_transfer: "Chuyển khoản",
+    credit_card: "Thẻ tín dụng",
+    momo: "MoMo",
+    refund: "Hoàn tiền",
+    other: "Khác",
   };
 
   const fetchReceipts = useCallback(async () => {
@@ -96,27 +132,66 @@ const ReceiptManagementPage = () => {
 
   const fetchStatistics = useCallback(async () => {
     try {
-      const params = {
-        startDate:
-          dateRange?.[0] && dateRange?.[0].isValid()
-            ? dateRange[0].format("YYYY-MM-DD")
-            : undefined,
-        endDate:
-          dateRange?.[1] && dateRange?.[1].isValid()
-            ? dateRange[1].format("YYYY-MM-DD")
-            : undefined,
-      };
+      const params = {};
+      if (dateRange?.[0] && dateRange?.[1]) {
+        params.startDate = dateRange[0].format("YYYY-MM-DD");
+        params.endDate = dateRange[1].format("YYYY-MM-DD");
+      }
+
       const data = await receiptService.getStatistics(params);
-      setStatistics(data);
+      setStatistics({
+        totalAmount: data.totalAmount || 0,
+        totalReceipts: data.totalReceipts || 0,
+        byMethod: data.byMethod || [],
+      });
+
+      processChartData(data.byMethod || [], data.dailyStats || []);
     } catch (error) {
       console.error("Error fetching statistics:", error);
     }
   }, [dateRange]);
 
+  // Load data on mount and when filters change
   useEffect(() => {
     fetchReceipts();
     fetchStatistics();
   }, [fetchReceipts, fetchStatistics]);
+
+  const processChartData = (methodData, dailyStats = []) => {
+    const detailed = methodData.map((item) => ({
+      name: methodLabels[item._id] || item._id,
+      value: item.total,
+      count: item.count,
+      originalMethod: item._id,
+    }));
+    setDetailedData(detailed);
+
+    if (dailyStats.length > 0) {
+      const formatted = dailyStats.map((stat) => ({
+        date: dayjs(stat.date).format("DD/MM"),
+        fullDate: stat.date,
+        receipts: stat.receipts,
+        amount: stat.amount,
+      }));
+      setDailyData(formatted);
+    } else {
+      generateDailyData();
+    }
+  };
+
+  const generateDailyData = () => {
+    const today = dayjs();
+    const last7Days = Array.from({ length: 7 }, (_, i) => {
+      const date = today.subtract(6 - i, "day");
+      return {
+        date: date.format("DD/MM"),
+        fullDate: date.format("YYYY-MM-DD"),
+        receipts: 0,
+        amount: 0,
+      };
+    });
+    setDailyData(last7Days);
+  };
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat("vi-VN", {
@@ -160,7 +235,7 @@ const ReceiptManagementPage = () => {
       <!DOCTYPE html>
       <html>
       <head>
-        <title>Phiếu Thu - ${record.receiptId}</title>
+        <title>Phiếu Thu - ${record.receiptNumber}</title>
         <style>
           body {
             font-family: 'Times New Roman', Times, serif;
@@ -252,7 +327,7 @@ const ReceiptManagementPage = () => {
         <div style="text-align: center; margin: 30px 0;">
           <h2 style="font-size: 24px; text-transform: uppercase;">PHIẾU THU</h2>
           <p style="font-size: 16px;">Mã phiếu: <strong>${
-            record.receiptId
+            record.receiptNumber
           }</strong></p>
           <p style="font-size: 14px;">Ngày: ${dayjs(record.createdAt).format(
             "DD/MM/YYYY"
@@ -263,18 +338,18 @@ const ReceiptManagementPage = () => {
           <div class="info-row">
             <span class="info-label">Họ và tên học viên:</span>
             <span class="info-value"><strong>${
-              record.studentId?.fullName || "N/A"
+              record.student?.fullName || "N/A"
             }</strong></span>
           </div>
           <div class="info-row">
             <span class="info-label">Mã học viên:</span>
             <span class="info-value">${
-              record.studentId?.studentId || "N/A"
+              record.student?.studentCode || "N/A"
             }</span>
           </div>
           <div class="info-row">
-            <span class="info-label">Loại thu:</span>
-            <span class="info-value">${typeLabels[record.type]}</span>
+            <span class="info-label">Lớp học:</span>
+            <span class="info-value">${record.class?.name || "N/A"}</span>
           </div>
           <div class="info-row">
             <span class="info-label">Phương thức thanh toán:</span>
@@ -419,8 +494,8 @@ const ReceiptManagementPage = () => {
   const columns = [
     {
       title: "Mã phiếu",
-      dataIndex: "receiptId",
-      key: "receiptId",
+      dataIndex: "receiptNumber",
+      key: "receiptNumber",
       width: 120,
       fixed: "left",
     },
@@ -434,24 +509,15 @@ const ReceiptManagementPage = () => {
     },
     {
       title: "Mã HV",
-      dataIndex: ["studentId", "studentId"],
+      dataIndex: ["student", "studentCode"],
       key: "studentCode",
       width: 100,
     },
     {
       title: "Họ tên học viên",
-      dataIndex: ["studentId", "fullName"],
+      dataIndex: ["student", "fullName"],
       key: "studentName",
       width: 180,
-    },
-    {
-      title: "Loại thu",
-      dataIndex: "type",
-      key: "type",
-      width: 120,
-      render: (type) => (
-        <Tag color={getTypeColor(type)}>{typeLabels[type]}</Tag>
-      ),
     },
     {
       title: "Số tiền",
@@ -483,7 +549,18 @@ const ReceiptManagementPage = () => {
       dataIndex: "status",
       key: "status",
       width: 120,
-      render: () => <Tag color="success">Đã hoàn thành</Tag>,
+      render: (status) => {
+        const statusConfig = {
+          active: { color: "success", label: "Hoạt động" },
+          inactive: { color: "default", label: "Không hoạt động" },
+          voided: { color: "error", label: "Đã hủy" },
+        };
+        const config = statusConfig[status] || {
+          color: "default",
+          label: status,
+        };
+        return <Tag color={config.color}>{config.label}</Tag>;
+      },
     },
     {
       title: "Thao tác",

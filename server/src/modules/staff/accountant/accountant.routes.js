@@ -27,5 +27,7 @@ router.get(
 
 // ==================== REPORTS ====================
 router.get("/reports/financial", accountantController.getFinancialReport);
+router.post("/reports/export", accountantController.exportReport);
+router.get("/reports/debug/receipts", accountantController.checkReceiptData);
 
 module.exports = router;

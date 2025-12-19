@@ -495,6 +495,10 @@ exports.createRequest = async (req, res) => {
 
 exports.uploadAvatar = async (req, res) => {
   try {
+    console.log("=== AVATAR UPLOAD DEBUG ===");
+    console.log("req.user:", req.user);
+    console.log("req.userType:", req.userType);
+
     if (!req.file) {
       return res.status(400).json({
         success: false,
@@ -502,11 +506,55 @@ exports.uploadAvatar = async (req, res) => {
       });
     }
 
-    const student = await Student.findByIdAndUpdate(
+    if (!req.user || !req.user._id) {
+      console.error("No user or user ID:", {
+        user: !!req.user,
+        userId: req.user?._id,
+      });
+      return res.status(401).json({
+        success: false,
+        message: "Không có quyền truy cập",
+      });
+    }
+
+    const avatarPath = `/uploads/avatars/${req.file.filename}`;
+    console.log("Avatar path:", avatarPath);
+    console.log("User ID:", req.user._id);
+    console.log("User ID type:", typeof req.user._id);
+
+    // Try to find and update in Student model first
+    let student = await Student.findByIdAndUpdate(
       req.user._id,
-      { avatar: `/uploads/avatars/${req.file.filename}` },
+      { avatar: avatarPath },
       { new: true }
     );
+
+    console.log("Student found:", !!student);
+
+    // If not found in Student, try Staff model
+    if (!student) {
+      try {
+        const Staff = require("../../../shared/models/Staff.model");
+        console.log("Trying Staff model...");
+        student = await Staff.findByIdAndUpdate(
+          req.user._id,
+          { avatar: avatarPath },
+          { new: true }
+        );
+        console.log("Staff found:", !!student);
+      } catch (staffError) {
+        console.error("Error updating Staff:", staffError.message);
+      }
+    }
+
+    if (!student) {
+      console.warn("User not found in Student or Staff collection");
+      console.warn("Searched with ID:", req.user._id);
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy người dùng",
+      });
+    }
 
     res.json({
       success: true,
@@ -514,9 +562,10 @@ exports.uploadAvatar = async (req, res) => {
       message: "Cập nhật ảnh đại diện thành công",
     });
   } catch (error) {
+    console.error("Avatar upload error:", error);
     res.status(500).json({
       success: false,
-      message: "Không thể tải lên ảnh",
+      message: "Không thể tải lên ảnh: " + error.message,
     });
   }
 };

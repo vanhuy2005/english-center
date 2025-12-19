@@ -12,18 +12,20 @@ import {
 import { FileTextOutlined } from "@ant-design/icons";
 import { useNavigate, useLocation } from "react-router-dom";
 import dayjs from "dayjs";
+import api from "@services/api";
 import { receiptService } from "@services/receiptService";
-import { studentService } from "@services/studentService";
 
 const CreateReceiptPage = () => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
+  const [dataLoading, setDataLoading] = useState(true);
   const [students, setStudents] = useState([]);
+  const [classes, setClasses] = useState([]);
   const navigate = useNavigate();
   const location = useLocation();
 
   useEffect(() => {
-    fetchStudents();
+    fetchData();
 
     // Pre-fill student if coming from tuition status page
     if (location.state?.studentId) {
@@ -38,25 +40,52 @@ const CreateReceiptPage = () => {
     }
   }, [location.state, form]);
 
-  const fetchStudents = async () => {
+  const fetchData = async () => {
     try {
-      const data = await studentService.getStudents({ limit: 1000 });
-      setStudents(data.students || []);
+      setDataLoading(true);
+      const [studentsRes, classesRes] = await Promise.all([
+        api.get("/students?limit=1000"),
+        api.get("/classes?limit=1000"),
+      ]);
+
+      const studentsData = studentsRes.data?.data || [];
+      const classesData = classesRes.data?.data || [];
+
+      setStudents(Array.isArray(studentsData) ? studentsData : []);
+      setClasses(Array.isArray(classesData) ? classesData : []);
     } catch (error) {
-      message.error("Không thể tải danh sách học viên");
+      console.error("Error fetching data:", error);
+      message.error("Không thể tải dữ liệu");
+    } finally {
+      setDataLoading(false);
     }
   };
 
   const handleSubmit = async (values) => {
     setLoading(true);
     try {
-      await receiptService.createReceipt({
+      console.log("Creating receipt...", values);
+      const response = await receiptService.createReceipt({
         ...values,
         date: values.date.format("YYYY-MM-DD"),
       });
+      console.log("Receipt created successfully:", response);
       message.success("Tạo phiếu thu thành công!");
-      navigate("/accountant/receipts");
+
+      // Redirect based on returnToTuition flag
+      if (location.state?.returnToTuition) {
+        setTimeout(() => {
+          navigate("/accountant/tuition-status");
+        }, 1000);
+      } else {
+        // Reset form if staying on this page
+        form.resetFields();
+        form.setFieldsValue({
+          date: dayjs(),
+        });
+      }
     } catch (error) {
+      console.error("Create receipt error:", error);
       message.error(error.response?.data?.message || "Tạo phiếu thu thất bại!");
     } finally {
       setLoading(false);
@@ -86,13 +115,39 @@ const CreateReceiptPage = () => {
             <Select
               placeholder="Chọn học viên"
               showSearch
+              optionFilterProp="children"
               filterOption={(input, option) =>
-                option.children.toLowerCase().includes(input.toLowerCase())
+                (option?.children ?? "")
+                  .toLowerCase()
+                  .includes(input.toLowerCase())
               }
             >
               {students.map((student) => (
                 <Select.Option key={student._id} value={student._id}>
-                  {student.studentId} - {student.fullName}
+                  {student.studentCode} - {student.fullName}
+                </Select.Option>
+              ))}
+            </Select>
+          </Form.Item>
+
+          <Form.Item
+            label="Lớp học"
+            name="classId"
+            rules={[{ required: true, message: "Vui lòng chọn lớp học!" }]}
+          >
+            <Select
+              placeholder="Chọn lớp học"
+              showSearch
+              optionFilterProp="children"
+              filterOption={(input, option) =>
+                (option?.children ?? "")
+                  .toLowerCase()
+                  .includes(input.toLowerCase())
+              }
+            >
+              {classes.map((cls) => (
+                <Select.Option key={cls._id} value={cls._id}>
+                  {cls.name || cls.className} ({cls.classCode})
                 </Select.Option>
               ))}
             </Select>
@@ -133,9 +188,10 @@ const CreateReceiptPage = () => {
           >
             <Select placeholder="Chọn phương thức">
               <Select.Option value="cash">Tiền mặt</Select.Option>
-              <Select.Option value="transfer">Chuyển khoản</Select.Option>
-              <Select.Option value="card">Thẻ</Select.Option>
+              <Select.Option value="bank_transfer">Chuyển khoản</Select.Option>
+              <Select.Option value="credit_card">Thẻ tín dụng</Select.Option>
               <Select.Option value="momo">MoMo</Select.Option>
+              <Select.Option value="other">Khác</Select.Option>
             </Select>
           </Form.Item>
 
@@ -149,7 +205,7 @@ const CreateReceiptPage = () => {
                 {loading ? "Đang tạo..." : "Tạo Phiếu Thu"}
               </Button>
               <Button onClick={handleCancel} block>
-                Hủy
+                Quay Lại
               </Button>
             </div>
           </Form.Item>

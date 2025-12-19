@@ -86,7 +86,7 @@ export const Table = ({
           <tbody className="bg-white divide-y divide-gray-200">
             {data.map((row, rowIndex) => (
               <tr
-                key={row.id || rowIndex}
+                key={row._id || row.id || rowIndex}
                 onClick={() => onRowClick && onRowClick(row)}
                 className={clsx(
                   striped && rowIndex % 2 === 0 && "bg-gray-50",

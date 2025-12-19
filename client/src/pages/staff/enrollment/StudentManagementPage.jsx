@@ -107,31 +107,31 @@ const StudentManagementPage = () => {
     {
       key: "studentCode",
       label: "Mã học viên",
-      render: (student) => (
+      render: (fieldValue, student) => (
         <span className="font-mono font-semibold">
-          {student.studentCode || "N/A"}
+          {student?.studentCode || "N/A"}
         </span>
       ),
     },
     {
       key: "fullName",
       label: "Họ và tên",
-      render: (student) => (
+      render: (fieldValue, student) => (
         <div>
-          <p className="font-medium">{student.fullName}</p>
-          <p className="text-sm text-gray-600">{student.email}</p>
+          <p className="font-medium">{student?.fullName || "N/A"}</p>
+          <p className="text-sm text-gray-600">{student?.email || "N/A"}</p>
         </div>
       ),
     },
     {
       key: "phone",
       label: "Số điện thoại",
-      render: (student) => student.phone || "N/A",
+      render: (fieldValue, student) => student?.phone || "N/A",
     },
     {
       key: "academicStatus",
       label: "Trạng thái",
-      render: (student) => {
+      render: (fieldValue, student) => {
         const statusConfig = {
           active: { variant: "success", label: "Đang học" },
           inactive: { variant: "secondary", label: "Chưa ghi danh" },
@@ -149,9 +149,9 @@ const StudentManagementPage = () => {
     {
       key: "enrolledCourses",
       label: "Khóa học",
-      render: (student) => (
+      render: (fieldValue, student) => (
         <div className="flex flex-wrap gap-1">
-          {student.enrolledCourses && student.enrolledCourses.length > 0 ? (
+          {student?.enrolledCourses && student.enrolledCourses.length > 0 ? (
             student.enrolledCourses.map((course) => (
               <Badge key={course._id} variant="info">
                 {course.courseCode || course.name}
@@ -166,13 +166,15 @@ const StudentManagementPage = () => {
     {
       key: "createdAt",
       label: "Ngày tạo",
-      render: (student) =>
-        new Date(student.createdAt).toLocaleDateString("vi-VN"),
+      render: (fieldValue, student) =>
+        student?.createdAt
+          ? new Date(student.createdAt).toLocaleDateString("vi-VN")
+          : "N/A",
     },
     {
       key: "actions",
       label: "Thao tác",
-      render: (student) => (
+      render: (fieldValue, student) => (
         <div className="flex gap-2">
           <Button
             size="small"
@@ -393,9 +395,12 @@ const NewStudentModal = ({ isOpen, onClose, onSuccess }) => {
 
       if (response.data.success) {
         toast.success("Đã thêm học viên mới thành công!");
-        toast.info(`Mật khẩu mặc định: ${response.data.data.defaultPassword}`, {
-          duration: 5000,
-        });
+        toast.success(
+          `Mật khẩu mặc định: ${response.data.data.defaultPassword}`,
+          {
+            duration: 5000,
+          }
+        );
         onSuccess();
         setFormData({
           fullName: "",
@@ -510,6 +515,7 @@ const NewStudentModal = ({ isOpen, onClose, onSuccess }) => {
 const EnrollStudentModal = ({ isOpen, onClose, student, onSuccess }) => {
   const [classes, setClasses] = useState([]);
   const [selectedClass, setSelectedClass] = useState("");
+  const [selectedClassDetail, setSelectedClassDetail] = useState(null);
   const [loading, setLoading] = useState(false);
   const [loadingClasses, setLoadingClasses] = useState(true);
 
@@ -523,17 +529,42 @@ const EnrollStudentModal = ({ isOpen, onClose, student, onSuccess }) => {
     try {
       setLoadingClasses(true);
       const response = await api.get("/staff/enrollment/classes", {
-        params: { status: "upcoming,active" },
+        params: { limit: 100 }, // Fetch more classes without status filter
       });
-      if (response.data.success) {
-        setClasses(response.data.data.classes);
+      console.log("🔍 Classes API Response:", response.data);
+
+      // Handle response structure - the API returns { success, data: { classes, pagination } }
+      let classList = [];
+      if (response.data?.success && response.data?.data?.classes) {
+        classList = response.data.data.classes;
+        console.log("📚 Classes from response.data.data.classes:", classList);
+      } else if (response.data?.classes) {
+        classList = response.data.classes;
+        console.log("📚 Classes from response.data.classes:", classList);
+      } else if (Array.isArray(response.data)) {
+        classList = response.data;
+        console.log("📚 Classes from direct array:", classList);
+      } else {
+        console.warn("⚠️ Unexpected API response structure:", response.data);
       }
+
+      console.log("📊 Total classes loaded:", classList.length);
+      setClasses(classList);
     } catch (error) {
-      console.error("Error fetching classes:", error);
+      console.error("❌ Error fetching classes:", error);
+      console.error("Error response:", error.response?.data);
+      console.error("Error details:", error.message);
       toast.error("Không thể tải danh sách lớp học");
+      setClasses([]);
     } finally {
       setLoadingClasses(false);
     }
+  };
+
+  const handleSelectClass = (classId) => {
+    setSelectedClass(classId);
+    const classDetail = classes.find((c) => c._id === classId);
+    setSelectedClassDetail(classDetail);
   };
 
   const handleEnroll = async (e) => {
@@ -571,14 +602,17 @@ const EnrollStudentModal = ({ isOpen, onClose, student, onSuccess }) => {
       isOpen={isOpen}
       onClose={onClose}
       title={`📝 Ghi danh học viên: ${student.fullName}`}
-      size="medium"
+      size="large"
     >
       <form onSubmit={handleEnroll} className="space-y-4">
         {/* Student Info */}
-        <div className="p-4 bg-gray-50 rounded-lg space-y-2">
+        <div className="p-4 bg-blue-50 rounded-lg space-y-2 border border-blue-200">
           <p className="text-sm">
             <span className="font-medium">Mã học viên:</span>{" "}
             {student.studentCode || "Chưa có"}
+          </p>
+          <p className="text-sm">
+            <span className="font-medium">Họ tên:</span> {student.fullName}
           </p>
           <p className="text-sm">
             <span className="font-medium">Email:</span> {student.email || "N/A"}
@@ -591,37 +625,125 @@ const EnrollStudentModal = ({ isOpen, onClose, student, onSuccess }) => {
 
         {/* Class Selection */}
         <div>
-          <label className="block text-sm font-medium mb-2">
+          <label className="block text-sm font-medium mb-3">
             Chọn lớp học *
           </label>
           {loadingClasses ? (
-            <div className="flex justify-center py-4">
+            <div className="flex justify-center py-6">
               <Loading size="small" />
             </div>
+          ) : classes.length === 0 ? (
+            <div className="text-center py-6 bg-gray-50 rounded-lg">
+              <p className="text-gray-600">Không có lớp học nào khả dụng</p>
+            </div>
           ) : (
-            <select
-              className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-              value={selectedClass}
-              onChange={(e) => setSelectedClass(e.target.value)}
-              required
-            >
-              <option value="">-- Chọn lớp học --</option>
+            <div className="space-y-3 max-h-64 overflow-y-auto">
               {classes.map((classItem) => (
-                <option
+                <div
                   key={classItem._id}
-                  value={classItem._id}
-                  disabled={classItem.isFull}
+                  className={`p-3 border rounded-lg cursor-pointer transition ${
+                    selectedClass === classItem._id
+                      ? "border-teal-500 bg-teal-50"
+                      : "border-gray-200 bg-white hover:border-gray-300"
+                  } ${classItem.isFull ? "opacity-60" : ""}`}
+                  onClick={() =>
+                    !classItem.isFull && handleSelectClass(classItem._id)
+                  }
                 >
-                  {classItem.name} - {classItem.course?.name} (
-                  {classItem.isFull
-                    ? "Đã đầy"
-                    : `Còn ${classItem.availableSlots} chỗ`}
-                  )
-                </option>
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1">
+                      <p className="font-semibold text-gray-900">
+                        {classItem.name}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        {classItem.course?.name} ({classItem.course?.courseCode}
+                        )
+                      </p>
+                      <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+                        <p>
+                          <span className="text-gray-600">Giáo viên:</span>{" "}
+                          <span className="font-medium">
+                            {classItem.teacher?.fullName || "Chưa assign"}
+                          </span>
+                        </p>
+                        <p>
+                          <span className="text-gray-600">Phòng:</span>{" "}
+                          <span className="font-medium">
+                            {classItem.room || "N/A"}
+                          </span>
+                        </p>
+                        <p>
+                          <span className="text-gray-600">Ngày bắt đầu:</span>{" "}
+                          <span className="font-medium">
+                            {new Date(classItem.startDate).toLocaleDateString(
+                              "vi-VN"
+                            )}
+                          </span>
+                        </p>
+                        <p>
+                          <span className="text-gray-600">Sức chứa:</span>{" "}
+                          <span className="font-medium">
+                            {classItem.currentEnrollment}/{classItem.capacity}
+                          </span>
+                        </p>
+                      </div>
+                    </div>
+                    <Badge
+                      variant={classItem.isFull ? "danger" : "success"}
+                      className="ml-2"
+                    >
+                      {classItem.isFull
+                        ? "Đã đầy"
+                        : `Còn ${classItem.availableSlots}`}
+                    </Badge>
+                  </div>
+                </div>
               ))}
-            </select>
+            </div>
           )}
         </div>
+
+        {/* Selected Class Details */}
+        {selectedClassDetail && (
+          <div className="p-4 bg-green-50 rounded-lg border border-green-200 space-y-2">
+            <p className="font-medium text-green-900">
+              ✓ Thông tin lớp học đã chọn
+            </p>
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              <p>
+                <span className="text-gray-600">Lớp:</span>{" "}
+                {selectedClassDetail.name}
+              </p>
+              <p>
+                <span className="text-gray-600">Mã lớp:</span>{" "}
+                {selectedClassDetail.classCode || "N/A"}
+              </p>
+              <p>
+                <span className="text-gray-600">Khóa học:</span>{" "}
+                {selectedClassDetail.course?.name}
+              </p>
+              <p>
+                <span className="text-gray-600">Học phí:</span>{" "}
+                {selectedClassDetail.course?.tuitionFee?.toLocaleString(
+                  "vi-VN"
+                )}
+                đ
+              </p>
+              <p>
+                <span className="text-gray-600">Khoá học:</span>{" "}
+                {typeof selectedClassDetail.course?.duration === "object"
+                  ? `${selectedClassDetail.course.duration?.weeks || 0} tuần (${
+                      selectedClassDetail.course.duration?.hours || 0
+                    } giờ)`
+                  : selectedClassDetail.course?.duration || "N/A"}
+              </p>
+              <p>
+                <span className="text-gray-600">Trạng thái:</span>{" "}
+                <Badge variant="info">{selectedClassDetail.status}</Badge>
+              </p>
+            </div>
+          </div>
+        )}
 
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
           <p className="text-sm text-yellow-800">
@@ -634,7 +756,12 @@ const EnrollStudentModal = ({ isOpen, onClose, student, onSuccess }) => {
           <Button variant="secondary" onClick={onClose} disabled={loading}>
             Hủy
           </Button>
-          <Button variant="primary" type="submit" loading={loading}>
+          <Button
+            variant="primary"
+            type="submit"
+            loading={loading}
+            disabled={!selectedClass}
+          >
             Ghi danh
           </Button>
         </div>

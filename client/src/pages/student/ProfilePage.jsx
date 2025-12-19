@@ -14,7 +14,7 @@ import { User, Mail, Phone, MapPin, Calendar, Edit } from "lucide-react";
 import toast from "react-hot-toast";
 
 const ProfilePage = () => {
-  const { user, setUser } = useAuth();
+  const { user, updateUser } = useAuth();
   const [loading, setLoading] = useState(false);
   const [editing, setEditing] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -26,27 +26,57 @@ const ProfilePage = () => {
     address: "",
     dateOfBirth: "",
   });
+  const [originalProfile, setOriginalProfile] = useState({
+    fullName: "",
+    email: "",
+    phone: "",
+    address: "",
+    dateOfBirth: "",
+  });
 
   useEffect(() => {
     if (user) {
-      setProfile({
+      const newProfile = {
         fullName: user.fullName || "",
         email: user.email || "",
         phone: user.phone || "",
-        address: user.profile?.address || "",
-        dateOfBirth: user.profile?.dateOfBirth || "",
-      });
+        address: user.profile?.address || user.address || "",
+        dateOfBirth: user.profile?.dateOfBirth || user.dateOfBirth || "",
+      };
+      setProfile(newProfile);
+      setOriginalProfile(newProfile);
     }
   }, [user]);
 
   const handleSave = async () => {
     try {
       setLoading(true);
-      await userService.updateProfile(profile);
+
+      // Only send fields that have changed
+      const changedFields = {};
+      Object.keys(profile).forEach((key) => {
+        if (profile[key] !== originalProfile[key]) {
+          changedFields[key] = profile[key];
+        }
+      });
+
+      console.log("Changed fields:", changedFields);
+
+      if (Object.keys(changedFields).length === 0) {
+        toast.info("Không có thay đổi nào");
+        setEditing(false);
+        return;
+      }
+
+      await userService.updateProfile(changedFields);
       toast.success("Cập nhật thông tin thành công!");
       setEditing(false);
+      setOriginalProfile(profile); // Update original after successful save
     } catch (error) {
-      toast.error("Cập nhật thất bại!");
+      const errorMsg =
+        error.response?.data?.message || error.message || "Cập nhật thất bại!";
+      console.error("Profile update error:", errorMsg);
+      toast.error(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -56,27 +86,42 @@ const ProfilePage = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith('image/')) {
-      toast.error('Vui lòng chọn file ảnh!');
+    if (!file.type.startsWith("image/")) {
+      toast.error("Vui lòng chọn file ảnh!");
       return;
     }
 
     try {
       setUploading(true);
       const formData = new FormData();
-      formData.append('avatar', file);
+      formData.append("avatar", file);
 
-      const response = await apiClient.post('/students/me/avatar', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+      const response = await apiClient.post("/auth/avatar", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
       });
 
+      console.log("Avatar upload response:", response.data);
+
       if (response.data.success) {
-        setUser({ ...user, avatar: response.data.data.avatar });
-        toast.success('Tải ảnh đại diện thành công!');
+        // Update with the returned data if available, otherwise keep current user
+        if (response.data.data) {
+          console.log("Updated user from response:", response.data.data);
+          // Update the user in context with the returned data
+          updateUser(response.data.data);
+          toast.success("Tải ảnh đại diện thành công!");
+        } else {
+          console.warn("No user data in response, showing message only");
+          toast.success("Tải ảnh đại diện thành công!");
+        }
+      } else {
+        toast.error(response.data.message || "Tải ảnh thất bại!");
       }
     } catch (error) {
-      console.error('Upload error:', error);
-      toast.error('Tải ảnh thất bại!');
+      console.error("Upload error:", error);
+      const errorMsg =
+        error.response?.data?.message || error.message || "Không biết lỗi";
+      console.error("Error details:", errorMsg);
+      toast.error("Tải ảnh thất bại: " + errorMsg);
     } finally {
       setUploading(false);
     }
@@ -109,7 +154,11 @@ const ProfilePage = () => {
           <CardContent className="flex flex-col items-center">
             <div className="w-32 h-32 rounded-full bg-blue-100 flex items-center justify-center mb-4 overflow-hidden">
               {user?.avatar ? (
-                <img src={`http://localhost:5000${user.avatar}`} alt="Avatar" className="w-full h-full object-cover" />
+                <img
+                  src={`http://localhost:5000${user.avatar}`}
+                  alt="Avatar"
+                  className="w-full h-full object-cover"
+                />
               ) : (
                 <User className="w-16 h-16 text-blue-600" />
               )}
@@ -118,7 +167,7 @@ const ProfilePage = () => {
               {user?.fullName}
             </p>
             <p className="text-sm text-gray-500">
-              {user?.studentCode || "N/A"}
+              {user?.studentCode || user?.staffCode || user?.phone || "N/A"}
             </p>
             <input
               ref={fileInputRef}
@@ -134,7 +183,7 @@ const ProfilePage = () => {
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
             >
-              {uploading ? 'Đang tải...' : 'Tải ảnh lên'}
+              {uploading ? "Đang tải..." : "Tải ảnh lên"}
             </Button>
           </CardContent>
         </Card>

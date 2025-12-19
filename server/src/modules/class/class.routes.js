@@ -36,6 +36,16 @@ router
   .delete(validateObjectId, authorize("director"), deleteClass);
 
 // Student management in class
+
+// Get all students in a class
+router.get(
+  "/:id/students",
+  validateObjectId,
+  authorize("director", "enrollment", "academic", "teacher"),
+  require("./class.controller").getClassStudents
+);
+
+// Add/remove a student from class
 router
   .route("/:id/students/:studentId")
   .post(
