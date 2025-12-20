@@ -81,4 +81,16 @@ router.get(
 router.get("/reports/charts/attendance", directorController.getAttendanceChart);
 router.get("/reports/activities", directorController.getRecentActivities);
 
+// Compatibility aliases used by client dashboard
+router.get("/reports/revenue-chart", directorController.getRevenueChart);
+router.get("/reports/attendance-chart", directorController.getAttendanceChart);
+router.get(
+  "/reports/student-distribution",
+  directorController.getStudentDistribution
+);
+router.get(
+  "/reports/recent-activities",
+  directorController.getRecentActivities
+);
+
 module.exports = router;

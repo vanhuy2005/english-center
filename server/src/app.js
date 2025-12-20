@@ -42,7 +42,24 @@ app.use(express.urlencoded({ extended: true }));
 // Debug middleware
 app.use((req, res, next) => {
   console.log(`📝 ${req.method} ${req.originalUrl}`);
-  console.log("Headers:", req.headers.authorization);
+  const authHeader = req.headers.authorization;
+  console.log(
+    "Authorization present:",
+    !!authHeader,
+    authHeader ? `[REDACTED ${authHeader.split(" ")[0]} token]` : null
+  );
+
+  // Log request body keys but redact sensitive fields
+  if (req.body && Object.keys(req.body).length) {
+    const masked = { ...req.body };
+    ["password", "currentPassword", "newPassword", "confirmPassword"].forEach(
+      (k) => {
+        if (Object.prototype.hasOwnProperty.call(masked, k) && masked[k])
+          masked[k] = "[REDACTED]";
+      }
+    );
+    console.log("Body:", masked);
+  }
   next();
 });
 
@@ -97,6 +114,10 @@ app.use(
   require("./modules/notification/notification.routes")
 );
 app.use("/api/finance", require("./modules/finance/finance.routes"));
+// Mount teacher routes at /api/teachers (client expects this path)
+app.use("/api/teachers", require("./modules/teacher/teacher.routes"));
+// Expose director reports under /api/reports for dashboard convenience
+app.use("/api/reports", require("./modules/director/director.routes"));
 app.use("/api/director", require("./modules/director/director.routes"));
 app.use(
   "/api/staff/enrollment",

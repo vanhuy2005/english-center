@@ -69,21 +69,28 @@ const LoginPage = () => {
     setLoading(true);
     setError("");
     try {
-      const data = await apiClient.put("/auth/change-password", {
-        newPassword,
-        isFirstLogin: true,
-      });
+      // Ensure Authorization header is sent (use token from localStorage)
+      const token = localStorage.getItem("token");
+      const response = await apiClient.put(
+        "/auth/change-password",
+        { newPassword, confirmPassword, isFirstLogin: true },
+        { headers: token ? { Authorization: `Bearer ${token}` } : {} }
+      );
 
-      if (data.success) {
+      const resData = response?.data;
+      if (resData && resData.success) {
         setShowChangePassword(false);
-        const userRole = JSON.parse(localStorage.getItem("user"))?.role || localStorage.getItem("role");
+        const userRole =
+          JSON.parse(localStorage.getItem("user"))?.role ||
+          localStorage.getItem("role");
         const dashboardPath = getRoleDashboard(userRole);
         navigate(dashboardPath);
       } else {
-        setError(data.message || "Đổi mật khẩu thất bại");
+        setError(resData?.message || "Đổi mật khẩu thất bại");
       }
     } catch (err) {
-      setError("Đổi mật khẩu thất bại");
+      console.error("Change password error (login page):", err);
+      setError(err.response?.data?.message || "Đổi mật khẩu thất bại");
     } finally {
       setLoading(false);
     }

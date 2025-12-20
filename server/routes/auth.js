@@ -163,6 +163,14 @@ router.put("/change-password", async (req, res) => {
   try {
     const token = req.header("Authorization")?.replace("Bearer ", "");
 
+    console.log("/auth/change-password called", {
+      hasAuthHeader: !!token,
+      body: {
+        ...req.body,
+        currentPassword: req.body.currentPassword ? "[PROVIDED]" : undefined,
+      },
+    });
+
     if (!token) {
       return res.status(401).json({
         success: false,
@@ -174,7 +182,12 @@ router.put("/change-password", async (req, res) => {
       token,
       process.env.JWT_SECRET || "your-secret-key"
     );
-    const { currentPassword, newPassword, isFirstLogin } = req.body;
+    const {
+      currentPassword,
+      newPassword,
+      confirmPassword,
+      isFirstLogin: clientFirstLogin,
+    } = req.body;
 
     let user;
     if (decoded.userType === "student") {
@@ -183,6 +196,11 @@ router.put("/change-password", async (req, res) => {
       user = await Staff.findById(decoded.id).select("+password");
     }
 
+    console.log("Change-password: decoded", {
+      id: decoded.id,
+      userType: decoded.userType,
+    });
+
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -190,8 +208,35 @@ router.put("/change-password", async (req, res) => {
       });
     }
 
+    // Validate new password and confirmation
+    if (!newPassword || newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: "Mật khẩu mới phải có ít nhất 6 ký tự",
+      });
+    }
+
+    if (confirmPassword && newPassword !== confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Mật khẩu xác nhận không khớp",
+      });
+    }
+
+    // Determine whether this is the user's first login from DB (not client-sent flag)
+    // Determine first-login status (allow client to signal first-login as fallback)
+    const firstLogin = !!user.isFirstLogin || !!clientFirstLogin;
+    console.log("Change-password: user.isFirstLogin =", firstLogin);
+
     // If not first login, verify current password
-    if (!isFirstLogin) {
+    if (!firstLogin) {
+      if (!currentPassword) {
+        return res.status(400).json({
+          success: false,
+          message: "Vui lòng nhập mật khẩu hiện tại",
+        });
+      }
+
       const isMatch = await user.comparePassword(currentPassword);
       if (!isMatch) {
         return res.status(401).json({
@@ -201,9 +246,10 @@ router.put("/change-password", async (req, res) => {
       }
     }
 
-    // Update password
+    // Update password and mark first login complete
     user.password = newPassword;
     user.isFirstLogin = false;
+    user.refreshToken = undefined;
     await user.save();
 
     res.json({
