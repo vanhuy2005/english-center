@@ -3,7 +3,14 @@ const router = express.Router();
 const requestController = require("./request.controller");
 const { protect, authorize } = require("../../shared/middleware/auth.middleware");
 
-// All routes require authentication and student role
+// Public routes (no auth required)
+// @route   POST /api/student/requests/consultation
+router.post("/consultation", requestController.registerConsultation);
+
+// @route   POST /api/student/requests/placement-test
+router.post("/placement-test", requestController.registerPlacementTest);
+
+// All routes below require authentication and student role
 router.use(protect);
 router.use(authorize("student"));
 

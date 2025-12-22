@@ -10,7 +10,10 @@ const requestSchema = new mongoose.Schema(
     student: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Student",
-      required: [true, "Student is required"],
+      required: function() {
+        // Student not required for public requests (consultation, placement_test without login)
+        return !["consultation", "placement_test"].includes(this.type);
+      },
     },
     type: {
       type: String,
@@ -22,6 +25,8 @@ const requestSchema = new mongoose.Schema(
         "resume",
         "withdrawal",
         "course_enrollment",
+        "consultation",
+        "placement_test",
       ],
       required: [true, "Request type is required"],
     },
@@ -46,8 +51,54 @@ const requestSchema = new mongoose.Schema(
     },
     reason: {
       type: String,
-      required: [true, "Reason is required"],
+      required: function() {
+        // Reason not required for placement_test and consultation
+        return this.type !== "placement_test" && this.type !== "consultation";
+      },
       trim: true,
+    },
+    // Consultation specific info
+    consultationInfo: {
+      fullName: String,
+      phone: String,
+      email: String,
+      note: String,
+      preferredContactTime: String,
+    },
+    // Course enrollment specific info
+    enrollmentInfo: {
+      fullName: String,
+      phone: String,
+      email: String,
+      dateOfBirth: Date,
+      address: String,
+    },
+    // Placement test specific info
+    placementTestInfo: {
+      fullName: String,
+      phone: String,
+      email: String,
+      dateOfBirth: Date,
+      address: String,
+      scheduledDate: Date,
+      scheduledTime: String,
+      testDuration: Number,
+      testLocation: String,
+      testResult: {
+        score: Number,
+        level: String,
+        strengths: [String],
+        weaknesses: [String],
+        comment: String,
+      },
+      recommendedCourse: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Course",
+      },
+      convertedToEnrollment: {
+        type: Boolean,
+        default: false,
+      },
     },
     documents: [
       {
@@ -100,6 +151,16 @@ requestSchema.pre("save", function (next) {
     case "course_enrollment":
       if (!this.course) {
         return next(new Error("Course is required for enrollment requests"));
+      }
+      break;
+    case "consultation":
+      if (!this.consultationInfo || !this.consultationInfo.fullName || !this.consultationInfo.phone) {
+        return next(new Error("Full name and phone are required for consultation requests"));
+      }
+      break;
+    case "placement_test":
+      if (!this.placementTestInfo || !this.placementTestInfo.fullName || !this.placementTestInfo.phone) {
+        return next(new Error("Full name and phone are required for placement test requests"));
       }
       break;
     case "transfer":

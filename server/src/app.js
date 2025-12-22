@@ -96,6 +96,7 @@ const academicRoutes = require("./modules/staff/academic/academic.routes");
 const accountantRoutes = require("./modules/staff/accountant/accountant.routes");
 const courseRoutes = require("./modules/course/course.routes");
 const studentRoutes = require("./modules/student/student.routes");
+const studentRequestRoutes = require("./modules/student/request.routes");
 
 // Register routes
 app.use("/api/auth", authRoutes);
@@ -104,6 +105,7 @@ app.use("/api/staff/academic", academicRoutes);
 app.use("/api/staff/accountant", accountantRoutes);
 app.use("/api/courses", courseRoutes);
 app.use("/api/students", studentRoutes);
+app.use("/api/student/requests", studentRequestRoutes);
 app.use("/api/classes", require("./modules/class/class.routes"));
 app.use("/api/schedules", require("./modules/schedule/schedule.routes"));
 app.use("/api/attendance", require("./modules/attendance/attendance.routes"));

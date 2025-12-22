@@ -18,9 +18,12 @@ const EnrollPage = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterLevel, setFilterLevel] = useState("all");
+  const [showPlacementTestModal, setShowPlacementTestModal] = useState(false);
   const [showEnrollModal, setShowEnrollModal] = useState(false);
   const [showConsultModal, setShowConsultModal] = useState(false);
   const [selectedCourse, setSelectedCourse] = useState(null);
+  const [enrollModalType, setEnrollModalType] = useState("course"); // "course" | "placement_test"
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [enrollForm, setEnrollForm] = useState({
     fullName: "",
     phone: "",
@@ -28,6 +31,7 @@ const EnrollPage = () => {
     dateOfBirth: "",
     address: "",
     note: "",
+    desiredTestDate: "", // Ngày thi mong muốn
   });
   const [consultForm, setConsultForm] = useState({
     fullName: "",
@@ -38,6 +42,13 @@ const EnrollPage = () => {
 
   useEffect(() => {
     fetchCourses();
+    
+    // Always show placement test modal when entering this page from sidebar
+    const timer = setTimeout(() => {
+      setShowPlacementTestModal(true);
+    }, 800);
+    
+    return () => clearTimeout(timer);
   }, []);
 
   const fetchCourses = async () => {
@@ -63,27 +74,101 @@ const EnrollPage = () => {
 
   const handleEnrollClick = (course) => {
     setSelectedCourse(course);
+    // Show course enrollment form directly (no placement test modal)
+    setEnrollModalType("course");
     setShowEnrollModal(true);
   };
 
-  const handleConsultClick = (course) => {
+  const handleConfirmEnroll = () => {
+    // User chose "Có" - show placement test form
+    setShowPlacementTestModal(false);
+    setEnrollModalType("placement_test");
+    setShowEnrollModal(true);
+  };
+
+  const handleSkipPlacementTest = () => {
+    // User chose "Không" - just close modal and return to course list
+    setShowPlacementTestModal(false);
+    // Don't save to sessionStorage - modal will show again next time user enters this page
+  };
+
+  const handleConsultClick = (course = null) => {
     setSelectedCourse(course);
     setShowConsultModal(true);
   };
 
   const handleEnrollSubmit = async (e) => {
     e.preventDefault();
+    
+    if (enrollModalType === "placement_test") {
+      await handlePlacementTestSubmit();
+    } else {
+      await handleCourseEnrollSubmit();
+    }
+  };
+
+  const handlePlacementTestSubmit = async () => {
     try {
-      const data = await apiClient.post("/student/requests/course-enrollment", {
-        courseId: selectedCourse._id,
-        reason: enrollForm.note || `Đăng ký khóa học ${selectedCourse.name}`,
+      const { fullName, phone, dateOfBirth, desiredTestDate } = enrollForm;
+      
+      if (!fullName || !phone || !dateOfBirth || !desiredTestDate) {
+        toast.error("Vui lòng nhập đầy đủ thông tin bắt buộc");
+        return;
+      }
+
+      setIsSubmitting(true);
+      const response = await apiClient.post("/student/requests/placement-test", {
+        fullName,
+        phone,
+        dateOfBirth,
+        desiredTestDate
       });
 
-      if (data.success) {
+      if (response.data.success) {
+        toast.success("Đăng ký thi đầu vào thành công! Chúng tôi sẽ liên hệ với bạn trong 24h.");
+        setShowEnrollModal(false);
+        setEnrollForm({
+          fullName: "",
+          phone: "",
+          email: "",
+          dateOfBirth: "",
+          address: "",
+          note: "",
+          desiredTestDate: "",
+        });
+      }
+    } catch (error) {
+      console.error("Placement test error:", error);
+      toast.error(error.response?.data?.message || "Đăng ký thất bại!");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleCourseEnrollSubmit = async () => {
+    try {
+      const { fullName, phone, email, dateOfBirth, address, note } = enrollForm;
+      
+      if (!fullName || !phone || !email || !dateOfBirth || !address) {
+        toast.error("Vui lòng nhập đầy đủ thông tin bắt buộc");
+        return;
+      }
+
+      setIsSubmitting(true);
+      const response = await apiClient.post("/student/requests/course-enrollment", {
+        courseId: selectedCourse._id,
+        fullName,
+        phone,
+        email,
+        dateOfBirth,
+        address,
+        note: note || `Đăng ký khóa học ${selectedCourse.name}`,
+      });
+
+      if (response.data.success) {
+        const feeAmount = response.data.data?.amount || 0;
         toast.success(
-          `Đăng ký khóa học thành công! Học phí: ${formatCurrency(
-            data.data.amount
-          )}`
+          `Đăng ký khóa học thành công! Học phí: ${formatCurrency(feeAmount)}. Vui lòng thanh toán trong 7 ngày.`
         );
         setShowEnrollModal(false);
         setEnrollForm({
@@ -93,25 +178,39 @@ const EnrollPage = () => {
           dateOfBirth: "",
           address: "",
           note: "",
+          desiredTestDate: "",
         });
-      } else {
-        toast.error(data.message || "Đăng ký thất bại!");
       }
     } catch (error) {
-      console.error("Enroll error:", error);
+      console.error("Course enrollment error:", error);
       toast.error(error.response?.data?.message || "Đăng ký thất bại!");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleConsultSubmit = async (e) => {
     e.preventDefault();
+    setIsSubmitting(true);
     try {
-      // TODO: Implement consult request API
-      toast.success("Đã gửi yêu cầu tư vấn! Chúng tôi sẽ liên hệ bạn sớm.");
-      setShowConsultModal(false);
-      setConsultForm({ fullName: "", phone: "", email: "", note: "" });
+      const response = await apiClient.post("/student/requests/consultation", {
+        courseId: selectedCourse?._id,
+        fullName: consultForm.fullName,
+        phone: consultForm.phone,
+        email: consultForm.email,
+        note: consultForm.note,
+      });
+
+      if (response.data.success) {
+        toast.success("Đã gửi yêu cầu tư vấn! Chúng tôi sẽ liên hệ bạn sớm.");
+        setShowConsultModal(false);
+        setConsultForm({ fullName: "", phone: "", email: "", note: "" });
+      }
     } catch (error) {
-      toast.error("Gửi yêu cầu thất bại!");
+      console.error("Consultation error:", error);
+      toast.error(error.response?.data?.message || "Gửi yêu cầu thất bại!");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -168,7 +267,29 @@ const EnrollPage = () => {
   }
 
   return (
-    <div className="p-8">
+    <div className="p-8 relative">
+      {/* Floating Tư vấn Button - Fixed góc phải */}
+      <button
+        onClick={() => handleConsultClick(null)}
+        className="fixed bottom-8 right-8 z-50 group"
+        style={{ zIndex: 999 }}
+      >
+        <div className="relative">
+          {/* Main Button */}
+          <div className="w-16 h-16 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full shadow-2xl flex items-center justify-center hover:scale-110 transition-transform duration-300 animate-pulse">
+            <span className="text-3xl">💬</span>
+          </div>
+          
+          {/* Tooltip */}
+          <div className="absolute right-20 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
+            <div className="bg-gray-900 text-white px-4 py-2 rounded-lg whitespace-nowrap text-sm font-medium shadow-xl">
+              Đăng ký tư vấn
+              <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-2 w-2 h-2 bg-gray-900 rotate-45"></div>
+            </div>
+          </div>
+        </div>
+      </button>
+
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">
@@ -282,19 +403,12 @@ const EnrollPage = () => {
                   </div>
                 </div>
 
-                <div className="pt-4 border-t border-gray-100 space-y-2">
+                <div className="pt-4 border-t border-gray-100">
                   <Button
                     onClick={() => handleEnrollClick(course)}
-                    className="w-full bg-red-600 hover:bg-red-700 text-white"
+                    className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold"
                   >
                     Đăng ký ngay
-                  </Button>
-                  <Button
-                    onClick={() => handleConsultClick(course)}
-                    variant="outline"
-                    className="w-full border-red-600 text-red-600 hover:bg-red-50"
-                  >
-                    Đăng ký tư vấn
                   </Button>
                 </div>
               </CardContent>
@@ -303,122 +417,329 @@ const EnrollPage = () => {
         )}
       </div>
 
-      {/* Modal Đăng ký ngay */}
-      {showEnrollModal && (
+      {/* Modal Xác nhận Test đầu vào */}
+      {showPlacementTestModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-md w-full p-6">
-            <h3 className="text-xl font-bold text-gray-900 mb-4">
-              Đăng ký khóa học: {selectedCourse?.name}
-            </h3>
+          <div className="bg-white rounded-2xl max-w-lg w-full p-8 shadow-2xl">
+            <div className="text-center mb-6">
+              <div className="w-24 h-24 bg-gradient-to-br from-blue-100 to-blue-200 rounded-full flex items-center justify-center mx-auto mb-4">
+                <span className="text-5xl">📝</span>
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-2">
+                Bạn có muốn đăng ký kiểm tra đầu vào không?
+              </h3>
+              <p className="text-gray-600 leading-relaxed">
+                Bài kiểm tra đầu vào giúp chúng tôi xác định trình độ tiếng Anh của bạn để gợi ý khóa học phù hợp với năng lực.
+              </p>
+            </div>
+
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl p-5 mb-6">
+              <p className="text-sm text-blue-900 font-medium mb-3">Lợi ích khi thi đầu vào:</p>
+              <ul className="space-y-2 text-sm text-blue-800">
+                <li className="flex items-start gap-2">
+                  <span className="text-green-600 font-bold">✓</span>
+                  <span>Xác định chính xác trình độ hiện tại của bạn</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-600 font-bold">✓</span>
+                  <span>Được gợi ý khóa học phù hợp với năng lực</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-600 font-bold">✓</span>
+                  <span>Tiết kiệm thời gian và chi phí học tập</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-600 font-bold">✓</span>
+                  <span>Nền tảng vững chắc để phát triển kỹ năng</span>
+                </li>
+              </ul>
+            </div>
+
+            <div className="flex gap-3">
+              <Button
+                type="button"
+                onClick={handleSkipPlacementTest}
+                variant="outline"
+                className="flex-1 border-2 border-gray-300 hover:bg-gray-50 text-gray-700 font-medium py-3"
+              >
+                Không, cảm ơn
+              </Button>
+              <Button
+                type="button"
+                onClick={handleConfirmEnroll}
+                className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold py-3 shadow-lg"
+              >
+                Có, đăng ký ngay
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Đăng ký - Conditional based on enrollModalType */}
+      {showEnrollModal && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowEnrollModal(false);
+            }
+          }}
+        >
+          <div 
+            className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header - changes based on type */}
+            {enrollModalType === "placement_test" ? (
+              <div className="bg-gradient-to-br from-red-600 via-red-700 to-rose-800 p-8 rounded-t-2xl relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-40 h-40 bg-white opacity-5 rounded-full -mr-20 -mt-20"></div>
+                <div className="absolute bottom-0 left-0 w-32 h-32 bg-white opacity-5 rounded-full -ml-16 -mb-16"></div>
+                
+                <div className="relative z-10">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-12 h-12 bg-white bg-opacity-20 rounded-xl flex items-center justify-center backdrop-blur-sm">
+                      <span className="text-3xl">🎯</span>
+                    </div>
+                    <h3 className="text-3xl font-extrabold text-white tracking-tight">
+                      Đăng Ký Thi Đầu Vào
+                    </h3>
+                  </div>
+                  <p className="text-red-100 text-base ml-15">Đánh giá trình độ tiếng Anh của bạn ngay hôm nay!</p>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 p-8 rounded-t-2xl relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-40 h-40 bg-white opacity-5 rounded-full -mr-20 -mt-20"></div>
+                <div className="absolute bottom-0 left-0 w-32 h-32 bg-white opacity-5 rounded-full -ml-16 -mb-16"></div>
+                
+                <div className="relative z-10">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-12 h-12 bg-white bg-opacity-20 rounded-xl flex items-center justify-center backdrop-blur-sm">
+                      <span className="text-3xl">📚</span>
+                    </div>
+                    <h3 className="text-3xl font-extrabold text-white tracking-tight">
+                      Đăng Ký Khóa Học
+                    </h3>
+                  </div>
+                  <p className="text-blue-100 text-base ml-15">
+                    {selectedCourse?.name}
+                  </p>
+                </div>
+              </div>
+            )}
+
             <form
               onSubmit={handleEnrollSubmit}
-              className="space-y-4 max-h-[70vh] overflow-y-auto"
+              className="p-6"
             >
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Họ và tên <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={enrollForm.fullName}
-                  onChange={(e) =>
-                    setEnrollForm({ ...enrollForm, fullName: e.target.value })
-                  }
-                  required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                  placeholder="Nhập họ và tên"
-                />
+              <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+                {enrollModalType === "placement_test" ? (
+                  // Placement Test Form
+                  <>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          Họ và tên <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={enrollForm.fullName}
+                          onChange={(e) =>
+                            setEnrollForm({ ...enrollForm, fullName: e.target.value })
+                          }
+                          required
+                          className="w-full px-4 py-2.5 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all duration-200 hover:border-gray-400"
+                          placeholder="Nguyễn Văn A"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          Số điện thoại <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="tel"
+                          value={enrollForm.phone}
+                          onChange={(e) =>
+                            setEnrollForm({ ...enrollForm, phone: e.target.value })
+                          }
+                          required
+                          pattern="[0-9]{10,11}"
+                          className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
+                          placeholder="0123456789"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          Ngày sinh <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="date"
+                          value={enrollForm.dateOfBirth}
+                          onChange={(e) =>
+                            setEnrollForm({
+                              ...enrollForm,
+                              dateOfBirth: e.target.value,
+                            })
+                          }
+                          required
+                          max={new Date().toISOString().split('T')[0]}
+                          className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          Ngày thi mong muốn <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="date"
+                          value={enrollForm.desiredTestDate}
+                          onChange={(e) =>
+                            setEnrollForm({
+                              ...enrollForm,
+                              desiredTestDate: e.target.value,
+                            })
+                          }
+                          required
+                          className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="bg-gradient-to-r from-red-50 to-rose-50 border-2 border-red-200 rounded-xl p-5 shadow-sm">
+                      <p className="text-sm text-red-900 flex items-start gap-3">
+                        <span className="text-2xl flex-shrink-0">📅</span>
+                        <span className="leading-relaxed">
+                          <strong className="text-red-700">⚡ Thông tin quan trọng:</strong> Bài thi bao gồm <span className="font-semibold">Ngữ pháp, Từ vựng, Đọc hiểu và Nghe hiểu</span>. Thời gian: <span className="font-semibold text-red-600">60 phút</span>. Kết quả sẽ có trong vòng <span className="font-semibold text-red-600">24h</span> sau khi hoàn thành.
+                        </span>
+                      </p>
+                    </div>
+                  </>
+                ) : (
+                  // Course Enrollment Form - Full personal info like placement test
+                  <>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          Họ và tên <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={enrollForm.fullName}
+                          onChange={(e) =>
+                            setEnrollForm({ ...enrollForm, fullName: e.target.value })
+                          }
+                          required
+                          className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                          placeholder="Nguyễn Văn A"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          Số điện thoại <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="tel"
+                          value={enrollForm.phone}
+                          onChange={(e) =>
+                            setEnrollForm({ ...enrollForm, phone: e.target.value })
+                          }
+                          required
+                          pattern="[0-9]{10,11}"
+                          className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                          placeholder="0123456789"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          Email <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="email"
+                          value={enrollForm.email}
+                          onChange={(e) =>
+                            setEnrollForm({ ...enrollForm, email: e.target.value })
+                          }
+                          required
+                          className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                          placeholder="example@email.com"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          Ngày sinh <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="date"
+                          value={enrollForm.dateOfBirth}
+                          onChange={(e) =>
+                            setEnrollForm({
+                              ...enrollForm,
+                              dateOfBirth: e.target.value,
+                            })
+                          }
+                          required
+                          max={new Date().toISOString().split('T')[0]}
+                          className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Địa chỉ <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={enrollForm.address}
+                        onChange={(e) =>
+                          setEnrollForm({ ...enrollForm, address: e.target.value })
+                        }
+                        required
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                        placeholder="Số nhà, đường, quận, thành phố"
+                      />
+                    </div>
+
+                    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl p-5">
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm font-semibold text-blue-900">Khóa học:</span>
+                          <span className="text-sm font-bold text-blue-700">{selectedCourse?.name}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm font-semibold text-blue-900">Học phí:</span>
+                          <span className="text-sm font-bold text-red-600">{formatCurrency(selectedCourse?.fee?.amount || 0)}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm font-semibold text-blue-900">Thời lượng:</span>
+                          <span className="text-sm text-blue-700">{selectedCourse?.duration?.weeks || 0} tuần</span>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Số điện thoại <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="tel"
-                  value={enrollForm.phone}
-                  onChange={(e) =>
-                    setEnrollForm({ ...enrollForm, phone: e.target.value })
-                  }
-                  required
-                  pattern="[0-9]{10,11}"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                  placeholder="Nhập số điện thoại (10-11 số)"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Email <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="email"
-                  value={enrollForm.email}
-                  onChange={(e) =>
-                    setEnrollForm({ ...enrollForm, email: e.target.value })
-                  }
-                  required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                  placeholder="Nhập email"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Ngày sinh <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="date"
-                  value={enrollForm.dateOfBirth}
-                  onChange={(e) =>
-                    setEnrollForm({
-                      ...enrollForm,
-                      dateOfBirth: e.target.value,
-                    })
-                  }
-                  required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Địa chỉ
-                </label>
-                <input
-                  type="text"
-                  value={enrollForm.address}
-                  onChange={(e) =>
-                    setEnrollForm({ ...enrollForm, address: e.target.value })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                  placeholder="Nhập địa chỉ"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Ghi chú
-                </label>
-                <textarea
-                  value={enrollForm.note}
-                  onChange={(e) =>
-                    setEnrollForm({ ...enrollForm, note: e.target.value })
-                  }
-                  rows={2}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                  placeholder="Nhập ghi chú nếu có..."
-                />
-              </div>
-              <div className="flex gap-3">
+
+              <div className="flex gap-3 mt-6 pt-4 border-t">
                 <Button
                   type="button"
                   onClick={() => setShowEnrollModal(false)}
                   variant="outline"
-                  className="flex-1"
+                  className="flex-1 border-2 font-medium"
                 >
                   Hủy
                 </Button>
                 <Button
                   type="submit"
-                  className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                  disabled={isSubmitting}
+                  className={`flex-1 font-bold shadow-lg ${
+                    enrollModalType === "placement_test"
+                      ? "bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700"
+                      : "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
+                  } text-white`}
                 >
-                  Xác nhận đăng ký
+                  {enrollModalType === "placement_test" ? "Đăng ký thi" : "Xác nhận đăng ký"}
                 </Button>
               </div>
             </form>
@@ -429,10 +750,18 @@ const EnrollPage = () => {
       {/* Modal Đăng ký tư vấn */}
       {showConsultModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-md w-full p-6">
-            <h3 className="text-xl font-bold text-gray-900 mb-4">
-              Đăng ký tư vấn: {selectedCourse?.name}
-            </h3>
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
+            <div className="mb-6">
+              <div className="w-16 h-16 bg-gradient-to-br from-purple-100 to-pink-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <span className="text-4xl">💬</span>
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 text-center mb-2">
+                Đăng ký tư vấn
+              </h3>
+              <p className="text-gray-600 text-center text-sm">
+                Để lại thông tin, chúng tôi sẽ liên hệ tư vấn chi tiết cho bạn
+              </p>
+            </div>
             <form onSubmit={handleConsultSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -505,7 +834,7 @@ const EnrollPage = () => {
                 </Button>
                 <Button
                   type="submit"
-                  className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                  className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold"
                 >
                   Gửi yêu cầu
                 </Button>
