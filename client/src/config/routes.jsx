@@ -24,6 +24,7 @@ import StudentDashboard from "@pages/student/StudentDashboard";
 import ProfilePage from "@pages/student/ProfilePage";
 import NotificationsPage from "@pages/student/NotificationsPage";
 import SchedulePage from "@pages/student/SchedulePage";
+import StudentTimetablePage from "@pages/student/StudentTimetablePage";
 import GradesPage from "@pages/student/GradesPage";
 import TuitionPage from "@pages/student/TuitionPage";
 import RequestFormPage from "@pages/student/RequestFormPage";
@@ -46,12 +47,15 @@ import {
 // Academic Staff Pages
 import AcademicStaffDashboardPage from "@pages/staff/academic/AcademicStaffDashboardPage";
 import ClassManagementPage from "@pages/staff/academic/ClassManagementPage";
+import CourseManagementPage from "@pages/staff/academic/CourseManagementPage";
+import ClassSchedulePage from "@pages/staff/academic/ClassSchedulePage";
 import AttendanceTrackingPage from "@pages/staff/academic/AttendanceTrackingPage";
 import GradeManagementPage from "@pages/staff/academic/GradeManagementPage";
 import StudentProgressPage from "@pages/staff/academic/StudentProgressPage";
 import RequestHandlingPage from "@pages/staff/academic/RequestHandlingPage";
 import ClassReportsPage from "@pages/staff/academic/ClassReportsPage";
 import AcademicStatisticsPage from "@pages/staff/academic/AcademicStatisticsPage";
+import AssignClassesPage from "@pages/staff/academic/AssignClassesPage";
 
 // Accountant Pages
 import AccountantDashboardPage from "@pages/staff/accountant/AccountantDashboardPage";
@@ -148,6 +152,7 @@ export const roleRoutes = {
     { path: "/profile", element: <ProfilePage /> },
     { path: "/notifications", element: <NotificationsPage /> },
     { path: "/schedule", element: <SchedulePage /> },
+    { path: "/timetable", element: <StudentTimetablePage /> },
     { path: "/grades", element: <GradesPage /> },
     { path: "/tuition", element: <TuitionPage /> },
     { path: "/my-courses", element: <MyCoursesPage /> },
@@ -170,9 +175,12 @@ export const roleRoutes = {
   academic: [
     { path: "/dashboard", element: <AcademicStaffDashboardPage /> },
     { path: "/academic/classes", element: <ClassManagementPage /> },
+    { path: "/academic/courses", element: <CourseManagementPage /> },
+    { path: "/academic/schedule", element: <ClassSchedulePage /> },
     { path: "/academic/attendance", element: <AttendanceTrackingPage /> },
     { path: "/academic/grades", element: <GradeManagementPage /> },
     { path: "/academic/students", element: <StudentProgressPage /> },
+    { path: "/academic/assign-classes", element: <AssignClassesPage /> },
     { path: "/academic/requests", element: <RequestHandlingPage /> },
     { path: "/academic/reports", element: <ClassReportsPage /> },
     { path: "/academic/reports/class/:classId", element: <ClassReportsPage /> },

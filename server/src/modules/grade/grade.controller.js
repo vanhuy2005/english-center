@@ -164,15 +164,35 @@ exports.createOrUpdateGrade = async (req, res) => {
           }
         }
       });
+      // Determine publish behavior: if caller specified isPublished use it,
+      // otherwise default to published so students see saved grades.
+      if (req.body.isPublished !== undefined) {
+        grade.isPublished = req.body.isPublished;
+      } else {
+        grade.isPublished = true;
+      }
+      if (grade.isPublished && !grade.publishedDate)
+        grade.publishedDate = new Date();
+
       await grade.save();
     } else {
       // Create new grade
-      grade = await Grade.create({
+      const createPayload = {
         student,
         class: classId,
         course,
         ...gradeData,
-      });
+        isPublished:
+          req.body.isPublished !== undefined ? req.body.isPublished : true,
+        publishedDate:
+          req.body.isPublished !== undefined
+            ? req.body.isPublished
+              ? new Date()
+              : undefined
+            : new Date(),
+      };
+
+      grade = await Grade.create(createPayload);
     }
 
     const populatedGrade = await Grade.findById(grade._id)

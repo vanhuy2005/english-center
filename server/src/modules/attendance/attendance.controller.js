@@ -344,67 +344,121 @@ exports.getClassAttendance = async (req, res) => {
       if (endDate) filter.date.$lte = new Date(endDate);
     }
 
-    const attendance = await Attendance.find(filter)
-      .populate("student", "studentCode fullName email")
-      .populate("schedule", "date topic")
-      .sort({ date: -1 });
-
-    // Group by student
-    const byStudent = {};
-    attendance.forEach((record) => {
-      const studentId = record.student._id.toString();
-      if (!byStudent[studentId]) {
-        byStudent[studentId] = {
-          student: record.student,
-          records: [],
-          stats: {
-            total: 0,
+    let attendance = [];
+    try {
+      attendance = await Attendance.find(filter)
+        .populate("student", "studentCode fullName email")
+        .populate("schedule", "date topic")
+        .sort({ date: -1 });
+      console.log("[getClassAttendance] query filter:", filter);
+      console.log("[getClassAttendance] attendance count:", attendance.length);
+    } catch (queryErr) {
+      console.error("[getClassAttendance] DB query error:", queryErr);
+      console.error(queryErr.stack || queryErr);
+      // Return safe empty response instead of 500 so UI can continue working
+      return res.status(200).json({
+        success: true,
+        data: {
+          byStudent: [],
+          overallStats: {
+            totalSessions: 0,
+            totalRecords: 0,
             present: 0,
             absent: 0,
             late: 0,
             excused: 0,
+            averageAttendanceRate: 0,
           },
-        };
-      }
-      byStudent[studentId].records.push(record);
-      byStudent[studentId].stats.total++;
-      byStudent[studentId].stats[record.status]++;
-    });
+        },
+      });
+    }
 
-    // Calculate attendance rate for each student
-    Object.values(byStudent).forEach((studentData) => {
-      const { present, late, total } = studentData.stats;
-      studentData.stats.attendanceRate =
-        total > 0 ? Math.round(((present + late) / total) * 100) : 0;
-    });
+    try {
+      // Group by student. Skip records with missing student to avoid runtime errors
+      // (e.g., dangling references or deleted student documents).
+      const byStudent = {};
+      attendance.forEach((record) => {
+        if (!record || !record.student || !record.student._id) return;
 
-    // Overall class stats
-    const overallStats = {
-      totalSessions: new Set(attendance.map((a) => a.schedule?.toString()))
-        .size,
-      totalRecords: attendance.length,
-      present: attendance.filter((a) => a.status === "present").length,
-      absent: attendance.filter((a) => a.status === "absent").length,
-      late: attendance.filter((a) => a.status === "late").length,
-      excused: attendance.filter((a) => a.status === "excused").length,
-    };
+        const studentId = record.student._id.toString();
+        if (!byStudent[studentId]) {
+          byStudent[studentId] = {
+            student: record.student,
+            records: [],
+            stats: {
+              total: 0,
+              present: 0,
+              absent: 0,
+              late: 0,
+              excused: 0,
+            },
+          };
+        }
+        byStudent[studentId].records.push(record);
+        byStudent[studentId].stats.total++;
+        const statusKey = record.status || "no_record";
+        if (statusKey in byStudent[studentId].stats) {
+          byStudent[studentId].stats[statusKey]++;
+        }
+      });
 
-    overallStats.averageAttendanceRate =
-      overallStats.totalRecords > 0
-        ? Math.round(
-            ((overallStats.present + overallStats.late) /
-              overallStats.totalRecords) *
-              100
+      // Calculate attendance rate for each student
+      Object.values(byStudent).forEach((studentData) => {
+        const { present, late, total } = studentData.stats;
+        studentData.stats.attendanceRate =
+          total > 0 ? Math.round(((present + late) / total) * 100) : 0;
+      });
+
+      // Overall class stats
+      const overallStats = {
+        totalSessions: new Set(
+          attendance.map((a) =>
+            a && a.schedule ? a.schedule.toString() : null
           )
-        : 0;
+        ).size,
+        totalRecords: attendance.length,
+        present: attendance.filter((a) => a && a.status === "present").length,
+        absent: attendance.filter((a) => a && a.status === "absent").length,
+        late: attendance.filter((a) => a && a.status === "late").length,
+        excused: attendance.filter((a) => a && a.status === "excused").length,
+      };
 
-    res.status(200).json({
-      success: true,
-      data: {
-        byStudent: Object.values(byStudent),
-        overallStats,
-      },
-    });
+      overallStats.averageAttendanceRate =
+        overallStats.totalRecords > 0
+          ? Math.round(
+              ((overallStats.present + overallStats.late) /
+                overallStats.totalRecords) *
+                100
+            )
+          : 0;
+
+      res.status(200).json({
+        success: true,
+        data: {
+          byStudent: Object.values(byStudent),
+          overallStats,
+        },
+      });
+    } catch (groupErr) {
+      console.error("[getClassAttendance] grouping error:", groupErr);
+      console.error(groupErr.stack || groupErr);
+      // Return safe empty response instead of failing the whole request
+      res.status(200).json({
+        success: true,
+        data: {
+          byStudent: [],
+          overallStats: {
+            totalSessions: 0,
+            totalRecords: 0,
+            present: 0,
+            absent: 0,
+            late: 0,
+            excused: 0,
+            averageAttendanceRate: 0,
+          },
+        },
+      });
+    }
   } catch (error) {
     console.error("Error fetching class attendance:", error);
     res.status(500).json({

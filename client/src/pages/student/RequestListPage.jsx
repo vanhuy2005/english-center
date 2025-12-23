@@ -21,7 +21,21 @@ const RequestListPage = () => {
       setLoading(true);
       setError(null);
       const response = await studentService.getMyRequests();
-      setRequests(response.data.data || []);
+
+      // `studentService.getMyRequests` may return either an array (data) or an axios response.
+      if (Array.isArray(response)) {
+        setRequests(response);
+      } else if (
+        response &&
+        response.data &&
+        Array.isArray(response.data.data)
+      ) {
+        setRequests(response.data.data);
+      } else if (response && Array.isArray(response.data)) {
+        setRequests(response.data);
+      } else {
+        setRequests([]);
+      }
     } catch (err) {
       console.error("Error fetching requests:", err);
       setError(

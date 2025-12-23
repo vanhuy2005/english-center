@@ -3,13 +3,13 @@ import api from "@config/api";
 export const classService = {
   // Get all classes
   getClasses: async (params) => {
-    const response = await api.get("/staff/enrollment/classes", { params });
+    const response = await api.get("/api/staff/enrollment/classes", { params });
     return response.data;
   },
 
   // Get class by ID
   getClassById: async (id) => {
-    const response = await api.get(`/classes/${id}`);
+    const response = await api.get(`/api/classes/${id}`);
     return response.data;
   },
 

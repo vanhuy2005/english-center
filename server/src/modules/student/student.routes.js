@@ -7,6 +7,9 @@ const studentController = require("./student.controller");
 router.use(auth);
 
 // ===== STUDENT SELF-SERVICE ROUTES =====
+// Get my enrolled classes with schedules
+router.get("/me/classes", studentController.getMyEnrolledClasses);
+
 // Get my courses
 router.get("/me/courses", studentController.getMyCourses);
 

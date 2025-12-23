@@ -1,14 +1,26 @@
 import { useState, useEffect } from "react";
-import { notificationService } from "../../services";
-import { Card, CardContent, CardHeader, CardTitle } from "@components/common";
-import { Badge } from "@components/common";
-import { Bell, CheckCircle, AlertCircle, Info, Calendar } from "lucide-react";
-import toast from "react-hot-toast";
+import { useNavigate } from "react-router-dom";
+import { Card, Loading } from "@components/common";
+import {
+  getNotifications,
+  markAsRead,
+  deleteNotification,
+} from "@services/notificationApi";
+import {
+  Bell,
+  ArrowLeft,
+  Trash2,
+  Check,
+  AlertCircle,
+  CheckCircle,
+  Info,
+} from "lucide-react";
 
 const NotificationsPage = () => {
-  const [notifications, setNotifications] = useState([]);
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState("all"); // all, unread, read
+  const [notifications, setNotifications] = useState([]);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     fetchNotifications();
@@ -17,195 +29,218 @@ const NotificationsPage = () => {
   const fetchNotifications = async () => {
     try {
       setLoading(true);
-      const response = await notificationService.getMyNotifications();
-      console.log("🔔 Notifications response:", response);
+      setError(null);
+      console.log("📥 Fetching notifications...");
 
-      // Handle both response formats: { data: [...] } or just [...]
-      let notificationsData = [];
-      if (response.data) {
-        if (Array.isArray(response.data)) {
-          notificationsData = response.data;
-        } else if (response.data.data && Array.isArray(response.data.data)) {
-          notificationsData = response.data.data;
-        } else if (
-          typeof response.data === "object" &&
-          !Array.isArray(response.data)
-        ) {
-          // Single notification returned as object, wrap in array
-          notificationsData = [response.data];
-        }
-      }
+      const data = await getNotifications();
+      console.log("✓ Notifications loaded:", data);
 
-      console.log("✅ Processed notifications:", notificationsData);
-      setNotifications(notificationsData);
-    } catch (error) {
-      console.error("❌ Error fetching notifications:", error);
-      toast.error("Không thể tải thông báo!");
-      setNotifications([]);
+      setNotifications(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("❌ Error fetching notifications:", err);
+      setError("Lỗi tải thông báo");
+      setNotifications(getMockNotifications());
     } finally {
       setLoading(false);
     }
   };
 
-  const markAsRead = async (id) => {
+  const getMockNotifications = () => [
+    {
+      _id: "notif_1",
+      title: "Chào mừng",
+      message: "Chào mừng bạn đến với trung tâm tiếng Anh",
+      type: "info",
+      isRead: false,
+      createdAt: new Date(),
+    },
+    {
+      _id: "notif_2",
+      title: "Lịch học",
+      message: "Lớp English A1 bắt đầu vào thứ Hai tuần tới",
+      type: "reminder",
+      isRead: false,
+      createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
+    },
+  ];
+
+  const handleMarkAsRead = async (notificationId) => {
     try {
-      await notificationService.markAsRead([id]);
+      await markAsRead(notificationId);
       setNotifications(
-        notifications.map((n) => (n._id === id ? { ...n, isRead: true } : n))
+        notifications.map((notif) =>
+          notif._id === notificationId ? { ...notif, isRead: true } : notif
+        )
       );
-      toast.success("Đã đánh dấu là đã đọc!");
-    } catch (error) {
-      toast.error("Không thể cập nhật!");
+    } catch (err) {
+      console.error("Error marking as read:", err);
     }
   };
 
-  const markAllAsRead = async () => {
+  const handleDelete = async (notificationId) => {
+    if (!window.confirm("Bạn có chắc chắn muốn xóa thông báo này?")) {
+      return;
+    }
+
     try {
-      await notificationService.markAllAsRead();
-      setNotifications(notifications.map((n) => ({ ...n, isRead: true })));
-      toast.success("Đã đánh dấu tất cả là đã đọc!");
-    } catch (error) {
-      toast.error("Không thể cập nhật!");
+      await deleteNotification(notificationId);
+      setNotifications(
+        notifications.filter((notif) => notif._id !== notificationId)
+      );
+    } catch (err) {
+      console.error("Error deleting notification:", err);
     }
   };
 
-  const getIcon = (type) => {
+  const getNotificationIcon = (type) => {
     switch (type) {
       case "success":
-        return <CheckCircle className="w-6 h-6 text-green-600" />;
+        return <CheckCircle size={20} className="text-green-600" />;
       case "warning":
-        return <AlertCircle className="w-6 h-6 text-yellow-600" />;
+        return <AlertCircle size={20} className="text-yellow-600" />;
       case "error":
-        return <AlertCircle className="w-6 h-6 text-red-600" />;
+        return <AlertCircle size={20} className="text-red-600" />;
+      case "info":
       default:
-        return <Info className="w-6 h-6 text-blue-600" />;
+        return <Info size={20} className="text-blue-600" />;
     }
   };
 
-  const filteredNotifications = notifications.filter((n) => {
-    if (filter === "unread") return !n.isRead;
-    if (filter === "read") return n.isRead;
-    return true;
-  });
+  const getNotificationColor = (type) => {
+    switch (type) {
+      case "success":
+        return "bg-green-50 border-l-4 border-l-green-600";
+      case "warning":
+        return "bg-yellow-50 border-l-4 border-l-yellow-600";
+      case "error":
+        return "bg-red-50 border-l-4 border-l-red-600";
+      case "info":
+      default:
+        return "bg-blue-50 border-l-4 border-l-blue-600";
+    }
+  };
+
+  if (loading) {
+    return <Loading />;
+  }
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Đang tải thông báo...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="p-8">
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
-        <div className="mb-4 md:mb-0">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Thông Báo</h1>
-          <p className="text-gray-600">
-            Bạn có {unreadCount} thông báo chưa đọc
-          </p>
+      <div className="bg-white border-b">
+        <div className="max-w-4xl mx-auto px-4 py-6">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => navigate("/student")}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              <ArrowLeft size={24} className="text-gray-600" />
+            </button>
+            <div className="flex-1">
+              <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
+                <Bell size={32} className="text-blue-600" />
+                Thông Báo
+              </h1>
+              <p className="text-gray-600 mt-1">
+                {unreadCount > 0
+                  ? `Bạn có ${unreadCount} thông báo chưa đọc`
+                  : "Bạn đã đọc hết thông báo"}
+              </p>
+            </div>
+          </div>
         </div>
-        {unreadCount > 0 && (
-          <button
-            onClick={markAllAsRead}
-            className="text-blue-600 hover:text-blue-700 font-medium"
-          >
-            Đánh dấu tất cả là đã đọc
-          </button>
-        )}
       </div>
 
-      {/* Filter Tabs */}
-      <div className="flex gap-2 mb-6 overflow-x-auto">
-        <button
-          onClick={() => setFilter("all")}
-          className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap ${
-            filter === "all"
-              ? "bg-blue-600 text-white"
-              : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-          }`}
-        >
-          Tất cả ({notifications.length})
-        </button>
-        <button
-          onClick={() => setFilter("unread")}
-          className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap ${
-            filter === "unread"
-              ? "bg-blue-600 text-white"
-              : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-          }`}
-        >
-          Chưa đọc ({unreadCount})
-        </button>
-        <button
-          onClick={() => setFilter("read")}
-          className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap ${
-            filter === "read"
-              ? "bg-blue-600 text-white"
-              : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-          }`}
-        >
-          Đã đọc ({notifications.length - unreadCount})
-        </button>
-      </div>
+      {/* Error Alert */}
+      {error && (
+        <div className="max-w-4xl mx-auto px-4 py-4">
+          <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <AlertCircle className="text-red-600" size={20} />
+            <p className="text-sm text-red-800">{error}</p>
+          </div>
+        </div>
+      )}
 
       {/* Notifications List */}
-      <div className="space-y-4">
-        {filteredNotifications.length === 0 ? (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-16">
-              <Bell className="w-16 h-16 text-gray-300 mb-4" />
-              <p className="text-gray-500 text-lg">Không có thông báo nào</p>
-            </CardContent>
-          </Card>
-        ) : (
-          filteredNotifications.map((notification) => (
-            <Card
-              key={notification._id}
-              className={`${
-                !notification.isRead
-                  ? "border-l-4 border-l-blue-600 bg-blue-50"
-                  : "hover:shadow-md"
-              } transition-shadow cursor-pointer`}
-              onClick={() =>
-                !notification.isRead && markAsRead(notification._id)
-              }
-            >
-              <CardContent className="p-6">
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        {notifications.length > 0 ? (
+          <div className="space-y-4">
+            {notifications.map((notification) => (
+              <Card
+                key={notification._id}
+                className={`${getNotificationColor(
+                  notification.type
+                )} p-4 hover:shadow-md transition-shadow`}
+              >
                 <div className="flex items-start gap-4">
                   {/* Icon */}
-                  <div className="flex-shrink-0">
-                    {getIcon(notification.type)}
+                  <div className="flex-shrink-0 pt-1">
+                    {getNotificationIcon(notification.type)}
                   </div>
 
                   {/* Content */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-4 mb-2">
-                      <h3 className="font-semibold text-gray-900 text-lg">
-                        {notification.title}
-                      </h3>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-gray-900">
+                          {notification.title}
+                        </h3>
+                        <p className="text-sm text-gray-700 mt-1">
+                          {notification.message}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-2">
+                          {new Date(notification.createdAt).toLocaleDateString(
+                            "vi-VN",
+                            {
+                              year: "numeric",
+                              month: "long",
+                              day: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            }
+                          )}
+                        </p>
+                      </div>
+
+                      {/* Status Badge */}
                       {!notification.isRead && (
-                        <Badge className="bg-red-500 hover:bg-red-600 flex-shrink-0">
+                        <span className="inline-block px-2 py-1 bg-blue-600 text-white text-xs rounded-full flex-shrink-0">
                           Mới
-                        </Badge>
+                        </span>
                       )}
                     </div>
-                    <p className="text-gray-700 mb-3">{notification.message}</p>
-                    <div className="flex items-center text-sm text-gray-500">
-                      <Calendar className="w-4 h-4 mr-1" />
-                      {new Date(notification.createdAt).toLocaleString("vi-VN")}
-                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex gap-2 flex-shrink-0">
+                    {!notification.isRead && (
+                      <button
+                        onClick={() => handleMarkAsRead(notification._id)}
+                        className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
+                        title="Đánh dấu đã đọc"
+                      >
+                        <Check size={18} className="text-gray-600" />
+                      </button>
+                    )}
+                    <button
+                      onClick={() => handleDelete(notification._id)}
+                      className="p-2 hover:bg-red-200 rounded-lg transition-colors"
+                      title="Xóa"
+                    >
+                      <Trash2 size={18} className="text-red-600" />
+                    </button>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          ))
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-12">
+            <Bell size={48} className="mx-auto text-gray-300 mb-4" />
+            <p className="text-gray-600 text-lg">Không có thông báo nào</p>
+          </div>
         )}
       </div>
     </div>

@@ -106,7 +106,7 @@ const gradeSchema = new mongoose.Schema(
     // Tracking
     gradedBy: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: "Staff",
     },
     gradedDate: {
       type: Date,
@@ -212,8 +212,33 @@ gradeSchema.index({ course: 1, status: 1 });
 
 // Static method to get student transcript
 gradeSchema.statics.getStudentTranscript = async function (studentId) {
+  const mongoose = require("mongoose");
+  const Student = require("./Student.model");
+
+  let resolvedId = studentId;
+
+  // If studentId is not a valid ObjectId, try resolving by studentCode
+  if (!mongoose.Types.ObjectId.isValid(studentId)) {
+    try {
+      const found = await Student.findOne({ studentCode: studentId }).select(
+        "_id"
+      );
+      if (found) resolvedId = found._id;
+      else {
+        // If not found by code, return empty
+        return [];
+      }
+    } catch (err) {
+      console.warn(
+        "getStudentTranscript: could not resolve studentId:",
+        err.message
+      );
+      return [];
+    }
+  }
+
   return this.find({
-    student: studentId,
+    student: resolvedId,
     isPublished: true,
   })
     .sort({ createdAt: -1 })

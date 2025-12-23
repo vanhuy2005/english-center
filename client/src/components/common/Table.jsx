@@ -84,28 +84,32 @@ export const Table = ({
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {data.map((row, rowIndex) => (
-              <tr
-                key={row._id || row.id || rowIndex}
-                onClick={() => onRowClick && onRowClick(row)}
-                className={clsx(
-                  striped && rowIndex % 2 === 0 && "bg-gray-50",
-                  hover && "hover:bg-gray-100 transition-colors",
-                  onRowClick && "cursor-pointer"
-                )}
-              >
-                {columns.map((column) => (
-                  <td
-                    key={column.key}
-                    className="px-6 py-4 whitespace-nowrap text-sm text-gray-900"
-                  >
-                    {column.render
-                      ? column.render(row[column.key], row, rowIndex)
-                      : row[column.key]}
-                  </td>
-                ))}
-              </tr>
-            ))}
+            {data.map((row, rowIndex) => {
+              const safeRow = row || {};
+              const rowKey = (row && (row._id || row.id)) || rowIndex;
+              return (
+                <tr
+                  key={rowKey}
+                  onClick={() => onRowClick && onRowClick(safeRow)}
+                  className={clsx(
+                    striped && rowIndex % 2 === 0 && "bg-gray-50",
+                    hover && "hover:bg-gray-100 transition-colors",
+                    onRowClick && "cursor-pointer"
+                  )}
+                >
+                  {columns.map((column) => (
+                    <td
+                      key={column.key}
+                      className="px-6 py-4 whitespace-nowrap text-sm text-gray-900"
+                    >
+                      {column.render
+                        ? column.render(safeRow[column.key], safeRow, rowIndex)
+                        : safeRow[column.key]}
+                    </td>
+                  ))}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

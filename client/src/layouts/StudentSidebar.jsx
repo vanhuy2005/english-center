@@ -84,7 +84,8 @@ export const StudentSidebar = ({ menuItems = [] }) => {
                   {user?.fullName || "Nguyễn Văn An"}
                 </p>
                 <p className="text-xs text-gray-500 truncate">
-                  Mã học viên: {user?.profile?.studentCode || "SV001"}
+                  Mã học viên:{" "}
+                  {user?.studentCode || user?.profile?.studentCode || "SV001"}
                 </p>
               </div>
             </div>

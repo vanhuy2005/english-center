@@ -45,12 +45,31 @@ const RequestHandlingPage = () => {
 
   const confirmAction = async () => {
     try {
-      await api.put(`/staff/academic/requests/${selectedRequest._id}`, {
-        status: action,
-      });
-      toast.success(
-        `Đã ${action === "approved" ? "phê duyệt" : "từ chối"} yêu cầu`
-      );
+      if (action === "approved") {
+        await api.put(
+          `/staff/academic/requests/${selectedRequest._id}/approve`,
+          {
+            note: "",
+          }
+        );
+        toast.success("Đã phê duyệt yêu cầu");
+      } else if (action === "rejected") {
+        const reason = window.prompt("Lý do từ chối yêu cầu (bắt buộc):");
+        if (!reason) {
+          toast.error("Vui lòng nhập lý do từ chối");
+          return;
+        }
+        await api.put(
+          `/staff/academic/requests/${selectedRequest._id}/reject`,
+          {
+            reason,
+            note: "",
+          }
+        );
+        toast.success("Đã từ chối yêu cầu");
+      } else {
+        throw new Error("Hành động không hợp lệ");
+      }
       setShowModal(false);
       fetchRequests();
     } catch (error) {

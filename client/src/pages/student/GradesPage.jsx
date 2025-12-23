@@ -1,26 +1,20 @@
 import { useState, useEffect } from "react";
-import { gradeService } from "../../services";
-import { DataGrid } from "@mui/x-data-grid";
+import { useNavigate } from "react-router-dom";
+import { Card, Loading } from "@components/common";
+import { getMyGrades } from "@services/gradesApi";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@components/common";
-import { Badge } from "@components/common";
-import { Trophy, TrendingUp, Award, BookOpen } from "lucide-react";
-import toast from "react-hot-toast";
+  BarChart3,
+  ArrowLeft,
+  AlertCircle,
+  TrendingUp,
+  CheckCircle,
+} from "lucide-react";
 
 const GradesPage = () => {
-  const [grades, setGrades] = useState([]);
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({
-    averageGrade: 0,
-    highestGrade: 0,
-    lowestGrade: 0,
-    totalCourses: 0,
-  });
+  const [grades, setGrades] = useState([]);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     fetchGrades();
@@ -29,303 +23,251 @@ const GradesPage = () => {
   const fetchGrades = async () => {
     try {
       setLoading(true);
-      const response = await gradeService.getMyGrades();
-      console.log("📊 Grades response:", response);
+      setError(null);
+      console.log("📥 Fetching grades...");
 
-      // Handle both response formats: { data: [...] } or just [...]
-      let gradesData = [];
-      if (response.data) {
-        if (Array.isArray(response.data)) {
-          gradesData = response.data;
-        } else if (response.data.data && Array.isArray(response.data.data)) {
-          gradesData = response.data.data;
-        } else if (
-          typeof response.data === "object" &&
-          !Array.isArray(response.data)
-        ) {
-          // Single grade returned as object, wrap in array
-          gradesData = [response.data];
-        }
-      }
+      const data = await getMyGrades();
+      console.log("✓ Grades loaded:", data);
 
-      console.log(
-        "✅ Processed grades:",
-        gradesData,
-        "Type:",
-        typeof gradesData
-      );
-      setGrades(gradesData);
-      calculateStats(gradesData);
-    } catch (error) {
-      console.error("❌ Error fetching grades:", error);
-      toast.error("Không thể tải điểm!");
-      setGrades([]);
+      setGrades(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("❌ Error fetching grades:", err);
+      setError("Lỗi tải điểm số");
+      setGrades(getMockGrades());
     } finally {
       setLoading(false);
     }
   };
 
-  const calculateStats = (gradesData) => {
-    if (gradesData.length === 0) {
-      setStats({
-        averageGrade: 0,
-        highestGrade: 0,
-        lowestGrade: 0,
-        totalCourses: 0,
-      });
-      return;
-    }
-
-    const grades = gradesData.map((g) => g.finalGrade || 0);
-    const sum = grades.reduce((a, b) => a + b, 0);
-    const avg = sum / grades.length;
-    const max = Math.max(...grades);
-    const min = Math.min(...grades);
-
-    setStats({
-      averageGrade: avg.toFixed(2),
-      highestGrade: max.toFixed(2),
-      lowestGrade: min.toFixed(2),
-      totalCourses: gradesData.length,
-    });
-  };
-
-  const getGradeColor = (grade) => {
-    if (grade >= 9) return "bg-green-100 text-green-800";
-    if (grade >= 8) return "bg-blue-100 text-blue-800";
-    if (grade >= 6.5) return "bg-yellow-100 text-yellow-800";
-    if (grade >= 5) return "bg-orange-100 text-orange-800";
-    return "bg-red-100 text-red-800";
-  };
-
-  const getGradeLabel = (grade) => {
-    if (grade >= 9) return "Xuất sắc";
-    if (grade >= 8) return "Giỏi";
-    if (grade >= 6.5) return "Khá";
-    if (grade >= 5) return "Trung bình";
-    return "Yếu";
-  };
-
-  const columns = [
+  const getMockGrades = () => [
     {
-      field: "courseName",
-      headerName: "Khóa học",
-      flex: 1,
-      minWidth: 200,
-      valueGetter: (params) => params.row.course?.name || "N/A",
-    },
-    {
-      field: "className",
-      headerName: "Lớp học",
-      flex: 1,
-      minWidth: 150,
-      valueGetter: (params) => params.row.class?.name || "N/A",
-    },
-    {
-      field: "midtermGrade",
-      headerName: "Điểm giữa kỳ",
-      width: 120,
-      align: "center",
-      headerAlign: "center",
-      renderCell: (params) => (
-        <span className="font-semibold">
-          {params.value !== null && params.value !== undefined
-            ? params.value.toFixed(1)
-            : "-"}
-        </span>
-      ),
-    },
-    {
-      field: "finalGrade",
-      headerName: "Điểm cuối kỳ",
-      width: 120,
-      align: "center",
-      headerAlign: "center",
-      renderCell: (params) => (
-        <span className="font-semibold">
-          {params.value !== null && params.value !== undefined
-            ? params.value.toFixed(1)
-            : "-"}
-        </span>
-      ),
-    },
-    {
-      field: "averageGrade",
-      headerName: "Điểm TB",
-      width: 120,
-      align: "center",
-      headerAlign: "center",
-      renderCell: (params) => {
-        const avg =
-          params.row.midtermGrade !== null &&
-          params.row.midtermGrade !== undefined &&
-          params.row.finalGrade !== null &&
-          params.row.finalGrade !== undefined
-            ? ((params.row.midtermGrade + params.row.finalGrade) / 2).toFixed(1)
-            : "-";
-        return <span className="font-bold text-blue-600">{avg}</span>;
+      _id: "grade_1",
+      course: {
+        _id: "course1",
+        name: "English A1",
+        code: "EN-A1",
       },
+      enrollment: "enrollment1",
+      midtermScore: 8.5,
+      finalScore: 8.0,
+      attendance: 85,
+      status: "completed",
+      letterGrade: "A",
     },
     {
-      field: "status",
-      headerName: "Xếp loại",
-      width: 150,
-      align: "center",
-      headerAlign: "center",
-      renderCell: (params) => {
-        const avg =
-          params.row.midtermGrade !== null &&
-          params.row.midtermGrade !== undefined &&
-          params.row.finalGrade !== null &&
-          params.row.finalGrade !== undefined
-            ? (params.row.midtermGrade + params.row.finalGrade) / 2
-            : 0;
-
-        if (avg === 0)
-          return <Badge className="bg-gray-100 text-gray-800">Chưa có</Badge>;
-
-        return (
-          <Badge className={getGradeColor(avg)}>{getGradeLabel(avg)}</Badge>
-        );
+      _id: "grade_2",
+      course: {
+        _id: "course2",
+        name: "English A2",
+        code: "EN-A2",
       },
-    },
-    {
-      field: "updatedAt",
-      headerName: "Cập nhật",
-      width: 150,
-      valueGetter: (params) =>
-        new Date(params.value).toLocaleDateString("vi-VN"),
+      enrollment: "enrollment2",
+      midtermScore: 7.5,
+      finalScore: null,
+      attendance: 90,
+      status: "in-progress",
+      letterGrade: null,
     },
   ];
 
+  const getLetterGradeColor = (letterGrade) => {
+    switch (letterGrade) {
+      case "A":
+        return "bg-green-100 text-green-700";
+      case "B":
+        return "bg-blue-100 text-blue-700";
+      case "C":
+        return "bg-yellow-100 text-yellow-700";
+      case "D":
+        return "bg-orange-100 text-orange-700";
+      case "F":
+        return "bg-red-100 text-red-700";
+      default:
+        return "bg-gray-100 text-gray-700";
+    }
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case "completed":
+        return "bg-green-50 border-l-4 border-l-green-600";
+      case "in-progress":
+        return "bg-blue-50 border-l-4 border-l-blue-600";
+      default:
+        return "bg-gray-50 border-l-4 border-l-gray-600";
+    }
+  };
+
+  const getStatusLabel = (status) => {
+    switch (status) {
+      case "completed":
+        return "Hoàn thành";
+      case "in-progress":
+        return "Đang học";
+      default:
+        return status;
+    }
+  };
+
+  if (loading) {
+    return <Loading />;
+  }
+
+  const completedGrades = grades.filter((g) => g.status === "completed");
+  const averageScore =
+    completedGrades.length > 0
+      ? (
+          completedGrades.reduce((sum, g) => sum + (g.finalScore || 0), 0) /
+          completedGrades.length
+        ).toFixed(1)
+      : 0;
+
   return (
-    <div className="p-8">
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Bảng Điểm</h1>
-        <p className="text-gray-600">Xem điểm số và xếp loại của bạn</p>
-      </div>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <Card className="border-t-4 border-t-blue-600">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-gray-600">
-              Điểm Trung Bình
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-3xl font-bold text-blue-600">
-                  {stats.averageGrade}
-                </p>
-                <p className="text-sm text-gray-500 mt-1">
-                  {getGradeLabel(parseFloat(stats.averageGrade))}
-                </p>
-              </div>
-              <TrendingUp className="w-10 h-10 text-blue-600 opacity-50" />
+      <div className="bg-white border-b">
+        <div className="max-w-4xl mx-auto px-4 py-6">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => navigate("/student")}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              <ArrowLeft size={24} className="text-gray-600" />
+            </button>
+            <div className="flex-1">
+              <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
+                <BarChart3 size={32} className="text-blue-600" />
+                Điểm Số
+              </h1>
+              <p className="text-gray-600 mt-1">Xem kết quả học tập của bạn</p>
             </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-t-4 border-t-green-600">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-gray-600">
-              Điểm Cao Nhất
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-3xl font-bold text-green-600">
-                  {stats.highestGrade}
-                </p>
-                <p className="text-sm text-gray-500 mt-1">
-                  {getGradeLabel(parseFloat(stats.highestGrade))}
-                </p>
-              </div>
-              <Trophy className="w-10 h-10 text-green-600 opacity-50" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-t-4 border-t-red-600">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-gray-600">
-              Điểm Thấp Nhất
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-3xl font-bold text-red-600">
-                  {stats.lowestGrade}
-                </p>
-                <p className="text-sm text-gray-500 mt-1">
-                  {getGradeLabel(parseFloat(stats.lowestGrade))}
-                </p>
-              </div>
-              <Award className="w-10 h-10 text-red-600 opacity-50" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-t-4 border-t-purple-600">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-gray-600">
-              Tổng Môn Học
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-3xl font-bold text-purple-600">
-                  {stats.totalCourses}
-                </p>
-                <p className="text-sm text-gray-500 mt-1">Khóa học</p>
-              </div>
-              <BookOpen className="w-10 h-10 text-purple-600 opacity-50" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Grades Table */}
-      <Card className="border-t-4 border-t-blue-600">
-        <CardHeader>
-          <CardTitle>Chi Tiết Điểm Số</CardTitle>
-          <CardDescription>
-            Danh sách điểm số của tất cả các khóa học
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div style={{ height: 500, width: "100%" }}>
-            <DataGrid
-              rows={grades}
-              columns={columns}
-              pageSize={10}
-              rowsPerPageOptions={[5, 10, 20]}
-              loading={loading}
-              disableSelectionOnClick
-              getRowId={(row) => row._id}
-              sx={{
-                border: 0,
-                "& .MuiDataGrid-cell:focus": {
-                  outline: "none",
-                },
-                "& .MuiDataGrid-row:hover": {
-                  backgroundColor: "#f3f4f6",
-                },
-                "& .MuiDataGrid-columnHeaders": {
-                  backgroundColor: "#f9fafb",
-                  fontWeight: "bold",
-                },
-              }}
-            />
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
+
+      {/* Error Alert */}
+      {error && (
+        <div className="max-w-4xl mx-auto px-4 py-4">
+          <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <AlertCircle className="text-red-600" size={20} />
+            <p className="text-sm text-red-800">{error}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Stats */}
+      <div className="max-w-4xl mx-auto px-4 py-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white">
+            <div>
+              <p className="text-blue-100 text-sm font-medium">Tổng Khóa Học</p>
+              <h3 className="text-3xl font-bold mt-2">{grades.length}</h3>
+            </div>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-green-500 to-green-600 text-white">
+            <div>
+              <p className="text-green-100 text-sm font-medium">Hoàn Thành</p>
+              <h3 className="text-3xl font-bold mt-2">
+                {completedGrades.length}
+              </h3>
+            </div>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-purple-500 to-purple-600 text-white">
+            <div>
+              <p className="text-purple-100 text-sm font-medium">
+                Điểm Trung Bình
+              </p>
+              <h3 className="text-3xl font-bold mt-2">{averageScore}</h3>
+            </div>
+          </Card>
+        </div>
+      </div>
+
+      {/* Grades List */}
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        {grades.length > 0 ? (
+          <div className="space-y-4">
+            {grades.map((grade) => (
+              <Card
+                key={grade._id}
+                className={`${getStatusColor(
+                  grade.status
+                )} p-4 hover:shadow-md transition-shadow`}
+              >
+                <div className="flex items-start justify-between gap-4">
+                  {/* Course Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-lg font-semibold text-gray-900">
+                        {grade.course?.name}
+                      </h3>
+                      <span className="text-sm text-gray-600">
+                        ({grade.course?.code})
+                      </span>
+                    </div>
+
+                    {/* Scores Grid */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-3">
+                      <div>
+                        <p className="text-xs text-gray-600">Giữa kỳ</p>
+                        <p className="text-lg font-bold text-gray-900">
+                          {grade.midtermScore?.toFixed(1) || "-"}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-600">Cuối kỳ</p>
+                        <p className="text-lg font-bold text-gray-900">
+                          {grade.finalScore?.toFixed(1) || "-"}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-600">Chuyên Cần</p>
+                        <p className="text-lg font-bold text-gray-900">
+                          {grade.attendance}%
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-600">Trạng Thái</p>
+                        <p className="text-sm font-bold text-gray-900">
+                          {getStatusLabel(grade.status)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Letter Grade Badge */}
+                  {grade.letterGrade ? (
+                    <div className="flex-shrink-0">
+                      <div
+                        className={`w-16 h-16 rounded-lg flex items-center justify-center ${getLetterGradeColor(
+                          grade.letterGrade
+                        )}`}
+                      >
+                        <span className="text-2xl font-bold">
+                          {grade.letterGrade}
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex-shrink-0">
+                      <div className="px-3 py-1 bg-yellow-100 text-yellow-700 text-sm rounded-full font-medium">
+                        Đang học
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-12">
+            <BarChart3 size={48} className="mx-auto text-gray-300 mb-4" />
+            <p className="text-gray-600 text-lg">Không có điểm số nào</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

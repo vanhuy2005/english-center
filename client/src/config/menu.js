@@ -184,10 +184,10 @@ export const studentMenu = [
     title: "TRA CỨU THÔNG TIN",
     items: [
       {
-        path: "/schedule",
-        label: "Lịch Học",
-        icon: "📅",
-        description: "Xem lịch học và thời khóa biểu",
+        path: "/timetable",
+        label: "Thời Khóa Biểu",
+        icon: "📋",
+        description: "Xem chi tiết thời khóa biểu từng ngày",
       },
       {
         path: "/tuition",
@@ -304,10 +304,22 @@ export const academicStaffMenu = [
         description: "Danh sách lớp đang quản lý",
       },
       {
+        path: "/academic/assign-classes",
+        label: "Sắp Xếp Lớp Học",
+        icon: "🗂️",
+        description: "Gán lớp cho học viên đã đăng ký",
+      },
+      {
         path: "/academic/schedule",
-        label: "Lịch Học và Phòng",
+        label: "Quản Lý Lịch Học",
         icon: "📅",
-        description: "Xem lịch học, lịch kiểm tra, lịch phòng",
+        description: "Sắp xếp lịch học, phòng, giáo viên",
+      },
+      {
+        path: "/academic/courses",
+        label: "Quản Lý Khóa Học",
+        icon: "📖",
+        description: "Thêm / Sửa / Xóa các khóa học",
       },
       {
         path: "/academic/students",
@@ -398,6 +410,12 @@ export const accountantMenu = [
         label: "Phiếu Thu",
         icon: "🧾",
         description: "Tra cứu phiếu thu học phí",
+      },
+      {
+        path: "/accountant/receipts/statistics",
+        label: "Thống Kê Phiếu Thu",
+        icon: "📊",
+        description: "Phân tích doanh thu từ phiếu thu",
       },
       {
         path: "/accountant/reports",

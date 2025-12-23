@@ -40,10 +40,16 @@ const classSchema = new mongoose.Schema(
       },
     ],
     capacity: {
-      type: Number,
-      required: [true, "Capacity is required"],
-      min: [1, "Capacity must be at least 1"],
-      default: 20,
+      max: {
+        type: Number,
+        required: [true, "Capacity is required"],
+        min: [1, "Capacity must be at least 1"],
+        default: 20,
+      },
+      current: {
+        type: Number,
+        default: 0,
+      },
     },
     room: {
       type: String,
@@ -141,17 +147,26 @@ classSchema.pre("save", async function (next) {
 
 // Virtual for current enrollment count
 classSchema.virtual("enrollmentCount").get(function () {
-  return this.students.filter((s) => s.status === "active").length;
+  const students = this.students || [];
+  return students.filter((s) => s && s.status === "active").length;
 });
 
-// Virtual for available seats
+// Virtual for available seats (uses capacity.max)
 classSchema.virtual("availableSeats").get(function () {
-  return this.capacity - this.enrollmentCount;
+  const max =
+    this.capacity && typeof this.capacity === "object"
+      ? this.capacity.max
+      : this.capacity || 0;
+  return max - this.enrollmentCount;
 });
 
 // Virtual for is full
 classSchema.virtual("isFull").get(function () {
-  return this.enrollmentCount >= this.capacity;
+  const max =
+    this.capacity && typeof this.capacity === "object"
+      ? this.capacity.max
+      : this.capacity || 0;
+  return this.enrollmentCount >= max;
 });
 
 // Method to check if class can accept new student

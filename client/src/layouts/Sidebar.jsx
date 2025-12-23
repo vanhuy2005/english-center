@@ -16,9 +16,18 @@ export const Sidebar = ({ menuItems = [], collapsed = false, onToggle }) => {
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
 
   const isActive = (path) => {
-    return (
-      location.pathname === path || location.pathname.startsWith(path + "/")
+    const normalize = (p) => (p || "").replace(/\/?$/, "");
+    const current = normalize(location.pathname);
+    const target = normalize(path);
+
+    if (current === target) return true;
+
+    const exactMatchExists = menuItems.some((section) =>
+      section.items.some((i) => normalize(i.path) === current)
     );
+    if (exactMatchExists) return false;
+
+    return current.startsWith(target + "/");
   };
 
   const handleLogout = () => {

@@ -30,5 +30,7 @@ router.get("/students/:id", academicController.getStudentDetail);
 
 // Reports
 router.get("/reports/class/:classId", academicController.getClassReport);
+// Statistics
+router.get("/statistics", academicController.getStatistics);
 
 module.exports = router;

@@ -58,7 +58,7 @@ const ClassTrackingPage = () => {
 
   const fetchCourses = async () => {
     try {
-      const response = await api.get("/courses");
+      const response = await api.get("/api/courses");
       setCourses(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.error("Error fetching courses:", error);

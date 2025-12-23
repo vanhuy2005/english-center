@@ -37,6 +37,8 @@ const RequestManagementPage = () => {
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [processAction, setProcessAction] = useState("");
   const [processNote, setProcessNote] = useState("");
+  const [availableClasses, setAvailableClasses] = useState([]);
+  const [selectedClassId, setSelectedClassId] = useState("");
 
   useEffect(() => {
     fetchRequests();
@@ -83,6 +85,7 @@ const RequestManagementPage = () => {
   const handleProcessClick = (request, action) => {
     setSelectedRequest(request);
     setProcessAction(action);
+    setSelectedClassId("");
     setShowProcessModal(true);
   };
 
@@ -91,12 +94,18 @@ const RequestManagementPage = () => {
 
     try {
       setLoading(true);
+      const body = { action: processAction, note: processNote };
+      if (
+        processAction === "approve" &&
+        selectedRequest?.type === "course_enrollment" &&
+        selectedClassId
+      ) {
+        body.classId = selectedClassId;
+      }
+
       const response = await api.put(
         `/staff/enrollment/requests/${selectedRequest._id}`,
-        {
-          action: processAction,
-          note: processNote,
-        }
+        body
       );
 
       if (response.data.success) {
@@ -109,6 +118,8 @@ const RequestManagementPage = () => {
         setSelectedRequest(null);
         setProcessAction("");
         setProcessNote("");
+        setAvailableClasses([]);
+        setSelectedClassId("");
         fetchRequests();
       }
     } catch (error) {
@@ -118,6 +129,34 @@ const RequestManagementPage = () => {
       setLoading(false);
     }
   };
+
+  // Fetch classes for assignment when processing enrollment requests
+  useEffect(() => {
+    const fetchClassesIfNeeded = async () => {
+      if (
+        showProcessModal &&
+        selectedRequest &&
+        selectedRequest.type === "course_enrollment"
+      ) {
+        try {
+          const res = await api.get("/staff/enrollment/classes", {
+            params: {
+              // Use 'ongoing' (server uses 'ongoing' not 'active')
+              status: "upcoming,ongoing",
+              course: selectedRequest.course?._id,
+            },
+          });
+          const classList =
+            res.data?.data?.classes || res.data?.data || res.data || [];
+          setAvailableClasses(Array.isArray(classList) ? classList : []);
+        } catch (err) {
+          console.error("Error fetching classes for request processing:", err);
+          setAvailableClasses([]);
+        }
+      }
+    };
+    fetchClassesIfNeeded();
+  }, [showProcessModal, selectedRequest]);
 
   const getTypeLabel = (type) => {
     const labels = {
@@ -465,6 +504,33 @@ const RequestManagementPage = () => {
                 {selectedRequest.reason || "Không có"}
               </p>
             </div>
+
+            {/* Class selector for course enrollment requests */}
+            {processAction === "approve" &&
+              selectedRequest.type === "course_enrollment" && (
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    Gán lớp cho học viên (tùy chọn)
+                  </label>
+                  <select
+                    className="w-full px-3 py-2 border rounded-lg"
+                    value={selectedClassId}
+                    onChange={(e) => setSelectedClassId(e.target.value)}
+                  >
+                    <option value="">-- Chọn lớp --</option>
+                    {availableClasses.map((c) => {
+                      const cap = c.capacity?.max ?? c.capacity ?? 0;
+                      const enrolled =
+                        c.currentEnrollment ?? c.students?.length ?? 0;
+                      return (
+                        <option key={c._id} value={c._id}>
+                          {c.name} ({enrolled}/{cap})
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+              )}
 
             {/* Note */}
             <div>

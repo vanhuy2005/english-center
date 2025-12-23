@@ -9,12 +9,17 @@ const scheduleSchema = new mongoose.Schema(
     class: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Class",
-      required: [true, "Class is required"],
+      // optional for student-specific sessions
     },
     teacher: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Teacher",
-      required: [true, "Teacher is required"],
+      ref: "Staff",
+      // optional for student-specific sessions
+    },
+    // Optional student-specific session
+    student: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Student",
     },
     date: {
       type: Date,
@@ -118,6 +123,7 @@ scheduleSchema.pre("validate", function (next) {
 // Indexes
 scheduleSchema.index({ class: 1, date: 1 });
 scheduleSchema.index({ teacher: 1, date: 1 });
+scheduleSchema.index({ student: 1, date: 1 });
 scheduleSchema.index({ date: 1, status: 1 });
 scheduleSchema.index({ room: 1, date: 1, startTime: 1 });
 

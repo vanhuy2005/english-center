@@ -118,7 +118,8 @@ const MyClassesPage = () => {
                     <span>
                       {classItem.students?.filter((s) => s.status === "active")
                         .length || 0}{" "}
-                      / {classItem.capacity} học viên
+                      / {classItem.capacity?.max ?? classItem.capacity ?? 0} học
+                      viên
                     </span>
                   </div>
                   <div className="flex items-center text-gray-600">

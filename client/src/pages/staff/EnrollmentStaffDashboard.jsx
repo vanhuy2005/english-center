@@ -849,7 +849,7 @@ const EnrollmentModal = ({ isOpen, onClose, student, onSuccess }) => {
   const fetchAvailableClasses = async () => {
     try {
       const response = await api.get("/staff/enrollment/classes", {
-        params: { status: "upcoming,active" },
+        params: { status: "upcoming,ongoing" },
       });
 
       console.log("📚 Enrollment Modal - Classes response:", response.data);

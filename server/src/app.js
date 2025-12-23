@@ -79,6 +79,9 @@ const academicRoutes = require("./modules/staff/academic/academic.routes");
 const accountantRoutes = require("./modules/staff/accountant/accountant.routes");
 const courseRoutes = require("./modules/course/course.routes");
 const studentRoutes = require("./modules/student/student.routes");
+const teacherRoutes = require("./modules/teacher/teacher.routes");
+const teacherController = require("./modules/teacher/teacher.controller");
+const directorController = require("./modules/director/director.controller");
 
 // Register routes
 app.use("/api/auth", authRoutes);
@@ -87,6 +90,36 @@ app.use("/api/staff/academic", academicRoutes);
 app.use("/api/staff/accountant", accountantRoutes);
 app.use("/api/courses", courseRoutes);
 app.use("/api/students", studentRoutes);
+// In development allow a public GET /api/teachers to avoid 403 during UI development
+if (process.env.NODE_ENV === "development") {
+  app.get("/api/teachers", (req, res, next) => {
+    // Delegate to controller directly (no auth)
+    return teacherController.getAll(req, res, next);
+  });
+}
+app.use("/api/teachers", teacherRoutes);
+// Also provide non-/api aliases used by the client (development convenience)
+app.use("/teachers", teacherRoutes);
+
+// Expose report endpoints at /reports/* matching client calls
+app.get("/reports/revenue-chart", directorController.getRevenueChart);
+app.get("/reports/attendance-chart", directorController.getAttendanceChart);
+app.get(
+  "/reports/student-distribution",
+  directorController.getStudentDistribution
+);
+app.get("/reports/recent-activities", directorController.getRecentActivities);
+// Also expose the same report endpoints under /api/reports for clients that include /api prefix
+app.get("/api/reports/revenue-chart", directorController.getRevenueChart);
+app.get("/api/reports/attendance-chart", directorController.getAttendanceChart);
+app.get(
+  "/api/reports/student-distribution",
+  directorController.getStudentDistribution
+);
+app.get(
+  "/api/reports/recent-activities",
+  directorController.getRecentActivities
+);
 app.use("/api/classes", require("./modules/class/class.routes"));
 app.use("/api/schedules", require("./modules/schedule/schedule.routes"));
 app.use("/api/attendance", require("./modules/attendance/attendance.routes"));
@@ -111,6 +144,9 @@ app.use(
   require("./modules/staff/academic/request.routes")
 );
 app.use("/api/receipts", require("../routes/receipts"));
+// Mount legacy/student enrollment routes (development convenience)
+// Mount student request routes (handles course-enrollment requests and student requests)
+app.use("/api/student", require("./modules/student/request.routes"));
 
 // 404 Handler
 app.use((req, res) => {

@@ -76,11 +76,11 @@ const DirectorDashboard = () => {
       ]);
 
       // Helper để lấy data từ Promise.allSettled với mock data fallback
+      // Return axios response.data when fulfilled, otherwise return provided mock
       const getData = (result, mockData = {}) => {
         if (result.status === "fulfilled") {
-          return result.value;
+          return result.value.data;
         }
-        // Return mock data nếu API fails
         console.warn("API call failed, using mock data");
         return mockData;
       };
@@ -89,11 +89,9 @@ const DirectorDashboard = () => {
       const teachers = getData(teachersRes, { pagination: { total: 24 } });
       const courses = getData(coursesRes, { pagination: { total: 12 } });
       const finance = getData(financeRes, {
-        data: {
-          totalRevenue: 450000000,
-          newStudentsThisMonth: 23,
-          revenueGrowth: 12.5,
-        },
+        totalRevenue: 450000000,
+        newStudentsThisMonth: 23,
+        revenueGrowth: 12.5,
       });
       const revenueChart = getData(revenueChartRes, {
         data: [
@@ -196,7 +194,9 @@ const DirectorDashboard = () => {
       setRevenueData(revenueChart.data || []);
       setAttendanceData(attendanceChart.data || []);
       setStudentDistribution(distribution.data || []);
-      setRecentActivities(activities.data || []);
+      setRecentActivities(
+        Array.isArray(activities.data) ? activities.data : activities || []
+      );
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
       // Không set error để vẫn hiển thị mock data

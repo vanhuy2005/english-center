@@ -8,7 +8,8 @@ export { default as CardTitle } from "./CardTitle";
 export { default as Input } from "./Input";
 export { default as Loading } from "./Loading";
 export { default as Badge } from "./Badge";
-export { default as Select } from "./Select";
+// Use the Select implementation from Form which accepts an `options` prop
+export { Select } from "./Form";
 export { default as Modal } from "./Modal";
 export { default as Table } from "./Table";
 export { default as Progress } from "./Progress";

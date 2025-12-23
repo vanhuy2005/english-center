@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, Button, Loading, Input } from "@components/common";
-import { requestService, classService } from "@services";
+import { requestService, classService, studentService } from "@services";
 import toast from "react-hot-toast";
 import { useAuth, useLanguage } from "@hooks";
 import {
@@ -33,16 +33,40 @@ const RequestFormPage = () => {
   });
 
   useEffect(() => {
-    // Fetch student's classes (would need API endpoint)
-    // For now, using mock data
     fetchStudentClasses();
   }, []);
 
   const fetchStudentClasses = async () => {
     try {
-      // TODO: Implement API to get student's enrolled classes
-      // const res = await classService.getByStudent(user.id);
-      // setClasses(res.data || []);
+      // Load enrolled classes from API
+      try {
+        const courses = await studentService.getMyCourses();
+
+        // `getMyCourses` may return either an array or an axios response
+        const data = Array.isArray(courses)
+          ? courses
+          : courses?.data || courses?.data?.data || [];
+
+        const mapped = (data || []).map((cls) => ({
+          _id: cls._id || cls.id,
+          className:
+            cls.className || cls.name || cls.courseName || cls.className,
+          classCode:
+            cls.classCode || cls.code || cls.courseCode || cls.classCode || "",
+        }));
+
+        if (mapped.length) {
+          setClasses(mapped);
+          return;
+        }
+      } catch (err) {
+        console.warn(
+          "Failed to load classes from API, falling back to mock",
+          err
+        );
+      }
+
+      // Fallback mock classes for development
       setClasses([
         { _id: "1", className: "English Basic A1", classCode: "EB-A1-001" },
         { _id: "2", className: "IELTS 6.5", classCode: "IELTS-65-002" },
@@ -88,30 +112,70 @@ const RequestFormPage = () => {
 
     try {
       setSubmitting(true);
+      console.log("📤 Submitting request:", formData);
+
+      // Build payload matching server expectations
+      const studentId = user?._id || user?.id || user?.studentId || null;
+
+      const isValidObjectId = (id) => /^[a-fA-F0-9]{24}$/.test(String(id));
 
       const payload = {
-        student: user._id,
+        student: studentId,
         type: formData.type,
-        startDate: formData.date,
         reason: formData.reason,
+        documents: [],
+        priority: "normal",
       };
 
-      // Only add class if it exists and is not empty/mock
-      if (
-        formData.classId &&
-        formData.classId !== "1" &&
-        formData.classId !== "2"
-      ) {
+      // Only include `class` when it looks like a valid ObjectId
+      if (formData.classId && isValidObjectId(formData.classId)) {
         payload.class = formData.classId;
+      } else if (formData.classId) {
+        console.warn(
+          "Omitting invalid classId from payload:",
+          formData.classId
+        );
       }
 
-      await requestService.create(payload);
+      if (formData.type === "leave" || formData.type === "makeup") {
+        payload.startDate = formData.date;
+      }
 
-      toast.success("Đã gửi yêu cầu thành công!");
-      navigate("/requests");
+      if (formData.note && formData.note.trim())
+        payload.documents = [{ name: "note", url: formData.note }];
+
+      console.log("📨 Payload to send (server-style):", payload);
+
+      // Use student-scoped endpoint which uses authenticated user
+      const response = await studentService.createRequest(payload);
+      console.log("✓ Response:", response);
+
+      if (response.data?.success || response.success) {
+        toast.success("Đã gửi yêu cầu thành công!");
+        setTimeout(() => {
+          navigate("/requests");
+        }, 500);
+      } else {
+        throw new Error(response.data?.message || "Không thể gửi yêu cầu");
+      }
     } catch (error) {
-      console.error("Error submitting request:", error);
-      toast.error(error.response?.data?.message || "Không thể gửi yêu cầu");
+      console.error("❌ Error submitting request:", error);
+
+      let errorMsg = "Không thể gửi yêu cầu";
+
+      if (error.response?.status === 400) {
+        errorMsg =
+          error.response?.data?.message ||
+          "Dữ liệu không hợp lệ. Vui lòng kiểm tra lại.";
+      } else if (error.response?.status === 401) {
+        errorMsg = "Phiên đăng nhập đã hết. Vui lòng đăng nhập lại.";
+      } else if (error.response?.status === 500) {
+        errorMsg = "Lỗi server. Vui lòng thử lại sau.";
+      } else if (error.message === "Network Error") {
+        errorMsg = "Lỗi kết nối. Vui lòng kiểm tra internet.";
+      }
+
+      toast.error(errorMsg);
     } finally {
       setSubmitting(false);
     }
@@ -132,7 +196,7 @@ const RequestFormPage = () => {
       icon: PauseCircle,
       color: "orange",
     },
-    { value: "other", label: "Khác", icon: FileText, color: "gray" },
+    { value: "withdrawal", label: "Khác", icon: FileText, color: "gray" },
   ];
 
   return (

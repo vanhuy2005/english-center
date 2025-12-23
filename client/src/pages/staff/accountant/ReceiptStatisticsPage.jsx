@@ -148,7 +148,64 @@ const ReceiptStatisticsPage = () => {
   };
 
   const handleExport = () => {
-    message.info("Chức năng xuất báo cáo sẽ được cập nhật sớm");
+    try {
+      // Build CSV content with multiple sections: Summary, ByMethod, Daily
+      const lines = [];
+      lines.push(["Section", "Key", "Value"].join(","));
+
+      // Summary
+      lines.push(["Summary", "totalAmount", stats.totalAmount || 0].join(","));
+      lines.push(
+        ["Summary", "totalReceipts", stats.totalReceipts || 0].join(",")
+      );
+      lines.push(["Summary", "averageAmount", averageAmount].join(","));
+      lines.push([]);
+
+      // By Method
+      lines.push(["ByMethod", "method", "count", "total"].join(","));
+      (detailedData || []).forEach((m) => {
+        lines.push(
+          [
+            "ByMethod",
+            m.name || m.originalMethod || "",
+            m.count || 0,
+            m.value || 0,
+          ].join(",")
+        );
+      });
+      lines.push([]);
+
+      // Daily data
+      lines.push(["Daily", "date", "receipts", "amount"].join(","));
+      (dailyData || []).forEach((d) => {
+        lines.push(
+          [
+            "Daily",
+            d.fullDate || d.date || "",
+            d.receipts || 0,
+            d.amount || 0,
+          ].join(",")
+        );
+      });
+
+      const csvContent = lines
+        .map((l) => (Array.isArray(l) ? l.join(",") : l))
+        .join("\n");
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const now = dayjs().format("YYYYMMDD_HHmmss");
+      a.href = url;
+      a.download = `receipt_statistics_${now}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      message.success("Đã tải xuống báo cáo");
+    } catch (err) {
+      console.error("Export error:", err);
+      message.error("Xuất báo cáo thất bại");
+    }
   };
 
   const averageAmount =

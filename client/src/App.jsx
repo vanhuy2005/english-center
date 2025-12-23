@@ -34,11 +34,15 @@ import {
   ClassReportsPage,
   AcademicStatisticsPage,
 } from "@pages/staff/academic";
+import ClassSchedulePage from "@pages/staff/academic/ClassSchedulePage";
+import CourseManagementPage from "@pages/staff/academic/CourseManagementPage";
+import AssignClassesPage from "@pages/staff/academic/AssignClassesPage";
 
 // Student Pages
 import ProfilePage from "@pages/student/ProfilePage";
 import NotificationsPage from "@pages/student/NotificationsPage";
 import SchedulePage from "@pages/student/SchedulePage";
+import StudentTimetablePage from "@pages/student/StudentTimetablePage";
 import GradesPage from "@pages/student/GradesPage";
 import TuitionPage from "@pages/student/TuitionPage";
 import MyCoursesPage from "@pages/student/MyCoursesPage";
@@ -71,6 +75,7 @@ import {
   UpdateTuitionPage,
   RefundTuitionPage,
   CreateReceiptPage,
+  ReceiptStatisticsPage,
 } from "./pages/staff/accountant";
 
 import { AcademicStaffDashboardPage } from "./pages/staff/academic";
@@ -254,6 +259,14 @@ function App() {
           }
         />
         <Route
+          path="/timetable"
+          element={
+            <ProtectedRoute allowedRoles={["student"]}>
+              <StudentTimetablePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/grades"
           element={
             <ProtectedRoute allowedRoles={["student"]}>
@@ -312,10 +325,18 @@ function App() {
           }
         />
         <Route
+          path="/academic/courses"
+          element={
+            <ProtectedRoute allowedRoles={["academic", "director"]}>
+              <CourseManagementPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/academic/schedule"
           element={
             <ProtectedRoute allowedRoles={["academic", "director"]}>
-              <SchedulePage />
+              <ClassSchedulePage />
             </ProtectedRoute>
           }
         />
@@ -340,6 +361,14 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={["academic", "director"]}>
               <StudentProgressPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/academic/assign-classes"
+          element={
+            <ProtectedRoute allowedRoles={["academic", "director"]}>
+              <AssignClassesPage />
             </ProtectedRoute>
           }
         />
@@ -498,6 +527,14 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={["accountant", "director"]}>
               <ReceiptManagementPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/accountant/receipts/statistics"
+          element={
+            <ProtectedRoute allowedRoles={["accountant", "director"]}>
+              <ReceiptStatisticsPage />
             </ProtectedRoute>
           }
         />

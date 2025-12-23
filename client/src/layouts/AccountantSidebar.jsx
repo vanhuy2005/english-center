@@ -32,15 +32,19 @@ export const AccountantSidebar = ({ menuItems = [] }) => {
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
 
   const isActive = (path) => {
-    if (location.pathname === path) return true;
-    if (
-      path !== "/" &&
-      path !== "" &&
-      location.pathname.startsWith(path + "/")
-    ) {
-      return true;
-    }
-    return false;
+    const normalize = (p) => (p || "").replace(/\/?$/, "");
+    const current = normalize(location.pathname);
+    const target = normalize(path);
+
+    if (current === target) return true;
+
+    const exactMatchExists = menuItems.some((section) =>
+      section.items.some((i) => normalize(i.path) === current)
+    );
+    if (exactMatchExists) return false;
+
+    if (target === "" || target === "/") return false;
+    return current.startsWith(target + "/");
   };
 
   const handleLogout = () => {

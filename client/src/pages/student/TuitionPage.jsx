@@ -1,45 +1,21 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { financeService } from "../../services";
-import { DataGrid } from "@mui/x-data-grid";
+import { Card, Loading } from "@components/common";
+import { getMyPayments } from "@services/paymentApi";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@components/common";
-import { Badge } from "@components/common";
-import {
-  DollarSign,
+  CreditCard,
+  ArrowLeft,
+  AlertCircle,
   CheckCircle,
-  XCircle,
   Clock,
-  TrendingDown,
-  PieChart as PieChartIcon,
+  XCircle,
 } from "lucide-react";
-import {
-  PieChart,
-  Pie,
-  Cell,
-  ResponsiveContainer,
-  Legend,
-  Tooltip,
-} from "recharts";
-import toast from "react-hot-toast";
 
 const TuitionPage = () => {
   const navigate = useNavigate();
-  const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [selectedPayment, setSelectedPayment] = useState(null);
-  const [stats, setStats] = useState({
-    totalPaid: 0,
-    totalPending: 0,
-    totalOverdue: 0,
-    totalPayments: 0,
-  });
+  const [payments, setPayments] = useState([]);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     fetchPayments();
@@ -48,73 +24,74 @@ const TuitionPage = () => {
   const fetchPayments = async () => {
     try {
       setLoading(true);
-      const response = await financeService.getMyPayments();
-      console.log("💰 Payments response:", response);
+      setError(null);
+      console.log("📥 Fetching payments...");
 
-      // Handle both response formats: { data: [...] } or just [...]
-      let paymentsData = [];
-      if (response.data) {
-        if (Array.isArray(response.data)) {
-          paymentsData = response.data;
-        } else if (response.data.data && Array.isArray(response.data.data)) {
-          paymentsData = response.data.data;
-        } else if (
-          typeof response.data === "object" &&
-          !Array.isArray(response.data)
-        ) {
-          // Single payment returned as object, wrap in array
-          paymentsData = [response.data];
-        }
-      }
+      const data = await getMyPayments();
+      console.log("✓ Payments loaded:", data);
 
-      console.log(
-        "✅ Processed payments:",
-        paymentsData,
-        "Type:",
-        typeof paymentsData
-      );
-      setPayments(paymentsData);
-      calculateStats(paymentsData);
-    } catch (error) {
-      console.error("❌ Error fetching payments:", error);
-      toast.error("Không thể tải lịch sử thanh toán!");
-      setPayments([]);
+      setPayments(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("❌ Error fetching payments:", err);
+      setError("Lỗi tải thông tin thanh toán");
+      setPayments(getMockPayments());
     } finally {
       setLoading(false);
     }
   };
 
-  const calculateStats = (paymentsData) => {
-    const paid = paymentsData
-      .filter((p) => p.status === "paid")
-      .reduce((sum, p) => sum + (p.amount || 0), 0);
+  const getMockPayments = () => [
+    {
+      _id: "payment_1",
+      course: {
+        _id: "course1",
+        name: "English A1",
+        code: "EN-A1",
+      },
+      amount: 3500000,
+      status: "paid",
+      paymentDate: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
+      dueDate: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
+      paymentMethod: "bank_transfer",
+      transactionId: "TXN20241201001",
+    },
+    {
+      _id: "payment_2",
+      course: {
+        _id: "course2",
+        name: "English A2",
+        code: "EN-A2",
+      },
+      amount: 3500000,
+      status: "pending",
+      paymentDate: null,
+      dueDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
+    },
+  ];
 
-    const pending = paymentsData
-      .filter((p) => p.status === "pending")
-      .reduce((sum, p) => sum + (p.amount || 0), 0);
-
-    const overdue = paymentsData
-      .filter((p) => p.status === "overdue")
-      .reduce((sum, p) => sum + (p.amount || 0), 0);
-
-    setStats({
-      totalPaid: paid,
-      totalPending: pending,
-      totalOverdue: overdue,
-      totalPayments: paymentsData.length,
-    });
+  const getStatusIcon = (status) => {
+    switch (status) {
+      case "paid":
+        return <CheckCircle size={20} className="text-green-600" />;
+      case "pending":
+        return <Clock size={20} className="text-yellow-600" />;
+      case "overdue":
+        return <XCircle size={20} className="text-red-600" />;
+      default:
+        return <AlertCircle size={20} className="text-gray-600" />;
+    }
   };
 
   const getStatusColor = (status) => {
     switch (status) {
       case "paid":
-        return "bg-green-100 text-green-800";
+        return "bg-green-50 border-l-4 border-l-green-600";
       case "pending":
-        return "bg-yellow-100 text-yellow-800";
+        return "bg-yellow-50 border-l-4 border-l-yellow-600";
       case "overdue":
-        return "bg-red-100 text-red-800";
+        return "bg-red-50 border-l-4 border-l-red-600";
       default:
-        return "bg-gray-100 text-gray-800";
+        return "bg-gray-50 border-l-4 border-l-gray-600";
     }
   };
 
@@ -127,402 +104,197 @@ const TuitionPage = () => {
       case "overdue":
         return "Quá hạn";
       default:
-        return "Không xác định";
+        return status;
     }
   };
 
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat("vi-VN", {
-      style: "currency",
-      currency: "VND",
-    }).format(amount);
-  };
+  if (loading) {
+    return <Loading />;
+  }
 
-  const columns = [
-    {
-      field: "courseName",
-      headerName: "Khóa học",
-      flex: 1,
-      minWidth: 200,
-      valueGetter: (params) => params.row.course?.name || "N/A",
-    },
-    {
-      field: "amount",
-      headerName: "Số tiền",
-      width: 150,
-      align: "right",
-      headerAlign: "right",
-      renderCell: (params) => (
-        <span className="font-semibold text-blue-600">
-          {formatCurrency(params.value || 0)}
-        </span>
-      ),
-    },
-    {
-      field: "dueDate",
-      headerName: "Hạn thanh toán",
-      width: 150,
-      valueGetter: (params) =>
-        params.value ? new Date(params.value).toLocaleDateString("vi-VN") : "-",
-    },
-    {
-      field: "paidDate",
-      headerName: "Ngày thanh toán",
-      width: 150,
-      valueGetter: (params) =>
-        params.value ? new Date(params.value).toLocaleDateString("vi-VN") : "-",
-    },
-    {
-      field: "status",
-      headerName: "Trạng thái",
-      width: 150,
-      align: "center",
-      headerAlign: "center",
-      renderCell: (params) => (
-        <Badge className={getStatusColor(params.value)}>
-          {getStatusLabel(params.value)}
-        </Badge>
-      ),
-    },
-    {
-      field: "paymentMethod",
-      headerName: "Phương thức",
-      width: 150,
-      valueGetter: (params) => {
-        switch (params.value) {
-          case "cash":
-            return "Tiền mặt";
-          case "bank_transfer":
-            return "Chuyển khoản";
-          case "credit_card":
-            return "Thẻ tín dụng";
-          default:
-            return "-";
-        }
-      },
-    },
-  ];
-
-  // Prepare pie chart data
-  const pieChartData = [
-    { name: "Đã thanh toán", value: stats.totalPaid, color: "#10b981" },
-    { name: "Chờ thanh toán", value: stats.totalPending, color: "#f59e0b" },
-    { name: "Quá hạn", value: stats.totalOverdue, color: "#ef4444" },
-  ].filter((item) => item.value > 0);
+  const totalTuition = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
+  const paidAmount = payments
+    .filter((p) => p.status === "paid")
+    .reduce((sum, p) => sum + (p.amount || 0), 0);
+  const pendingAmount = payments
+    .filter((p) => p.status === "pending" || p.status === "overdue")
+    .reduce((sum, p) => sum + (p.amount || 0), 0);
 
   return (
-    <div className="p-8">
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="mb-8 flex items-center justify-between">
-        <div>
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">
-            Lịch Sử Thanh Toán
-          </h1>
-          <p className="text-lg text-gray-600">
-            Danh sách chi tiết các khoản thanh toán
-          </p>
+      <div className="bg-white border-b">
+        <div className="max-w-4xl mx-auto px-4 py-6">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => navigate("/student")}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              <ArrowLeft size={24} className="text-gray-600" />
+            </button>
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
+                <CreditCard size={32} className="text-blue-600" />
+                Học Phí
+              </h1>
+              <p className="text-gray-600 mt-1">
+                Quản lý và theo dõi thanh toán
+              </p>
+            </div>
+          </div>
         </div>
-        <button
-          onClick={() => setShowPaymentModal(true)}
-          className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center gap-2"
-        >
-          <DollarSign className="w-5 h-5" />
-          Thanh toán
-        </button>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <Card className="border-t-4 border-t-green-600">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-gray-600">
-              Đã Thanh Toán
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-2xl font-bold text-green-600">
-                  {formatCurrency(stats.totalPaid)}
-                </p>
-              </div>
-              <CheckCircle className="w-10 h-10 text-green-600 opacity-50" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-t-4 border-t-yellow-600">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-gray-600">
-              Chờ Thanh Toán
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-2xl font-bold text-yellow-600">
-                  {formatCurrency(stats.totalPending)}
-                </p>
-              </div>
-              <Clock className="w-10 h-10 text-yellow-600 opacity-50" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-t-4 border-t-red-600">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-gray-600">
-              Quá Hạn
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-2xl font-bold text-red-600">
-                  {formatCurrency(stats.totalOverdue)}
-                </p>
-              </div>
-              <XCircle className="w-10 h-10 text-red-600 opacity-50" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-t-4 border-t-blue-600">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-gray-600">
-              Tổng Giao Dịch
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-3xl font-bold text-blue-600">
-                  {stats.totalPayments}
-                </p>
-                <p className="text-sm text-gray-500 mt-1">Giao dịch</p>
-              </div>
-              <DollarSign className="w-10 h-10 text-blue-600 opacity-50" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Charts Row */}
-      {pieChartData.length > 0 && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          <Card className="border-t-4 border-t-blue-600">
-            <CardHeader>
-              <CardTitle>Phân Bố Học Phí</CardTitle>
-              <CardDescription>
-                Tổng quan về tình trạng thanh toán
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={pieChartData}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, percent }) =>
-                      `${name}: ${(percent * 100).toFixed(0)}%`
-                    }
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {pieChartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(value) => formatCurrency(value)} />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-
-          <Card className="border-t-4 border-t-red-600">
-            <CardHeader>
-              <CardTitle>Thống Kê Nhanh</CardTitle>
-              <CardDescription>Tổng quan chi tiết</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between p-4 bg-green-50 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <CheckCircle className="w-6 h-6 text-green-600" />
-                  <span className="font-medium text-gray-700">
-                    Đã thanh toán
-                  </span>
-                </div>
-                <span className="text-xl font-bold text-green-600">
-                  {formatCurrency(stats.totalPaid)}
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between p-4 bg-yellow-50 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <Clock className="w-6 h-6 text-yellow-600" />
-                  <span className="font-medium text-gray-700">
-                    Chờ thanh toán
-                  </span>
-                </div>
-                <span className="text-xl font-bold text-yellow-600">
-                  {formatCurrency(stats.totalPending)}
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between p-4 bg-red-50 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <XCircle className="w-6 h-6 text-red-600" />
-                  <span className="font-medium text-gray-700">Quá hạn</span>
-                </div>
-                <span className="text-xl font-bold text-red-600">
-                  {formatCurrency(stats.totalOverdue)}
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <DollarSign className="w-6 h-6 text-blue-600" />
-                  <span className="font-medium text-gray-700">Tổng cộng</span>
-                </div>
-                <span className="text-xl font-bold text-blue-600">
-                  {formatCurrency(
-                    stats.totalPaid + stats.totalPending + stats.totalOverdue
-                  )}
-                </span>
-              </div>
-            </CardContent>
-          </Card>
+      {/* Error Alert */}
+      {error && (
+        <div className="max-w-4xl mx-auto px-4 py-4">
+          <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <AlertCircle className="text-red-600" size={20} />
+            <p className="text-sm text-red-800">{error}</p>
+          </div>
         </div>
       )}
 
-      {/* Payments Table */}
-      <Card className="border-t-4 border-t-blue-600">
-        <CardHeader>
-          <CardTitle>Lịch Sử Thanh Toán</CardTitle>
-          <CardDescription>
-            Danh sách chi tiết các khoản thanh toán
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div style={{ height: 500, width: "100%" }}>
-            <DataGrid
-              rows={payments}
-              columns={columns}
-              pageSize={10}
-              rowsPerPageOptions={[5, 10, 20]}
-              loading={loading}
-              disableSelectionOnClick
-              getRowId={(row) => row._id}
-              sx={{
-                border: 0,
-                "& .MuiDataGrid-cell:focus": {
-                  outline: "none",
-                },
-                "& .MuiDataGrid-row:hover": {
-                  backgroundColor: "#f3f4f6",
-                },
-                "& .MuiDataGrid-columnHeaders": {
-                  backgroundColor: "#f9fafb",
-                  fontWeight: "bold",
-                },
-              }}
-            />
-          </div>
-        </CardContent>
-      </Card>
+      {/* Summary Stats */}
+      <div className="max-w-4xl mx-auto px-4 py-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white">
+            <div>
+              <p className="text-blue-100 text-sm font-medium">Tổng Học Phí</p>
+              <h3 className="text-3xl font-bold mt-2">
+                {totalTuition.toLocaleString("vi-VN")}
+              </h3>
+              <p className="text-blue-100 text-xs mt-1">VND</p>
+            </div>
+          </Card>
 
-      {/* Payment Modal */}
-      {showPaymentModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-2xl w-full p-6 max-h-[80vh] overflow-y-auto">
-            <h3 className="text-2xl font-bold text-gray-900 mb-4">
-              Chọn khóa học cần thanh toán
-            </h3>
-            <p className="text-gray-600 mb-6">
-              Vui lòng chọn khóa học bạn muốn thanh toán học phí
-            </p>
+          <Card className="bg-gradient-to-br from-green-500 to-green-600 text-white">
+            <div>
+              <p className="text-green-100 text-sm font-medium">
+                Đã Thanh Toán
+              </p>
+              <h3 className="text-3xl font-bold mt-2">
+                {paidAmount.toLocaleString("vi-VN")}
+              </h3>
+              <p className="text-green-100 text-xs mt-1">VND</p>
+            </div>
+          </Card>
 
-            <div className="space-y-3 mb-6">
-              {payments
-                .filter((p) => p.status === "pending" || p.remainingAmount > 0)
-                .map((payment) => (
-                  <div
-                    key={payment._id}
-                    onClick={() => setSelectedPayment(payment)}
-                    className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                      selectedPayment?._id === payment._id
-                        ? "border-blue-600 bg-blue-50"
-                        : "border-gray-200 hover:border-blue-300"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <h4 className="font-semibold text-lg text-gray-900">
-                          {payment.course?.name || "Khóa học"}
-                        </h4>
-                        <p className="text-sm text-gray-600 mt-1">
-                          Mã: {payment.course?.courseCode || "N/A"}
+          <Card className="bg-gradient-to-br from-orange-500 to-orange-600 text-white">
+            <div>
+              <p className="text-orange-100 text-sm font-medium">
+                Chờ Thanh Toán
+              </p>
+              <h3 className="text-3xl font-bold mt-2">
+                {pendingAmount.toLocaleString("vi-VN")}
+              </h3>
+              <p className="text-orange-100 text-xs mt-1">VND</p>
+            </div>
+          </Card>
+        </div>
+      </div>
+
+      {/* Payments List */}
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        {payments.length > 0 ? (
+          <div className="space-y-4">
+            {payments.map((payment) => (
+              <Card
+                key={payment._id}
+                className={`${getStatusColor(
+                  payment.status
+                )} p-4 hover:shadow-md transition-shadow`}
+              >
+                <div className="flex items-start justify-between gap-4">
+                  {/* Icon */}
+                  <div className="flex-shrink-0 pt-1">
+                    {getStatusIcon(payment.status)}
+                  </div>
+
+                  {/* Content */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-900">
+                          {payment.course?.name}
+                        </h3>
+                        <p className="text-sm text-gray-600">
+                          {payment.course?.code}
                         </p>
                       </div>
-                      <div className="text-right">
-                        <p className="text-xl font-bold text-red-600">
-                          {formatCurrency(
-                            payment.remainingAmount || payment.amount
+                      <span
+                        className={`inline-block px-3 py-1 text-xs rounded-full font-medium flex-shrink-0 ${
+                          payment.status === "paid"
+                            ? "bg-green-100 text-green-700"
+                            : payment.status === "pending"
+                            ? "bg-yellow-100 text-yellow-700"
+                            : "bg-red-100 text-red-700"
+                        }`}
+                      >
+                        {getStatusLabel(payment.status)}
+                      </span>
+                    </div>
+
+                    {/* Payment Details */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-3">
+                      <div>
+                        <p className="text-xs text-gray-600">Học Phí</p>
+                        <p className="text-lg font-bold text-gray-900">
+                          {(payment.amount || 0).toLocaleString("vi-VN")}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-600">Hạn Thanh Toán</p>
+                        <p className="text-sm font-semibold text-gray-900">
+                          {new Date(payment.dueDate).toLocaleDateString(
+                            "vi-VN"
                           )}
                         </p>
-                        <p className="text-sm text-gray-500 mt-1">Còn nợ</p>
                       </div>
+                      {payment.status === "paid" && (
+                        <>
+                          <div>
+                            <p className="text-xs text-gray-600">
+                              Ngày Thanh Toán
+                            </p>
+                            <p className="text-sm font-semibold text-gray-900">
+                              {new Date(payment.paymentDate).toLocaleDateString(
+                                "vi-VN"
+                              )}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-600">
+                              Mã Giao Dịch
+                            </p>
+                            <p className="text-sm font-semibold text-gray-900">
+                              {payment.transactionId}
+                            </p>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
-                ))}
 
-              {payments.filter(
-                (p) => p.status === "pending" || p.remainingAmount > 0
-              ).length === 0 && (
-                <div className="text-center py-8 text-gray-500">
-                  <CheckCircle className="w-16 h-16 mx-auto mb-4 text-green-500" />
-                  <p className="text-lg">
-                    Bạn đã thanh toán hết tất cả học phí!
-                  </p>
+                  {/* Action Button */}
+                  {payment.status === "pending" && (
+                    <button className="flex-shrink-0 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium">
+                      Thanh Toán
+                    </button>
+                  )}
                 </div>
-              )}
-            </div>
-
-            <div className="flex gap-3">
-              <button
-                onClick={() => {
-                  setShowPaymentModal(false);
-                  setSelectedPayment(null);
-                }}
-                className="flex-1 px-4 py-3 border-2 border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 transition-all"
-              >
-                Hủy
-              </button>
-              <button
-                onClick={() => {
-                  if (selectedPayment) {
-                    navigate(`/student/payment/${selectedPayment._id}`);
-                  } else {
-                    toast.error("Vui lòng chọn khóa học!");
-                  }
-                }}
-                disabled={!selectedPayment}
-                className={`flex-1 px-4 py-3 font-semibold rounded-lg transition-all ${
-                  selectedPayment
-                    ? "bg-blue-600 hover:bg-blue-700 text-white"
-                    : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                }`}
-              >
-                Tiếp tục thanh toán
-              </button>
-            </div>
+              </Card>
+            ))}
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="text-center py-12">
+            <CreditCard size={48} className="mx-auto text-gray-300 mb-4" />
+            <p className="text-gray-600 text-lg">
+              Không có thông tin thanh toán nào
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

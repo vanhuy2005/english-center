@@ -7,7 +7,8 @@ const {
 const enrollmentController = require("./enrollment.controller");
 
 router.use(protect);
-router.use(authorize("enrollment"));
+// Allow both enrollment staff and academic staff to access assignment endpoints
+router.use(authorize("enrollment", "academic"));
 
 // Dashboard
 router.get("/dashboard", enrollmentController.getDashboardStats);

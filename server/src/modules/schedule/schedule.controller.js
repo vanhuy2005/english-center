@@ -107,6 +107,7 @@ exports.createSchedule = async (req, res) => {
     const {
       class: classId,
       teacher,
+      student,
       date,
       startTime,
       endTime,
@@ -119,32 +120,32 @@ exports.createSchedule = async (req, res) => {
       recurrence,
     } = req.body;
 
-    // Validate required fields
-    if (!classId || !date || !startTime || !endTime) {
+    // Validate required fields: allow student-specific schedules (no class)
+    if (!date || !startTime || !endTime || (!classId && !student)) {
       return res.status(400).json({
         success: false,
-        message: "Vui lòng cung cấp đầy đủ thông tin bắt buộc",
+        message:
+          "Vui lòng cung cấp đầy đủ thông tin bắt buộc (class hoặc student, date, startTime, endTime)",
       });
     }
 
-    // Check if class exists
-    const classData = await Class.findById(classId);
-    if (!classData) {
-      return res.status(404).json({
-        success: false,
-        message: "Lớp học không tồn tại",
-      });
+    let classData = null;
+    if (classId) {
+      classData = await Class.findById(classId);
+      if (!classData) {
+        return res.status(404).json({
+          success: false,
+          message: "Lớp học không tồn tại",
+        });
+      }
     }
 
-    // Use class teacher if no teacher specified
-    const scheduleTeacher = teacher || classData.teacher;
+    // Determine teacher: class teacher if not provided and class exists
+    const scheduleTeacher = teacher || (classData ? classData.teacher : null);
 
-    // Check if teacher exists
+    // If teacher provided, validate existence
     if (scheduleTeacher) {
-      const teacherExists = await Staff.findOne({
-        _id: scheduleTeacher,
-        staffType: "teacher",
-      });
+      const teacherExists = await Staff.findOne({ _id: scheduleTeacher });
       if (!teacherExists) {
         return res.status(404).json({
           success: false,
@@ -153,12 +154,9 @@ exports.createSchedule = async (req, res) => {
       }
     }
 
-    // Check for scheduling conflicts
-    const conflict = await Schedule.findOne({
-      $or: [
-        { teacher: scheduleTeacher, date, status: { $ne: "cancelled" } },
-        { room, date, status: { $ne: "cancelled" } },
-      ],
+    // Check for scheduling conflicts only when teacher or room present
+    const conflictQuery = { $and: [] };
+    const timeOverlap = {
       $or: [
         {
           startTime: { $lte: startTime },
@@ -169,7 +167,26 @@ exports.createSchedule = async (req, res) => {
           endTime: { $gte: endTime },
         },
       ],
-    });
+    };
+
+    const orClauses = [];
+    if (scheduleTeacher) {
+      orClauses.push({
+        teacher: scheduleTeacher,
+        date,
+        status: { $ne: "cancelled" },
+      });
+    }
+    if (room) {
+      orClauses.push({ room, date, status: { $ne: "cancelled" } });
+    }
+
+    let conflict = null;
+    if (orClauses.length > 0) {
+      conflict = await Schedule.findOne({
+        $and: [{ $or: orClauses }, timeOverlap],
+      });
+    }
 
     if (conflict) {
       return res.status(400).json({
@@ -178,26 +195,31 @@ exports.createSchedule = async (req, res) => {
       });
     }
 
-    // Create schedule
-    const schedule = await Schedule.create({
-      class: classId,
-      teacher: scheduleTeacher,
+    // Create schedule object
+    const createPayload = {
       date,
       startTime,
       endTime,
       dayOfWeek: dayOfWeek || new Date(date).getDay(),
-      room: room || classData.room,
+      room: room || (classData ? classData.room : undefined),
       topic,
       description,
       materials,
       isRecurring,
       recurrence,
       createdBy: req.user._id,
-    });
+    };
+
+    if (classData) createPayload.class = classId;
+    if (scheduleTeacher) createPayload.teacher = scheduleTeacher;
+    if (student) createPayload.student = student;
+
+    const schedule = await Schedule.create(createPayload);
 
     const populatedSchedule = await Schedule.findById(schedule._id)
       .populate("class", "className classCode")
-      .populate("teacher", "fullName email");
+      .populate("teacher", "fullName email")
+      .populate("student", "name email phone");
 
     res.status(201).json({
       success: true,
@@ -490,33 +512,35 @@ exports.getMySchedules = async (req, res) => {
     if (userRole === "teacher" || req.role === "teacher") {
       filter.teacher = userId;
     } else if (userRole === "student" || req.role === "student") {
-      // Get student's enrolled classes
+      // Get student's enrolled classes and include personal schedules
       const Student = require("../../shared/models/Student.model");
       const student = await Student.findById(userId).populate(
         "enrolledCourses"
       );
 
-      if (
-        !student ||
-        !student.enrolledCourses ||
-        student.enrolledCourses.length === 0
-      ) {
-        console.log("📭 Student has no enrolled courses");
-        return res.status(200).json({
-          success: true,
-          data: [],
-          message: "Bạn chưa đăng ký khóa học nào",
-        });
-      }
-
-      // Get classes for enrolled courses
+      // Get classes for enrolled courses (may be empty)
       const Class = require("../../shared/models/Class.model");
-      const classes = await Class.find({
-        course: { $in: student.enrolledCourses },
-      }).select("_id");
+      const classes =
+        student && student.enrolledCourses && student.enrolledCourses.length > 0
+          ? await Class.find({
+              course: { $in: student.enrolledCourses },
+            }).select("_id")
+          : [];
 
-      filter.class = { $in: classes.map((c) => c._id) };
-      console.log("📚 Found", classes.length, "classes for student");
+      const classIds = classes.map((c) => c._id);
+
+      // Filter: schedules for student's classes OR schedules explicitly assigned to the student
+      filter = {
+        $or: [
+          { class: classIds.length > 0 ? { $in: classIds } : null },
+          { student: userId },
+        ].filter(Boolean),
+      };
+      console.log(
+        "📚 Found",
+        classIds.length,
+        "classes for student; including personal schedules"
+      );
     }
 
     // Date range filter

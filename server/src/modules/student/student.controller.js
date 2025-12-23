@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const Student = require("../../shared/models/Student.model");
 const Class = require("../../shared/models/Class.model");
 const Grade = require("../../shared/models/Grade.model");
@@ -365,19 +366,58 @@ exports.getMyCourses = async (req, res) => {
     const studentId = req.user._id;
     console.log("📚 Fetching courses for student:", studentId);
 
-    // Find all classes where student is enrolled
-    const classes = await Class.find({
+    // Find all classes where student is enrolled (by Class.students)
+    const classesByClassDoc = await Class.find({
       "students.student": studentId,
     })
       .populate("course", "name code level duration")
       .populate("teacher", "fullName email")
       .lean();
 
-    console.log("✅ Found", classes.length, "classes");
+    // Also check Student.enrolledCourses (legacy or different storage)
+    const student = await Student.findById(studentId).lean();
+    let classesByStudentDoc = [];
+    if (
+      student &&
+      Array.isArray(student.enrolledCourses) &&
+      student.enrolledCourses.length
+    ) {
+      const ids = student.enrolledCourses.map((c) => c.toString());
+      classesByStudentDoc = await Class.find({ _id: { $in: ids } })
+        .populate("course", "name code level duration")
+        .populate("teacher", "fullName email")
+        .lean();
+    }
+
+    // Merge and dedupe by _id
+    const combined = [];
+    const seen = new Set();
+
+    (classesByClassDoc || []).forEach((c) => {
+      if (!seen.has(String(c._id))) {
+        seen.add(String(c._id));
+        combined.push(c);
+      }
+    });
+    (classesByStudentDoc || []).forEach((c) => {
+      if (!seen.has(String(c._id))) {
+        seen.add(String(c._id));
+        combined.push(c);
+      }
+    });
+
+    console.log(
+      "✅ Found (by class doc):",
+      classesByClassDoc.length,
+      "by student doc:",
+      classesByStudentDoc.length,
+      "combined:",
+      combined.length
+    );
 
     res.json({
       success: true,
-      data: classes || [],
+      data: combined || [],
     });
   } catch (error) {
     console.error("❌ Error fetching student courses:", error);
@@ -431,11 +471,29 @@ exports.getMyAttendance = async (req, res) => {
 
 exports.getMyGrades = async (req, res) => {
   try {
+    const Grade = require("../../shared/models/Grade.model");
+
+    // Use the Grade static helper to fetch published transcript entries
+    const grades = await Grade.getStudentTranscript(req.user._id);
+
+    // Debug logging to help trace why students may see empty results
+    try {
+      console.log(
+        `[student.getMyGrades] userId=${
+          req.user && (req.user._id || req.user.id)
+        } -> grades found=`,
+        Array.isArray(grades) ? grades.length : 0
+      );
+    } catch (logErr) {
+      console.warn("[student.getMyGrades] logging failed:", logErr.message);
+    }
+
     res.json({
       success: true,
-      data: [],
+      data: grades,
     });
   } catch (error) {
+    console.error("Error fetching my grades:", error);
     res.status(500).json({
       success: false,
       message: "Không thể tải dữ liệu điểm số",
@@ -481,15 +539,74 @@ exports.getMyRequests = async (req, res) => {
 
 exports.createRequest = async (req, res) => {
   try {
-    res.json({
-      success: true,
-      message: "Tạo yêu cầu thành công",
+    const {
+      type,
+      class: classId,
+      targetClass,
+      startDate,
+      endDate,
+      reason,
+      documents,
+      priority,
+    } = req.body;
+
+    const studentId = req.user && (req.user._id || req.user.id);
+
+    console.log("[student.createRequest] payload:", req.body);
+    console.log("[student.createRequest] auth user:", studentId);
+
+    if (!studentId || !type || !reason) {
+      return errorResponse(res, "Vui lòng cung cấp thông tin bắt buộc", 400);
+    }
+
+    // Optional: validate class/targetClass existence
+    if (classId) {
+      if (!mongoose.Types.ObjectId.isValid(classId)) {
+        return errorResponse(res, "Mã lớp không hợp lệ", 400);
+      }
+      const ClassModel = require("../../shared/models/Class.model");
+      const c = await ClassModel.findById(classId);
+      if (!c) return errorResponse(res, "Lớp học không tồn tại", 404);
+    }
+
+    if (type === "transfer" && targetClass) {
+      if (!mongoose.Types.ObjectId.isValid(targetClass)) {
+        return errorResponse(res, "Mã lớp đích không hợp lệ", 400);
+      }
+      const ClassModel = require("../../shared/models/Class.model");
+      const tc = await ClassModel.findById(targetClass);
+      if (!tc) return errorResponse(res, "Lớp đích không tồn tại", 404);
+    }
+
+    const RequestModel = require("../../shared/models/Request.model");
+
+    const newReq = await RequestModel.create({
+      student: studentId,
+      type,
+      class: classId,
+      targetClass,
+      startDate,
+      endDate,
+      reason,
+      documents,
+      priority: priority || "normal",
     });
+
+    const populated = await RequestModel.findById(newReq._id)
+      .populate("student", "studentCode fullName")
+      .populate("class", "className classCode")
+      .populate("targetClass", "className classCode");
+
+    successResponse(res, populated, "Tạo yêu cầu thành công", 201);
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: "Không thể tạo yêu cầu",
-    });
+    console.error("Student createRequest error:", error);
+    const isClientError =
+      error.name === "ValidationError" ||
+      /required|Start date must be before end date|Target class is required/i.test(
+        error.message
+      );
+    if (isClientError) return errorResponse(res, error.message, 400);
+    errorResponse(res, error.message, 500);
   }
 };
 
@@ -566,6 +683,65 @@ exports.uploadAvatar = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Không thể tải lên ảnh: " + error.message,
+    });
+  }
+};
+
+/**
+ * @desc    Get my enrolled classes with schedules
+ * @route   GET /api/students/me/classes
+ * @access  Private (student)
+ */
+exports.getMyEnrolledClasses = async (req, res) => {
+  try {
+    // Get student info to find enrolled classes
+    const student = await Student.findById(req.user._id);
+
+    if (!student) {
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy học viên",
+      });
+    }
+
+    // Find all classes where student is enrolled
+    const classes = await Class.find({
+      "students.student": req.user._id,
+      "students.status": "active",
+    })
+      .populate("teacher", "fullName email phone")
+      .populate("course", "courseName code")
+      .select(
+        "name classCode schedule room startDate endDate status teacher course students capacity"
+      );
+
+    // Format response with schedule info
+    const formattedClasses = classes.map((cls) => ({
+      _id: cls._id,
+      name: cls.name,
+      classCode: cls.classCode,
+      room: cls.room,
+      status: cls.status,
+      schedule: cls.schedule || [],
+      teacher: cls.teacher,
+      course: cls.course,
+      capacity: cls.capacity,
+      startDate: cls.startDate,
+      endDate: cls.endDate,
+      studentCount: cls.students?.length || 0,
+    }));
+
+    res.status(200).json({
+      success: true,
+      data: formattedClasses,
+      message: "Lấy danh sách lớp học thành công",
+    });
+  } catch (error) {
+    console.error("Error getting enrolled classes:", error);
+    res.status(500).json({
+      success: false,
+      message: "Lỗi lấy danh sách lớp học",
+      error: error.message,
     });
   }
 };

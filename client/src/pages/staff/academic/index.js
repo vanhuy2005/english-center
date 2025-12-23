@@ -1,5 +1,6 @@
 export { default as AcademicStaffDashboardPage } from "./AcademicStaffDashboardPage";
 export { default as ClassManagementPage } from "./ClassManagementPage";
+export { default as ClassSchedulePage } from "./ClassSchedulePage";
 export { default as AttendanceTrackingPage } from "./AttendanceTrackingPage";
 export { default as GradeManagementPage } from "./GradeManagementPage";
 export { default as StudentProgressPage } from "./StudentProgressPage";

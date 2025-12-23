@@ -1,6 +1,7 @@
 const Request = require("../../shared/models/Request.model");
 const Student = require("../../shared/models/Student.model");
 const Class = require("../../shared/models/Class.model");
+const Course = require("../../shared/models/Course.model");
 
 /**
  * @desc    Get all requests with filters
@@ -110,6 +111,7 @@ exports.createRequest = async (req, res) => {
     const {
       student,
       type,
+      course,
       class: classId,
       targetClass,
       startDate,
@@ -119,9 +121,13 @@ exports.createRequest = async (req, res) => {
       priority,
     } = req.body;
 
-    console.log("Request body:", req.body);
+    // Prefer explicit student in body, otherwise use authenticated user
+    const studentId = student || req.user?._id || req.user?.id || null;
 
-    if (!student || !type || !reason) {
+    console.log("Request body:", req.body);
+    console.log("Authenticated user:", req.user?._id || req.user?.id || null);
+
+    if (!studentId || !type || !reason) {
       return res.status(400).json({
         success: false,
         message: "Vui lòng cung cấp đầy đủ thông tin bắt buộc",
@@ -129,7 +135,7 @@ exports.createRequest = async (req, res) => {
     }
 
     // Verify student exists
-    const studentExists = await Student.findById(student);
+    const studentExists = await Student.findById(studentId);
     if (!studentExists) {
       return res.status(404).json({
         success: false,
@@ -148,6 +154,17 @@ exports.createRequest = async (req, res) => {
       }
     }
 
+    // Verify course exists (if provided)
+    if (course) {
+      const courseExists = await Course.findById(course);
+      if (!courseExists) {
+        return res.status(404).json({
+          success: false,
+          message: "Khóa học không tồn tại",
+        });
+      }
+    }
+
     // For transfer requests, verify target class
     if (type === "transfer" && targetClass) {
       const targetClassExists = await Class.findById(targetClass);
@@ -160,8 +177,9 @@ exports.createRequest = async (req, res) => {
     }
 
     const request = await Request.create({
-      student,
+      student: studentId,
       type,
+      course: course || undefined,
       class: classId,
       targetClass,
       startDate,
@@ -182,7 +200,24 @@ exports.createRequest = async (req, res) => {
       data: populatedRequest,
     });
   } catch (error) {
-    console.error("Error creating request:", error);
+    console.error("Error creating request:", error.message);
+    console.error(error.stack);
+
+    // Treat validation-like errors (including model pre-save checks) as 400
+    const isClientError =
+      error.name === "ValidationError" ||
+      /required|must be|required for|Date is required|Start date must be before end date|Target class is required/i.test(
+        error.message
+      );
+
+    if (isClientError) {
+      return res.status(400).json({
+        success: false,
+        message: error.message || "Dữ liệu không hợp lệ",
+        details: error.errors || null,
+      });
+    }
+
     res.status(500).json({
       success: false,
       message: "Lỗi khi tạo yêu cầu",

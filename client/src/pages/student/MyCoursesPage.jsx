@@ -20,7 +20,9 @@ const MyCoursesPage = () => {
       setLoading(true);
       setError(null);
       const response = await studentService.getMyCourses();
-      const activeCourses = (response.data || []).filter(course => course.status === 'active');
+      const activeCourses = (response.data || []).filter(
+        (course) => course.status === "active"
+      );
       setCourses(activeCourses);
     } catch (err) {
       console.error("Error fetching courses:", err);
@@ -84,7 +86,7 @@ const MyCoursesPage = () => {
                 <div>
                   <div className="flex items-start justify-between mb-2">
                     <h3 className="text-lg font-semibold text-gray-800">
-                      {course.courseName}
+                      {course.name || course.courseName}
                     </h3>
                     {getStatusBadge(course.status)}
                   </div>

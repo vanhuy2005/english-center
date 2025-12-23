@@ -11,3 +11,4 @@ export { default as RevenueReportsPage } from "./RevenueReportsPage";
 export { default as ExportReportsPage } from "./ExportReportsPage";
 export { default as RefundTuitionPage } from "./RefundTuitionPage";
 export { default as CreateReceiptPage } from "./CreateReceiptPage";
+export { default as ReceiptStatisticsPage } from "./ReceiptStatisticsPage";

@@ -683,7 +683,8 @@ const EnrollStudentModal = ({ isOpen, onClose, student, onSuccess }) => {
                         <p>
                           <span className="text-gray-600">Sức chứa:</span>{" "}
                           <span className="font-medium">
-                            {classItem.currentEnrollment}/{classItem.capacity}
+                            {classItem.currentEnrollment}/
+                            {classItem.capacity?.max ?? classItem.capacity ?? 0}
                           </span>
                         </p>
                       </div>

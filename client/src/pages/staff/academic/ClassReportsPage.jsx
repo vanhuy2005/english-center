@@ -31,6 +31,7 @@ const ClassReportsPage = () => {
   const fetchClasses = async () => {
     try {
       const response = await api.get("/classes");
+      console.log("[ClassReportsPage] GET /classes response:", response);
       const data = response.data?.data || response.data || [];
       setClasses(Array.isArray(data) ? data : []);
     } catch (error) {
@@ -115,7 +116,7 @@ const ClassReportsPage = () => {
       scoreRanges,
       averageScore,
       passRate,
-      capacity: classData.capacity || 0,
+      capacity: classData.capacity?.max ?? classData.capacity ?? 0,
       teacher: classData.teacher,
       course: classData.course,
     };
@@ -397,14 +398,12 @@ const ClassReportsPage = () => {
           value={selectedClass}
           onChange={(e) => setSelectedClass(e.target.value)}
           required
-        >
-          <option value="">-- Vui lòng chọn lớp học --</option>
-          {classes.map((cls) => (
-            <option key={cls._id} value={cls._id}>
-              {cls.name || cls.className} ({cls.classCode || "N/A"})
-            </option>
-          ))}
-        </Select>
+          placeholder="-- Vui lòng chọn lớp học --"
+          options={classes.map((cls) => ({
+            value: cls._id,
+            label: `${cls.name || cls.className} (${cls.classCode || "N/A"})`,
+          }))}
+        />
       </Card>
 
       {/* Statistics */}
@@ -493,7 +492,9 @@ const ClassReportsPage = () => {
               <div>
                 <p className="text-sm text-gray-600">Khóa học</p>
                 <p className="font-medium">
-                  {classStats.course?.courseName || "N/A"}
+                  {classStats.course?.name ||
+                    classStats.course?.courseName ||
+                    "N/A"}
                 </p>
               </div>
               <div>

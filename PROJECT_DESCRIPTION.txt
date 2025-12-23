@@ -1,0 +1,81 @@
+PHẦN MÔ TẢ DỰ ÁN
+
+1. Kiến trúc hệ thống
+Hệ thống quản lý trung tâm tiếng Anh được triển khai theo kiến trúc client-server:
+- Frontend: Ứng dụng SPA sử dụng React (Vite) chịu trách nhiệm giao diện người dùng, các trang quản lý học viên, nhân viên, học phí, báo cáo.
+- Backend: API server Node.js/Express xử lý xác thực, logic nghiệp vụ, báo cáo và tương tác với cơ sở dữ liệu.
+- Cơ sở dữ liệu: MongoDB (hoặc một hệ quản trị NoSQL/SQL tương ứng) lưu trữ người dùng, học viên, lớp học, biên lai, thông báo, lịch học.
+- Lưu trữ file: Thư mục `uploads/` để lưu avatar và file đính kèm.
+- Giao tiếp: Frontend gọi REST API của backend; có thể bổ sung WebSocket cho thông báo thời gian thực.
+
+2. Dữ liệu thực nghiệm
+Dữ liệu dùng thử bao gồm:
+- Tập người dùng: administrator, accountant, teacher, student, director.
+- Hồ sơ học viên: tên, ngày sinh, liên hệ, khóa học tham gia.
+- Lớp học và lịch: mã lớp, giáo viên, thời gian, phòng học.
+- Biên lai và giao dịch: mã biên lai, học viên, số tiền, ngày thu, phương thức thanh toán.
+- Thông báo và yêu cầu: mẫu thông báo, trạng thái xử lý.
+Ghi chú: các tập dữ liệu có thể được sinh giả lập (mock) hoặc import từ file CSV/JSON để chạy thử nghiệm.
+
+3. Cài đặt cơ sở dữ liệu
+- Cài MongoDB server (hoặc kết nối tới MongoDB Atlas).
+- Tạo database: `english_center` (hoặc tên tương ứng trong file cấu hình).
+- Tạo các collection: `users`, `students`, `classes`, `receipts`, `notifications`, `schedules`.
+- Thiết lập biến môi trường kết nối trong file cấu hình backend (ví dụ: `MONGODB_URI`, `DB_NAME`).
+- Nếu có script seed, chạy script để nạp dữ liệu mẫu: ví dụ `node scripts/seed.js`.
+
+4. Cài đặt ứng dụng
+- Backend:
+  - Vào thư mục `server/`.
+  - Cài phụ thuộc: `npm install`.
+  - Tạo file `.env` chứa các biến: `PORT`, `MONGODB_URI`, `JWT_SECRET`, v.v.
+  - Khởi động: `npm run dev` hoặc `node server.js`.
+- Frontend:
+  - Vào thư mục `client/`.
+  - Cài phụ thuộc: `npm install`.
+  - Thiết lập cấu hình API endpoint trong `src/config/api.js` (hoặc biến môi trường).
+  - Chạy dev server: `npm run dev`.
+
+5. Một số chức năng xử lý chính
+- Xác thực và phân quyền: đăng nhập JWT, phân quyền theo vai trò (admin, accountant, teacher, student).
+- Quản lý học viên và lớp học: CRUD học viên, tạo lớp, gán giáo viên, quản lý lịch học.
+- Thu chi / Biên lai: tạo, lưu trữ, tra cứu biên lai; thống kê doanh thu theo ngày/tháng/năm.
+- Báo cáo và thống kê: tổng thu, thu theo lớp/khóa, báo cáo học viên nghỉ/đi học.
+- Thông báo và yêu cầu: gửi/hiển thị thông báo, quản lý trạng thái yêu cầu.
+- Tải lên ảnh avatar và file đính kèm: lưu vào `uploads/` và lưu đường dẫn trong DB.
+
+API Endpoints chính:
+Backend Base: http://localhost:5000/api
+
+Authentication:
+- POST /auth/login - Đăng nhập
+- POST /auth/logout - Đăng xuất
+- POST /auth/refresh-token - Làm mới token
+
+Student APIs:
+- GET /student/courses - Danh sách khóa học
+- POST /student/course-enrollments - Đăng ký khóa học
+- GET /student/enrollments - Danh sách đăng ký của học viên
+- GET /student/attendance - Xem điểm danh
+- GET /student/grades - Xem điểm số
+
+Staff/Academic APIs:
+- GET /staff/academic/dashboard - Tổng quan
+- GET /staff/academic/classes - Danh sách lớp
+- GET /staff/academic/classes/:id - Chi tiết lớp
+- POST /staff/academic/attendance/mark - Điểm danh
+- GET /staff/academic/courses - Danh sách khóa học
+- POST /staff/academic/courses - Tạo khóa học
+
+6. Kết quả thực nghiệm
+- Mục tiêu: đánh giá tính đúng đắn của nghiệp vụ, hiệu năng API, thời gian phản hồi, và tính ổn định khi truy cập đồng thời.
+- Dữ liệu thu thập: thời gian phản hồi trung bình cho các API chính (ms), throughput (requests/giây), số lỗi phát sinh, kết quả thống kê doanh thu.
+- Ví dụ báo cáo mẫu:
+  - Thời gian phản hồi trung bình API danh sách biên lai: ~120ms (phụ thuộc môi trường).
+  - Thời gian phản hồi trung bình API điểm danh: ~150ms.
+  - Thời gian phản hồi trung bình API tạo khóa học: ~200ms.
+  - Tổng doanh thu thử nghiệm (tháng X): 100.000.000 VND (ví dụ dữ liệu mẫu).
+- Ghi chú: phần "Kết quả thực nghiệm" nên được cập nhật bằng số liệu thực tế sau khi chạy bộ test tải và thu thập logs/metrics.
+
+---
+Hướng dẫn tiếp theo: bạn có muốn tôi cập nhật nội dung này theo dạng PDF hoặc thêm số liệu thực nghiệm cụ thể từ cơ sở dữ liệu hiện có không?

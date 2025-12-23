@@ -60,7 +60,7 @@ exports.getAllClasses = async (req, res) => {
 
     if (search) {
       filter.$or = [
-        { className: { $regex: search, $options: "i" } },
+        { name: { $regex: search, $options: "i" } },
         { classCode: { $regex: search, $options: "i" } },
       ];
     }
@@ -153,6 +153,8 @@ exports.createClass = async (req, res) => {
   try {
     const {
       className,
+      name,
+      classCode,
       course,
       teacher,
       schedule,
@@ -164,11 +166,34 @@ exports.createClass = async (req, res) => {
       status,
     } = req.body;
 
+    // Debug: log incoming payload to help diagnose missing fields
+    console.log("📝 POST /api/classes payload:", {
+      className,
+      name,
+      classCode,
+      course,
+      teacher,
+      startDate,
+      endDate,
+      maxStudents,
+      room,
+      status,
+    });
+
+    const finalName = className || name;
+
     // Validate required fields
-    if (!className || !course || !startDate) {
+    const missing = [];
+    if (!finalName) missing.push("name");
+    if (!course) missing.push("course");
+    if (!startDate) missing.push("startDate");
+
+    if (missing.length) {
+      console.warn("Create class validation failed - missing:", missing);
       return res.status(400).json({
         success: false,
         message: "Vui lòng cung cấp đầy đủ thông tin bắt buộc",
+        missing,
       });
     }
 
@@ -197,7 +222,8 @@ exports.createClass = async (req, res) => {
 
     // Create class
     const newClass = await Class.create({
-      className,
+      name: finalName,
+      classCode: classCode || undefined,
       course,
       teacher,
       schedule,
@@ -248,6 +274,8 @@ exports.updateClass = async (req, res) => {
 
     const {
       className,
+      name,
+      classCode,
       teacher,
       schedule,
       startDate,
@@ -273,7 +301,8 @@ exports.updateClass = async (req, res) => {
     }
 
     // Update fields
-    if (className) classData.className = className;
+    if (className || name) classData.name = className || name;
+    if (classCode) classData.classCode = classCode;
     if (teacher) classData.teacher = teacher;
     if (schedule) classData.schedule = schedule;
     if (startDate) classData.startDate = startDate;

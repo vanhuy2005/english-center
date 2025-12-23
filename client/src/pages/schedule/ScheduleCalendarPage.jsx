@@ -288,6 +288,18 @@ const ScheduleCalendarPage = () => {
           </div>
         )}
       </Card>
+      {/* Floating action button for academic staff to manage schedules */}
+      {role === "academic" && (
+        <div className="fixed bottom-6 right-6 z-50">
+          <Button
+            variant="primary"
+            onClick={() => (window.location.href = "/academic/schedule")}
+            className="flex items-center gap-2 px-4 py-3 rounded-full shadow-lg"
+          >
+            + Quản Lý Lịch
+          </Button>
+        </div>
+      )}
     </div>
   );
 };

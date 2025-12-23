@@ -452,7 +452,14 @@ exports.getAllClasses = async (req, res) => {
         query.status = status;
       }
     }
-    if (course) query.course = course;
+    if (course) {
+      // Support passing multiple course ids as comma-separated string
+      if (typeof course === "string" && course.includes(",")) {
+        query.course = { $in: course.split(",") };
+      } else {
+        query.course = course;
+      }
+    }
 
     console.log("📚 getAllClasses - Query:", query);
     console.log("📚 getAllClasses - Params:", { status, course, page, limit });
@@ -550,6 +557,7 @@ exports.getEnrollmentRequests = async (req, res) => {
     const [requests, total] = await Promise.all([
       Request.find(query)
         .populate("student", "studentCode fullName email phone")
+        .populate("course", "name title tuition fee")
         .populate("class", "name code")
         .populate("targetClass", "name code")
         .sort({ createdAt: -1 })
@@ -614,6 +622,97 @@ exports.processRequest = async (req, res) => {
       const student = await Student.findById(request.student);
       if (!student) {
         return errorResponse(res, "Không tìm thấy học viên", 404);
+      }
+
+      // If the request is a course enrollment and staff provided a classId,
+      // enroll the student into that class immediately.
+      if (request.type === "course_enrollment") {
+        const { classId } = req.body;
+
+        if (classId) {
+          const classData = await Class.findById(classId).populate("course");
+          if (!classData) {
+            return errorResponse(res, "Không tìm thấy lớp học", 404);
+          }
+
+          // Check capacity
+          const activeStudents = classData.students.filter(
+            (s) => s.status === "active"
+          ).length;
+          if (activeStudents >= classData.capacity) {
+            return errorResponse(res, "Lớp học đã đầy", 400);
+          }
+
+          // Check already enrolled
+          const alreadyEnrolledInClass = classData.students.some(
+            (s) =>
+              s.student?.toString() === student._id.toString() &&
+              s.status === "active"
+          );
+          if (alreadyEnrolledInClass) {
+            return errorResponse(
+              res,
+              "Học viên đã được ghi danh vào lớp này",
+              400
+            );
+          }
+
+          // Add student to class
+          classData.students.push({
+            student: student._id,
+            enrolledDate: new Date(),
+            status: "active",
+          });
+          await classData.save();
+
+          // Update student profile
+          if (!student.enrolledCourses) student.enrolledCourses = [];
+          if (!student.enrollmentHistory) student.enrollmentHistory = [];
+          if (!student.enrolledCourses.includes(classData.course?._id)) {
+            student.enrolledCourses.push(classData.course?._id);
+          }
+          student.academicStatus = "active";
+          student.enrollmentHistory.push({
+            class: classData._id,
+            course: classData.course?._id || null,
+            enrolledDate: new Date(),
+            status: "active",
+          });
+          await student.save();
+
+          // Optional finance record
+          try {
+            const tuitionFee = classData.course?.tuitionFee || 0;
+            if (tuitionFee > 0) {
+              await Finance.create({
+                student: student._id,
+                class: classData._id,
+                course: classData.course?._id || null,
+                type: "tuition",
+                amount: tuitionFee,
+                paymentMethod: "other",
+                status: "pending",
+                description: `Học phí khóa ${
+                  classData.course?.name || "N/A"
+                } - Lớp ${classData.name}`,
+              });
+            }
+          } catch (financeErr) {
+            console.error(
+              "⚠️ Error creating finance record during request processing:",
+              financeErr.message
+            );
+          }
+        } else {
+          // No classId provided: just add the course to student's enrolledCourses (keep as pending class assignment)
+          if (!student.enrolledCourses) student.enrolledCourses = [];
+          if (!student.enrolledCourses.includes(request.course)) {
+            student.enrolledCourses.push(request.course);
+            await student.save();
+          }
+        }
+
+        // finished handling course_enrollment
       }
 
       if (request.type === "transfer") {

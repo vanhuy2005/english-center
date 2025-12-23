@@ -19,7 +19,58 @@ const StudentGradesPage = () => {
       setLoading(true);
       setError(null);
       const response = await studentService.getMyGrades();
-      setGrades(response.data || []);
+
+      // Support multiple response shapes from various API implementations:
+      // - axios response with { success, data: [...] }
+      // - axios response with direct array in response.data
+      // - direct array returned by a wrapper
+      let payload = [];
+      if (!response) payload = [];
+      else if (Array.isArray(response)) payload = response;
+      else if (response.data) {
+        if (Array.isArray(response.data)) payload = response.data;
+        else if (response.data.data && Array.isArray(response.data.data))
+          payload = response.data.data;
+        else payload = [];
+      } else payload = [];
+
+      // Normalize each grade item into the shape the UI expects
+      const normalized = (payload || []).map((g) => {
+        // Support both server-populated objects and legacy shapes
+        const courseName =
+          g.course?.name ||
+          g.courseName ||
+          (g.course && g.course.courseName) ||
+          "";
+        const className =
+          g.class?.name || g.className || (g.class && g.class.className) || "";
+
+        const participation =
+          g.scores?.participation ?? g.participation ?? null;
+        const assignment = g.scores?.homework ?? g.assignment ?? null;
+        const midterm = g.scores?.midterm ?? g.midterm ?? null;
+        const finalExam = g.scores?.final ?? g.final ?? null;
+
+        const finalGrade =
+          g.totalScore !== undefined && g.totalScore !== null
+            ? g.totalScore
+            : g.finalGrade !== undefined
+            ? g.finalGrade
+            : null;
+
+        return {
+          ...g,
+          courseName,
+          className,
+          participation,
+          assignment,
+          midterm,
+          finalExam,
+          finalGrade,
+        };
+      });
+
+      setGrades(normalized);
     } catch (err) {
       console.error("Error fetching grades:", err);
       setError(err.response?.data?.message || "Không thể tải kết quả học tập");

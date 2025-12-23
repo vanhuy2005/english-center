@@ -47,7 +47,7 @@ const ClassManagementPage = () => {
     endDate: "",
     schedule: "",
     room: "",
-    status: "scheduled",
+    status: "upcoming",
   });
 
   useEffect(() => {
@@ -161,8 +161,50 @@ const ClassManagementPage = () => {
 
   const handleCreateClass = async (e) => {
     e.preventDefault();
+    console.log("Submitting newClassForm:", newClassForm);
+    // Basic client-side validation (trim and empty-string safe)
+    const hasName = (newClassForm.className || "").toString().trim() !== "";
+    const hasCourse = newClassForm.course && newClassForm.course !== "";
+    const hasStartDate =
+      newClassForm.startDate && newClassForm.startDate !== "";
+    if (!hasName || !hasCourse || !hasStartDate) {
+      console.warn("Create class validation failed", {
+        hasName,
+        hasCourse,
+        hasStartDate,
+      });
+      toast.error("Vui lòng điền đủ: tên lớp, khóa học và ngày bắt đầu");
+      return;
+    }
+
     try {
-      await api.post("/classes", newClassForm);
+      // Build payload matching server expectations
+      const payload = {
+        name: newClassForm.className,
+        classCode: newClassForm.classCode || undefined,
+        course: newClassForm.course,
+        teacher: newClassForm.teacher || undefined,
+        maxStudents: Number(newClassForm.capacity) || undefined,
+        startDate: newClassForm.startDate,
+        endDate: newClassForm.endDate || undefined,
+        room: newClassForm.room || undefined,
+        status:
+          newClassForm.status === "scheduled"
+            ? "upcoming"
+            : newClassForm.status || "upcoming",
+      };
+
+      // Only include schedule when it's structured (server expects embedded docs)
+      if (
+        Array.isArray(newClassForm.schedule) ||
+        typeof newClassForm.schedule === "object"
+      ) {
+        payload.schedule = newClassForm.schedule;
+      }
+
+      console.log("Creating class with payload:", payload);
+      const res = await api.post("/classes", payload);
+      console.log("Create class response:", res);
       toast.success("Tạo lớp học thành công");
       setShowCreateModal(false);
       setNewClassForm({
@@ -175,12 +217,28 @@ const ClassManagementPage = () => {
         endDate: "",
         schedule: "",
         room: "",
-        status: "scheduled",
+        status: "upcoming",
       });
       fetchClasses();
     } catch (error) {
       console.error("Error creating class:", error);
-      toast.error(error.response?.data?.message || "Không thể tạo lớp học");
+      if (error.response) {
+        console.error(
+          "Response data:",
+          error.response.status,
+          error.response.data
+        );
+        toast.error(
+          error.response.data?.message ||
+            `Lỗi server (${error.response.status})`
+        );
+      } else if (error.request) {
+        console.error("No response received:", error.request);
+        toast.error("Không nhận được phản hồi từ server");
+      } else {
+        console.error("Request setup error:", error.message);
+        toast.error("Lỗi khi gửi yêu cầu tạo lớp");
+      }
     }
   };
 
@@ -254,7 +312,7 @@ const ClassManagementPage = () => {
           {filteredClasses.map((cls) => {
             const statusInfo = getStatusBadge(cls.status);
             const enrolledCount = cls.students?.length || 0;
-            const capacity = cls.capacity || 0;
+            const capacity = cls.capacity?.max ?? cls.capacity ?? 0;
             const fillRate =
               capacity > 0 ? Math.round((enrolledCount / capacity) * 100) : 0;
 
@@ -279,7 +337,10 @@ const ClassManagementPage = () => {
                     <div className="flex items-center gap-2">
                       <GraduationCap className="w-4 h-4" />
                       <span>
-                        Khóa học: {cls.course?.courseName || "Chưa có"}
+                        Khóa học:{" "}
+                        {cls.course?.name ||
+                          cls.course?.courseName ||
+                          "Chưa có"}
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
@@ -377,7 +438,8 @@ const ClassManagementPage = () => {
                   <p className="text-sm text-gray-600">Sức chứa</p>
                   <p className="font-medium">
                     {selectedClass.students?.length || 0}/
-                    {selectedClass.capacity} học viên
+                    {selectedClass.capacity?.max ?? selectedClass.capacity} học
+                    viên
                   </p>
                 </div>
               </div>
@@ -545,14 +607,12 @@ const ClassManagementPage = () => {
               value={assignTeacherId}
               onChange={(e) => setAssignTeacherId(e.target.value)}
               required
-            >
-              <option value="">-- Chọn giáo viên --</option>
-              {teachers.map((teacher) => (
-                <option key={teacher._id} value={teacher._id}>
-                  {teacher.fullName} ({teacher.staffCode})
-                </option>
-              ))}
-            </Select>
+              placeholder="-- Chọn giáo viên --"
+              options={teachers.map((teacher) => ({
+                value: teacher._id,
+                label: `${teacher.fullName} (${teacher.staffCode || ""})`,
+              }))}
+            />
             <div className="flex gap-2 justify-end">
               <Button
                 variant="outline"
@@ -608,28 +668,26 @@ const ClassManagementPage = () => {
               onChange={(e) =>
                 setNewClassForm({ ...newClassForm, course: e.target.value })
               }
-            >
-              <option value="">-- Chọn khóa học --</option>
-              {courses.map((course) => (
-                <option key={course._id} value={course._id}>
-                  {course.courseName} ({course.courseCode})
-                </option>
-              ))}
-            </Select>
+              placeholder="-- Chọn khóa học --"
+              options={courses.map((course) => ({
+                value: course._id,
+                label: `${
+                  course.name || course.courseName || course.title || "Unnamed"
+                } (${course.courseCode || ""})`,
+              }))}
+            />
             <Select
               label="Giáo viên"
               value={newClassForm.teacher}
               onChange={(e) =>
                 setNewClassForm({ ...newClassForm, teacher: e.target.value })
               }
-            >
-              <option value="">-- Chọn giáo viên (tùy chọn) --</option>
-              {teachers.map((teacher) => (
-                <option key={teacher._id} value={teacher._id}>
-                  {teacher.fullName} ({teacher.staffCode})
-                </option>
-              ))}
-            </Select>
+              placeholder="-- Chọn giáo viên (tùy chọn) --"
+              options={teachers.map((teacher) => ({
+                value: teacher._id,
+                label: `${teacher.fullName} (${teacher.staffCode || ""})`,
+              }))}
+            />
             <Input
               label="Sức chứa"
               type="number"
@@ -649,11 +707,12 @@ const ClassManagementPage = () => {
               onChange={(e) =>
                 setNewClassForm({ ...newClassForm, status: e.target.value })
               }
-            >
-              <option value="scheduled">Sắp khai giảng</option>
-              <option value="ongoing">Đang học</option>
-              <option value="completed">Đã kết thúc</option>
-            </Select>
+              options={[
+                { value: "upcoming", label: "Sắp khai giảng" },
+                { value: "ongoing", label: "Đang học" },
+                { value: "completed", label: "Đã kết thúc" },
+              ]}
+            />
             <Input
               label="Ngày bắt đầu"
               type="date"
