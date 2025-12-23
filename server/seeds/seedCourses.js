@@ -15,11 +15,18 @@ const seedCourses = async () => {
     await Course.deleteMany({});
     console.log("✓ Xóa dữ liệu khóa học cũ");
 
+    // Xóa các index cũ nếu có conflict
+    try {
+      await Course.collection.dropIndexes();
+      console.log("✓ Xóa indexes cũ");
+    } catch (err) {
+      console.log("ℹ️  Không cần xóa indexes");
+    }
+
     // Seed dữ liệu mới
     const courses = [
       {
         name: "English A1",
-        code: "EN-A1-2024",
         description: "Khóa học tiếng Anh sơ cấp cho người mới bắt đầu",
         level: "beginner",
         duration: { hours: 60, weeks: 12 },
@@ -29,7 +36,6 @@ const seedCourses = async () => {
       },
       {
         name: "English A2",
-        code: "EN-A2-2024",
         description: "Khóa học tiếng Anh sơ cấp nâng cao",
         level: "beginner",
         duration: { hours: 60, weeks: 12 },
@@ -39,7 +45,6 @@ const seedCourses = async () => {
       },
       {
         name: "English B1",
-        code: "EN-B1-2024",
         description: "Khóa học tiếng Anh trung cấp",
         level: "intermediate",
         duration: { hours: 80, weeks: 16 },
@@ -49,7 +54,6 @@ const seedCourses = async () => {
       },
       {
         name: "English B2",
-        code: "EN-B2-2024",
         description: "Khóa học tiếng Anh trung cấp nâng cao",
         level: "intermediate",
         duration: { hours: 80, weeks: 16 },
@@ -59,7 +63,6 @@ const seedCourses = async () => {
       },
       {
         name: "English C1",
-        code: "EN-C1-2024",
         description: "Khóa học tiếng Anh nâng cao",
         level: "advanced",
         duration: { hours: 100, weeks: 20 },

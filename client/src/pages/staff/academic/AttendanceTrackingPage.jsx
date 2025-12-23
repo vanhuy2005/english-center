@@ -1,7 +1,30 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { ClipboardCheck } from "lucide-react";
-import { Card, Badge, Loading, Input, Table } from "@components/common";
-import api from "@services/api";
+import {
+  ClipboardCheck,
+  Search,
+  Calendar,
+  CheckCircle,
+  XCircle,
+  Clock,
+  User,
+  MoreVertical,
+  Edit2,
+  Save,
+  RotateCcw,
+  CheckSquare,
+  LayoutGrid,
+  List
+} from "lucide-react";
+import {
+  Card,
+  Button,
+  Badge,
+  Loading,
+  Input,
+  Select,
+  Modal
+} from "../../../components/common"; // Import path
+import api from "../../../services/api";
 import { toast } from "react-hot-toast";
 
 const AttendanceTrackingPage = () => {
@@ -9,30 +32,34 @@ const AttendanceTrackingPage = () => {
   const [selectedClass, setSelectedClass] = useState("");
   const [attendanceData, setAttendanceData] = useState([]);
   const [loading, setLoading] = useState(true);
-  // Use local date (YYYY-MM-DD) so client-side date matches user's day
+  const [viewMode, setViewMode] = useState("table"); // 'table' | 'grid'
+  const [searchTerm, setSearchTerm] = useState("");
+
+  // Date Logic
   const localDefaultDate = (() => {
     const d = new Date();
-    const tzOffset = d.getTimezoneOffset() * 60000; // offset in ms
+    const tzOffset = d.getTimezoneOffset() * 60000;
     return new Date(Date.now() - tzOffset).toISOString().split("T")[0];
   })();
   const [date, setDate] = useState(localDefaultDate);
-  const [editingRow, setEditingRow] = useState(null);
-  const [editStatus, setEditStatus] = useState("");
-  // Track which students were modified by the user, keyed by date.
-  // e.g. modifiedRef.current = { '2025-12-22': Set(['id1','id2']) }
+
+  // Edit State
+  const [editingRow, setEditingRow] = useState(null); // ID of student being edited
+  const [editForm, setEditForm] = useState({ status: "", note: "" });
+  
+  // Refs for data persistence
   const modifiedRef = useRef({});
-  // Store the modified row data per date so it can be re-applied when
-  // returning to that date without depending on in-memory table state.
   const modifiedDataRef = useRef({});
   const prevSelectedClassRef = useRef(selectedClass);
   const lastFetchDateRef = useRef(null);
 
   const statusOptions = useMemo(
     () => [
-      { value: "present", label: "Có mặt" },
-      { value: "absent", label: "Vắng" },
-      { value: "excused", label: "Vắng có lý do" },
-      { value: "no_record", label: "Chưa điểm danh" },
+      { value: "present", label: "Có mặt", color: "success", icon: <CheckCircle size={14}/> },
+      { value: "absent", label: "Vắng", color: "danger", icon: <XCircle size={14}/> },
+      { value: "late", label: "Đi muộn", color: "warning", icon: <Clock size={14}/> },
+      { value: "excused", label: "Có phép", color: "info", icon: <Clock size={14}/> },
+      { value: "no_record", label: "Chưa điểm danh", color: "secondary", icon: <User size={14}/> },
     ],
     []
   );
@@ -42,26 +69,19 @@ const AttendanceTrackingPage = () => {
   }, []);
 
   useEffect(() => {
-    // If the selected class changed, clear any saved per-date local edits.
-    // If only the date changed, keep per-date edits so returning to a
-    // previous date preserves the user's saved changes.
     if (prevSelectedClassRef.current !== selectedClass) {
       modifiedRef.current = {};
       modifiedDataRef.current = {};
       prevSelectedClassRef.current = selectedClass;
     }
-
-    // clear local rows to avoid merging previous-date in-memory table
     setAttendanceData([]);
-    // reset last fetch date so we won't merge previous-date prevMap
     lastFetchDateRef.current = null;
     if (selectedClass) fetchAttendance();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedClass, date]);
 
   const fetchClasses = async () => {
     try {
-      const response = await api.get("/classes");
+      const response = await api.get("/classes"); // Adjust endpoint
       const data = response.data?.data || response.data || [];
       setClasses(Array.isArray(data) ? data : []);
     } catch (error) {
@@ -73,27 +93,16 @@ const AttendanceTrackingPage = () => {
 
   const fetchAttendance = async () => {
     try {
-      console.log("[attendance] fetchAttendance start", {
-        selectedClass,
-        date,
-      });
       const response = await api.get(`/attendance/class/${selectedClass}`, {
         params: { startDate: date, endDate: date },
       });
       const byStudent = response.data?.data?.byStudent || [];
-      console.log(
-        "[attendance] GET /attendance/class response:",
-        response.data
-      );
-
+      
       let rows = [];
       if (Array.isArray(byStudent) && byStudent.length > 0) {
         rows = byStudent.map((item) => {
           const student = item.student || {};
-          const record =
-            Array.isArray(item.records) && item.records.length > 0
-              ? item.records[0]
-              : null;
+          const record = item.records?.[0] || null;
           return {
             _id: student._id,
             studentCode: student.studentCode || "",
@@ -105,376 +114,386 @@ const AttendanceTrackingPage = () => {
         });
       }
 
+      // If no attendance records, fetch student list to create empty rows
       if (rows.length === 0) {
         try {
           const rosterRes = await api.get(`/classes/${selectedClass}/students`);
-          console.log("[attendance] roster response:", rosterRes.data);
           const students = rosterRes.data?.data || [];
           rows = Array.isArray(students)
             ? students.map((s) => ({
-                _id: s._id,
-                studentCode: s.studentCode || "",
-                fullName: s.fullName || "",
+                _id: s.student?._id || s._id,
+                studentCode: s.student?.studentCode || s.studentCode || "",
+                fullName: s.student?.fullName || s.fullName || "",
                 status: "no_record",
                 note: "",
                 attendanceId: null,
               }))
             : [];
-        } catch (err) {
-          // ignore
-        }
+        } catch (err) { /* ignore */ }
       }
 
-      console.log("[attendance] built rows:", rows);
-
-      // Merge server rows with local optimistic state to avoid flicker:
-      // if the server returns 'no_record' but the local state recently
-      // recorded a non-'no_record' status, keep the local status.
-      try {
-        // Build a map of previous local data for this date. This includes
-        // any explicit user-saved rows (modifiedDataRef) and, when the
-        // current in-memory table was fetched for the same date, the
-        // existing `attendanceData`.
-        const prevMap = {};
-        if (modifiedDataRef.current[date]) {
-          Object.assign(prevMap, modifiedDataRef.current[date]);
-        }
-        if (lastFetchDateRef.current === date) {
-          (attendanceData || []).forEach((r) => {
-            if (r && r._id) prevMap[r._id.toString()] = r;
-          });
-        }
-
-        const merged = rows.map((r) => {
-          const id = r._id?.toString();
-
-          // If the user recently modified this row for this date, keep it.
-          if (
-            id &&
-            modifiedRef.current[date] &&
-            modifiedRef.current[date].has(id)
-          ) {
-            const prev = prevMap[id];
-            if (prev && prev.status) {
-              return {
-                ...r,
-                status: prev.status,
-                note: prev.note,
-                attendanceId: prev.attendanceId,
-              };
-            }
-          }
-
-          const prev = prevMap[id];
-          if (
-            prev &&
-            prev.status &&
-            prev.status !== "no_record" &&
-            r.status === "no_record"
-          ) {
-            return {
-              ...r,
-              status: prev.status,
-              note: prev.note,
-              attendanceId: prev.attendanceId,
-            };
-          }
-
-          return r;
-        });
-
-        console.log("[attendance] merged rows:", merged);
-        setAttendanceData(merged);
-        // remember which date these rows correspond to
-        lastFetchDateRef.current = date;
-      } catch (mergeErr) {
-        console.error("[attendance] merge error:", mergeErr);
-        setAttendanceData(rows);
-        lastFetchDateRef.current = date;
+      // Merge logic (keep optimistic updates)
+      const prevMap = { ...modifiedDataRef.current[date] };
+      if (lastFetchDateRef.current === date) {
+        (attendanceData || []).forEach((r) => { if (r?._id) prevMap[r._id] = r; });
       }
-      // final guard: ensure lastFetchDateRef is set even if no merge branch
-      if (lastFetchDateRef.current !== date) lastFetchDateRef.current = date;
+
+      const merged = rows.map((r) => {
+        const id = r._id?.toString();
+        if (modifiedRef.current[date]?.has(id)) {
+          return { ...r, ...prevMap[id] };
+        }
+        // Preserve un-synced "no_record" changes
+        if (prevMap[id]?.status !== "no_record" && r.status === "no_record") {
+           return { ...r, ...prevMap[id] };
+        }
+        return r;
+      });
+
+      setAttendanceData(merged);
+      lastFetchDateRef.current = date;
     } catch (error) {
-      console.error("Error fetching attendance:", error);
+      console.error(error);
       setAttendanceData([]);
     }
   };
 
-  const handleSaveStatus = async (row) => {
-    const studentId =
-      row?._id || row?.student?._id || row?.studentId || row?.student_id;
-    if (!studentId) {
-      console.error(
-        "[attendance] invalid row passed to handleSaveStatus:",
-        row
-      );
-      toast.error("Dữ liệu học viên không hợp lệ — vui lòng thử lại");
-      return;
-    }
-
-    const statusToSave =
-      editStatus ||
-      (row.status === "no_record" ? "present" : row.status) ||
-      "present";
-    const allowed = ["present", "absent", "late", "excused"];
-    const finalStatus = allowed.includes(statusToSave)
-      ? statusToSave
-      : "present";
-
-    if (!selectedClass) {
-      toast.error("Vui lòng chọn lớp trước khi cập nhật");
-      return;
-    }
+  const handleSaveStatus = async (studentId, newStatus, newNote = "") => {
+    if (!selectedClass) return toast.error("Vui lòng chọn lớp");
 
     const payload = {
       student: studentId,
       class: selectedClass,
       date,
-      status: finalStatus,
-      note: row.note || "",
+      status: newStatus,
+      note: newNote,
     };
 
-    console.log("[attendance] POST payload:", payload);
-
     try {
-      const res = await api.post(`/staff/academic/attendance`, payload);
-      const saved = res?.data?.data;
-      console.log("[attendance] POST success:", saved || res.data);
-
-      // Optimistically update local table for immediate feedback
+      // Optimistic Update
       setAttendanceData((prev) =>
         prev.map((r) =>
-          (r._id || r._id?._id || "")?.toString() === studentId?.toString()
-            ? {
-                ...r,
-                status: finalStatus,
-                note: row.note || "",
-                attendanceId: saved ? saved._id : r.attendanceId,
-                localOverride: true,
-              }
+          r._id === studentId
+            ? { ...r, status: newStatus, note: newNote, localOverride: true }
             : r
         )
       );
 
-      // mark this student as modified by the user so background refresh
-      // won't overwrite the chosen status
-      try {
-        const d = date;
-        if (!modifiedRef.current[d]) modifiedRef.current[d] = new Set();
-        modifiedRef.current[d].add(studentId?.toString());
-        if (!modifiedDataRef.current[d]) modifiedDataRef.current[d] = {};
-        modifiedDataRef.current[d][studentId?.toString()] = {
-          ...row,
-          status: finalStatus,
-          note: row.note || "",
-          attendanceId: saved ? saved._id : row.attendanceId,
-          localOverride: true,
-        };
-      } catch (e) {
-        /* ignore */
-      }
+      // Track modification
+      if (!modifiedRef.current[date]) modifiedRef.current[date] = new Set();
+      modifiedRef.current[date].add(studentId);
+      if (!modifiedDataRef.current[date]) modifiedDataRef.current[date] = {};
+      modifiedDataRef.current[date][studentId] = {
+         ...attendanceData.find(r => r._id === studentId),
+         status: newStatus,
+         note: newNote,
+         localOverride: true
+      };
 
-      toast.success("Trạng thái điểm danh đã được cập nhật");
+      // API Call
+      await api.post(`/staff/academic/attendance`, payload);
+      toast.success("Cập nhật thành công");
       setEditingRow(null);
-      setEditStatus("");
-      // Do not auto-refresh immediately to avoid overwriting user's choice.
-      // Rely on manual refresh / navigation to re-sync with server.
     } catch (err) {
-      console.error(
-        "[attendance] POST error:",
-        err?.response?.data || err.message || err
-      );
-      const serverMessage =
-        err?.response?.data?.message ||
-        (err?.response?.data ? JSON.stringify(err.response.data) : null);
-      const isDuplicate =
-        serverMessage &&
-        /duplicate|E11000|already exists|unique/i.test(serverMessage);
-
-      if (isDuplicate) {
-        try {
-          const res = await api.get(`/staff/academic/attendance`, {
-            params: {
-              class: selectedClass,
-              student: studentId,
-              startDate: date,
-              endDate: date,
-            },
-          });
-          const existing = res.data?.data?.[0];
-          if (existing && existing._id) {
-            const putRes = await api.put(
-              `/staff/academic/attendance/${existing._id}`,
-              {
-                status: finalStatus,
-                note: row.note || "",
-              }
-            );
-            const updated = putRes?.data?.data;
-            console.log("[attendance] PUT success:", updated || putRes.data);
-
-            // Update local table immediately
-            setAttendanceData((prev) =>
-              prev.map((r) =>
-                (r._id || r._id?._id || "")?.toString() ===
-                studentId?.toString()
-                  ? {
-                      ...r,
-                      status: finalStatus,
-                      note: row.note || "",
-                      attendanceId: updated ? updated._id : r.attendanceId,
-                      localOverride: true,
-                    }
-                  : r
-              )
-            );
-
-            try {
-              const d = date;
-              if (!modifiedRef.current[d]) modifiedRef.current[d] = new Set();
-              modifiedRef.current[d].add(studentId?.toString());
-              if (!modifiedDataRef.current[d]) modifiedDataRef.current[d] = {};
-              modifiedDataRef.current[d][studentId?.toString()] = {
-                ...row,
-                status: finalStatus,
-                note: row.note || "",
-                attendanceId: updated ? updated._id : row.attendanceId,
-                localOverride: true,
-              };
-            } catch (e) {
-              /* ignore */
-            }
-
-            toast.success("Cập nhật điểm danh thành công");
-            setEditingRow(null);
-            setEditStatus("");
-            return;
-          }
-        } catch (updateErr) {
-          console.error("Error updating existing attendance:", updateErr);
-        }
-      }
-
-      toast.error(serverMessage || "Không thể cập nhật trạng thái");
+      console.error(err);
+      toast.error("Lỗi cập nhật điểm danh");
+      // Revert optimistic update here if needed
     }
   };
 
-  const columns = [
-    { key: "studentCode", label: "Mã HV" },
-    { key: "fullName", label: "Họ và tên" },
-    {
-      key: "status",
-      label: "Trạng thái",
-      render: (value, row) => {
-        const statusVal = value || row?.status || "no_record";
-        return (
-          <div className="flex items-center gap-3">
-            <Badge
-              variant={
-                statusVal === "present"
-                  ? "success"
-                  : statusVal === "no_record"
-                  ? "secondary"
-                  : "danger"
-              }
-            >
-              {statusVal === "present"
-                ? "Có mặt"
-                : statusVal === "no_record"
-                ? "Chưa điểm danh"
-                : statusVal === "absent"
-                ? "Vắng"
-                : statusVal}
-            </Badge>
+  const handleMarkAllPresent = () => {
+     if (!window.confirm("Bạn có chắc muốn đánh dấu tất cả là 'Có mặt'?")) return;
+     attendanceData.forEach(student => {
+        if (student.status === 'no_record') {
+           handleSaveStatus(student._id, 'present');
+        }
+     });
+  };
 
-            {editingRow === row?._id ? (
-              <div className="flex items-center gap-2">
-                <select
-                  value={editStatus || statusVal}
-                  onChange={(e) => setEditStatus(e.target.value)}
-                  className="px-2 py-1 border rounded"
-                >
-                  {statusOptions.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  className="px-2 py-1 bg-green-500 text-white rounded"
-                  onClick={() => handleSaveStatus(row)}
-                >
-                  Lưu
-                </button>
-                <button
-                  className="px-2 py-1 bg-gray-300 rounded"
-                  onClick={() => {
-                    setEditingRow(null);
-                    setEditStatus("");
-                  }}
-                >
-                  Hủy
-                </button>
-              </div>
-            ) : (
-              <button
-                className="px-2 py-1 bg-blue-500 text-white rounded"
-                onClick={() => {
-                  setEditingRow(row?._id);
-                  setEditStatus(
-                    statusVal === "no_record" ? "present" : statusVal
-                  );
-                }}
-              >
-                Thay đổi
-              </button>
-            )}
-          </div>
-        );
-      },
-    },
-    { key: "note", label: "Ghi chú" },
-  ];
+  const filteredData = attendanceData.filter(
+    (s) =>
+      s.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      s.studentCode?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
-  if (loading) return <Loading fullScreen />;
+  // --- RENDER HELPERS ---
+
+  const getStatusBadge = (status) => {
+    const opt = statusOptions.find(o => o.value === status) || statusOptions[4];
+    return (
+      <Badge variant={opt.color} className="flex items-center gap-1.5 px-2.5 py-1">
+        {opt.icon} {opt.label}
+      </Badge>
+    );
+  };
+
+  if (loading) return <div className="h-screen flex items-center justify-center bg-gray-50"><Loading size="large" /></div>;
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center gap-3">
-        <ClipboardCheck className="w-8 h-8 text-[#3B9797]" />
-        <h1 className="text-2xl font-bold text-gray-800">Theo dõi điểm danh</h1>
-      </div>
-
-      <Card>
-        <div className="flex gap-4 mb-6">
-          <select
-            value={selectedClass}
-            onChange={(e) => setSelectedClass(e.target.value)}
-            className="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3B9797]"
-          >
-            <option value="">Chọn lớp học</option>
-            {classes.map((cls) => (
-              <option key={cls._id} value={cls._id}>
-                {cls.name}
-              </option>
-            ))}
-          </select>
-          <Input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="w-48"
-          />
+    <div className="min-h-screen bg-gray-50/50 p-6 md:p-8 font-sans text-gray-800">
+      <div className="max-w-[1600px] mx-auto space-y-6">
+        
+        {/* --- HEADER --- */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+          <div>
+            <h1 className="text-2xl font-bold text-[var(--color-primary)] flex items-center gap-3">
+               <div className="p-2 bg-[var(--color-primary)] rounded-lg shadow-sm">
+                  <ClipboardCheck className="w-6 h-6 text-white" />
+               </div>
+               Điểm Danh Lớp Học
+            </h1>
+            <p className="text-gray-500 text-sm mt-1 ml-12">
+              Quản lý chuyên cần và ghi nhận trạng thái tham gia
+            </p>
+          </div>
+          
+          <div className="flex gap-2">
+             <Button variant="outline" className="text-gray-600 border-gray-300" onClick={() => fetchAttendance()}>
+                <RotateCcw size={18} />
+             </Button>
+             <div className="bg-gray-100 p-1 rounded-lg flex gap-1">
+                <button 
+                   onClick={() => setViewMode('table')}
+                   className={`p-2 rounded-md transition-all ${viewMode === 'table' ? 'bg-white shadow-sm text-[var(--color-primary)]' : 'text-gray-500 hover:text-gray-700'}`}
+                >
+                   <List size={18} />
+                </button>
+                <button 
+                   onClick={() => setViewMode('grid')}
+                   className={`p-2 rounded-md transition-all ${viewMode === 'grid' ? 'bg-white shadow-sm text-[var(--color-primary)]' : 'text-gray-500 hover:text-gray-700'}`}
+                >
+                   <LayoutGrid size={18} />
+                </button>
+             </div>
+          </div>
         </div>
 
-        {selectedClass ? (
-          <Table columns={columns} data={attendanceData} />
+        {/* --- TOOLBAR --- */}
+        <Card className="border border-gray-200 shadow-sm">
+           <div className="p-4 flex flex-col xl:flex-row gap-4 items-center justify-between">
+              
+              {/* Selection Controls */}
+              <div className="flex flex-col md:flex-row gap-4 w-full xl:w-auto">
+                 <div className="relative w-full md:w-64">
+                    <select
+                       className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[var(--color-secondary)] outline-none text-sm font-medium"
+                       value={selectedClass}
+                       onChange={(e) => setSelectedClass(e.target.value)}
+                    >
+                       <option value="">-- Chọn lớp học --</option>
+                       {classes.map((cls) => (
+                          <option key={cls._id} value={cls._id}>{cls.name}</option>
+                       ))}
+                    </select>
+                 </div>
+                 <div className="relative w-full md:w-48">
+                    <input 
+                       type="date" 
+                       className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[var(--color-secondary)] outline-none text-sm"
+                       value={date}
+                       onChange={(e) => setDate(e.target.value)}
+                    />
+                 </div>
+              </div>
+
+              {/* Search & Bulk Actions */}
+              <div className="flex flex-col md:flex-row gap-4 w-full xl:w-auto">
+                 <div className="relative flex-1 md:w-64">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                    <input 
+                       type="text" 
+                       placeholder="Tìm học viên..." 
+                       className="w-full pl-9 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[var(--color-secondary)] outline-none text-sm"
+                       value={searchTerm}
+                       onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                 </div>
+                 {selectedClass && (
+                    <Button 
+                       className="bg-[var(--color-secondary)] hover:bg-[var(--color-secondary-dark)] text-white shadow-md whitespace-nowrap"
+                       onClick={handleMarkAllPresent}
+                    >
+                       <CheckSquare size={18} className="mr-2"/> Tất cả có mặt
+                    </Button>
+                 )}
+              </div>
+
+           </div>
+        </Card>
+
+        {/* --- CONTENT AREA --- */}
+        {!selectedClass ? (
+           <div className="flex flex-col items-center justify-center py-24 bg-white rounded-xl border border-dashed border-gray-200">
+              <div className="p-4 bg-gray-50 rounded-full mb-3">
+                 <Clock size={40} className="text-gray-300" />
+              </div>
+              <p className="text-gray-500 font-medium">Vui lòng chọn lớp và ngày để bắt đầu điểm danh</p>
+           </div>
         ) : (
-          <div className="text-center py-12 text-gray-500">
-            Vui lòng chọn lớp học
-          </div>
+           <>
+              {/* TABLE VIEW */}
+              {viewMode === 'table' && (
+                 <Card className="border border-gray-200 shadow-sm overflow-hidden bg-white">
+                    <div className="overflow-x-auto">
+                       <table className="w-full text-sm text-left">
+                          <thead className="bg-gray-50/80 text-gray-500 font-semibold text-xs uppercase border-b border-gray-200">
+                             <tr>
+                                <th className="px-6 py-4 w-16">#</th>
+                                <th className="px-6 py-4">Học Viên</th>
+                                <th className="px-6 py-4 text-center">Trạng Thái</th>
+                                <th className="px-6 py-4">Ghi Chú</th>
+                                <th className="px-6 py-4 text-right">Thao Tác</th>
+                             </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                             {filteredData.map((row, idx) => (
+                                <tr key={row._id} className={`hover:bg-blue-50/30 transition-colors ${editingRow === row._id ? 'bg-blue-50/50' : ''}`}>
+                                   <td className="px-6 py-4 text-gray-400 font-mono text-xs">{idx + 1}</td>
+                                   <td className="px-6 py-4">
+                                      <div className="flex items-center gap-3">
+                                         <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 font-bold border border-gray-200 text-xs">
+                                            {row.fullName?.charAt(0).toUpperCase()}
+                                         </div>
+                                         <div>
+                                            <p className="font-bold text-[var(--color-primary)]">{row.fullName}</p>
+                                            <p className="text-xs text-gray-500 font-mono">{row.studentCode}</p>
+                                         </div>
+                                      </div>
+                                   </td>
+                                   <td className="px-6 py-4 text-center">
+                                      {editingRow === row._id ? (
+                                         <select 
+                                            className="px-3 py-1.5 border border-gray-300 rounded-md text-sm outline-none focus:border-blue-500 w-full"
+                                            value={editForm.status || row.status}
+                                            onChange={(e) => setEditForm({...editForm, status: e.target.value})}
+                                         >
+                                            {statusOptions.map(opt => (
+                                               <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                            ))}
+                                         </select>
+                                      ) : (
+                                         getStatusBadge(row.status)
+                                      )}
+                                   </td>
+                                   <td className="px-6 py-4">
+                                      {editingRow === row._id ? (
+                                         <input 
+                                            type="text" 
+                                            className="px-3 py-1.5 border border-gray-300 rounded-md text-sm outline-none focus:border-blue-500 w-full"
+                                            placeholder="Nhập ghi chú..."
+                                            value={editForm.note}
+                                            onChange={(e) => setEditForm({...editForm, note: e.target.value})}
+                                         />
+                                      ) : (
+                                         <span className="text-gray-500 italic truncate max-w-[200px] block">{row.note || "-"}</span>
+                                      )}
+                                   </td>
+                                   <td className="px-6 py-4 text-right">
+                                      {editingRow === row._id ? (
+                                         <div className="flex justify-end gap-2">
+                                            <Button 
+                                               size="sm" 
+                                               className="bg-emerald-600 hover:bg-emerald-700 text-white h-8 px-3"
+                                               onClick={() => handleSaveStatus(row._id, editForm.status, editForm.note)}
+                                            >
+                                               <Save size={14} />
+                                            </Button>
+                                            <Button 
+                                               size="sm" 
+                                               variant="outline" 
+                                               className="h-8 px-3"
+                                               onClick={() => setEditingRow(null)}
+                                            >
+                                               <XCircle size={14} />
+                                            </Button>
+                                         </div>
+                                      ) : (
+                                         <Button 
+                                            size="sm" 
+                                            variant="ghost" 
+                                            className="text-gray-500 hover:text-blue-600 h-8 w-8 p-0"
+                                            onClick={() => {
+                                               setEditingRow(row._id);
+                                               setEditForm({ status: row.status, note: row.note });
+                                            }}
+                                         >
+                                            <Edit2 size={16} />
+                                         </Button>
+                                      )}
+                                   </td>
+                                </tr>
+                             ))}
+                          </tbody>
+                       </table>
+                    </div>
+                 </Card>
+              )}
+
+              {/* GRID VIEW */}
+              {viewMode === 'grid' && (
+                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    {filteredData.map((row) => (
+                       <Card key={row._id} className="border border-gray-200 shadow-sm hover:shadow-md transition-all group relative overflow-hidden">
+                          {/* Quick Status Bar */}
+                          <div className={`h-1 w-full absolute top-0 left-0 ${
+                             row.status === 'present' ? 'bg-emerald-500' : 
+                             row.status === 'absent' ? 'bg-rose-500' : 
+                             row.status === 'late' ? 'bg-amber-500' : 'bg-gray-200'
+                          }`} />
+                          
+                          <div className="p-4 pt-5">
+                             <div className="flex items-start justify-between mb-3">
+                                <div className="flex items-center gap-3">
+                                   <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center font-bold text-[var(--color-primary)] border border-gray-200">
+                                      {row.fullName?.charAt(0).toUpperCase()}
+                                   </div>
+                                   <div>
+                                      <h4 className="font-bold text-gray-800 text-sm line-clamp-1">{row.fullName}</h4>
+                                      <p className="text-xs text-gray-500 font-mono">{row.studentCode}</p>
+                                   </div>
+                                </div>
+                             </div>
+
+                             {/* Quick Actions Grid */}
+                             <div className="grid grid-cols-2 gap-2 mt-4">
+                                <button 
+                                   onClick={() => handleSaveStatus(row._id, 'present')}
+                                   className={`flex flex-col items-center justify-center p-2 rounded-lg border transition-all ${row.status === 'present' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`}
+                                >
+                                   <CheckCircle size={18} className={row.status === 'present' ? 'text-emerald-600' : 'text-gray-400'} />
+                                   <span className="text-[10px] mt-1 font-medium">Có mặt</span>
+                                </button>
+                                <button 
+                                   onClick={() => handleSaveStatus(row._id, 'absent')}
+                                   className={`flex flex-col items-center justify-center p-2 rounded-lg border transition-all ${row.status === 'absent' ? 'bg-rose-50 border-rose-200 text-rose-700' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`}
+                                >
+                                   <XCircle size={18} className={row.status === 'absent' ? 'text-rose-600' : 'text-gray-400'} />
+                                   <span className="text-[10px] mt-1 font-medium">Vắng</span>
+                                </button>
+                             </div>
+                             
+                             {/* Expanded Options */}
+                             <div className="mt-2 text-center">
+                                <button 
+                                   className="text-xs text-gray-400 hover:text-blue-600 flex items-center justify-center gap-1 w-full py-1"
+                                   onClick={() => {
+                                      setEditingRow(row._id);
+                                      setEditForm({ status: row.status, note: row.note });
+                                      setViewMode('table'); // Switch back to table for detailed edit
+                                   }}
+                                >
+                                   <MoreVertical size={12} /> Tùy chọn khác (Trễ, Phép...)
+                                </button>
+                             </div>
+                          </div>
+                       </Card>
+                    ))}
+                 </div>
+              )}
+           </>
         )}
-      </Card>
+
+      </div>
     </div>
   );
 };

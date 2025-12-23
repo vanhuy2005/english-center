@@ -9,16 +9,6 @@ import RegisterPage from "@pages/auth/RegisterPage";
 import DirectorDashboard from "@pages/director/DirectorDashboard";
 import UserManagementPage from "@pages/director/UserManagementPage";
 
-// Teacher Pages
-import TeacherDashboardPage from "@pages/teacher/TeacherDashboardPage";
-import MyClassesPage from "@pages/teacher/MyClassesPage";
-import ClassStudentsPage from "@pages/teacher/ClassStudentsPage";
-import ClassStatisticsPage from "@pages/teacher/ClassStatisticsPage";
-import StudentEvaluationPage from "@pages/teacher/StudentEvaluationPage";
-import TeacherSchedulePage from "@pages/teacher/TeacherSchedulePage";
-import TeacherNotificationsPage from "@pages/teacher/TeacherNotificationsPage";
-import { AttendanceMarkPage, GradeInputPage } from "@pages/teacher";
-
 // Student Pages
 import StudentDashboard from "@pages/student/StudentDashboard";
 import ProfilePage from "@pages/student/ProfilePage";
@@ -88,8 +78,6 @@ export const DashboardRoute = ({ role }) => {
   switch (role) {
     case "director":
       return <DirectorDashboard />;
-    case "teacher":
-      return <TeacherDashboardPage />;
     case "student":
       return <StudentDashboard />;
     case "enrollment":
@@ -129,22 +117,6 @@ export const roleRoutes = {
     { path: "/classes/:id", element: <ClassDetailPage /> },
     { path: "/finance", element: <div>Finance Management - TODO</div> },
     { path: "/reports", element: <div>Reports - TODO</div> },
-  ],
-
-  // Teacher-specific routes
-  teacher: [
-    { path: "/classes", element: <MyClassesPage /> },
-    { path: "/classes/:classId", element: <ClassDetailPage /> },
-    { path: "/classes/:classId/students", element: <ClassStudentsPage /> },
-    { path: "/classes/:classId/attendance", element: <AttendanceMarkPage /> },
-    { path: "/classes/:classId/grades", element: <GradeInputPage /> },
-    { path: "/classes/:classId/statistics", element: <ClassStatisticsPage /> },
-    {
-      path: "/classes/:classId/evaluation",
-      element: <StudentEvaluationPage />,
-    },
-    { path: "/schedule", element: <TeacherSchedulePage /> },
-    { path: "/notifications", element: <TeacherNotificationsPage /> },
   ],
 
   // Student-specific routes

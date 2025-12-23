@@ -7,6 +7,12 @@ import {
   X,
   Check,
   ChevronDown,
+  Search,
+  Clock,
+  MapPin,
+  User,
+  Users,
+  Briefcase
 } from "lucide-react";
 import {
   Card,
@@ -16,10 +22,32 @@ import {
   Input,
   Select,
   Modal,
-} from "@components/common";
-import api from "@services/api";
-import { scheduleService, studentService } from "@services";
-import { toast } from "react-hot-toast";
+} from "../../../components/common";
+import api from "../../../services/api";
+import { scheduleService } from "../../../services";
+import toast from "react-hot-toast";
+
+// --- HELPER: Safe Data Extraction ---
+const getDayName = (dayOfWeek) => {
+  const days = [
+    { value: 0, label: "Chủ Nhật" },
+    { value: 1, label: "Thứ Hai" },
+    { value: 2, label: "Thứ Ba" },
+    { value: 3, label: "Thứ Tư" },
+    { value: 4, label: "Thứ Năm" },
+    { value: 5, label: "Thứ Sáu" },
+    { value: 6, label: "Thứ Bảy" },
+  ];
+  return days.find((d) => d.value === Number(dayOfWeek))?.label || "Không xác định";
+};
+
+// Helper để lấy giá trị capacity an toàn (Fix lỗi Object object)
+const getCapacityValue = (capacity) => {
+  if (typeof capacity === 'object' && capacity !== null) {
+    return capacity.max || 0;
+  }
+  return capacity || 0;
+};
 
 const ClassSchedulePage = () => {
   const [classes, setClasses] = useState([]);
@@ -35,7 +63,7 @@ const ClassSchedulePage = () => {
 
   // Form states
   const [scheduleForm, setScheduleForm] = useState({
-    dayOfWeek: "",
+    dayOfWeek: "1",
     startTime: "",
     endTime: "",
   });
@@ -47,7 +75,6 @@ const ClassSchedulePage = () => {
   });
 
   const [teachers, setTeachers] = useState([]);
-  const [staffMembers, setStaffMembers] = useState([]);
   const [students, setStudents] = useState([]);
   const [showPersonalModal, setShowPersonalModal] = useState(false);
   const [personalForm, setPersonalForm] = useState({
@@ -60,44 +87,36 @@ const ClassSchedulePage = () => {
     description: "",
   });
 
-  const daysOfWeek = [
-    { value: 0, label: "Chủ Nhật" },
+  const daysOptions = [
     { value: 1, label: "Thứ Hai" },
     { value: 2, label: "Thứ Ba" },
     { value: 3, label: "Thứ Tư" },
     { value: 4, label: "Thứ Năm" },
     { value: 5, label: "Thứ Sáu" },
     { value: 6, label: "Thứ Bảy" },
+    { value: 0, label: "Chủ Nhật" },
   ];
 
   useEffect(() => {
-    (async () => {
-      await loadData();
-      // Quick test: auto-open personal schedule modal once after load
-      try {
-        await fetchStudents();
-        setShowPersonalModal(true);
-      } catch (e) {
-        // ignore
-      }
-    })();
+    loadData();
   }, []);
 
   const loadData = async () => {
     try {
       setLoading(true);
       const [classRes, staffRes] = await Promise.all([
-        api.get("classes?limit=100"),
-        api.get("staffs?staffType=teacher&limit=100"),
+        api.get("/staff/enrollment/classes", { params: { limit: 100 } }),
+        api.get("/staffs", { params: { role: "teacher", limit: 100 } }),
       ]);
 
-      setClasses(classRes.data.data || []);
-      setStaffMembers(staffRes.data.data || []);
-      setTeachers(staffRes.data.data || []);
-      // do not fetch students here to keep list small; fetched when opening personal modal
+      const classData = classRes.data?.data?.classes || classRes.data?.data || [];
+      const teacherData = staffRes.data?.data || [];
+
+      setClasses(Array.isArray(classData) ? classData : []);
+      setTeachers(Array.isArray(teacherData) ? teacherData : []);
     } catch (error) {
       console.error("Error loading data:", error);
-      toast.error("Lỗi tải dữ liệu");
+      toast.error("Lỗi tải dữ liệu lớp học");
     } finally {
       setLoading(false);
     }
@@ -105,8 +124,8 @@ const ClassSchedulePage = () => {
 
   const fetchStudents = async () => {
     try {
-      const res = await studentService.getAll({ limit: 200 });
-      const data = res?.data?.data || res?.data || [];
+      const res = await api.get("/staff/enrollment/students", { params: { limit: 200 } });
+      const data = res.data?.data?.students || res.data?.data || [];
       setStudents(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error(err);
@@ -115,7 +134,7 @@ const ClassSchedulePage = () => {
   };
 
   const openPersonalModal = async () => {
-    await fetchStudents();
+    if (students.length === 0) await fetchStudents();
     setPersonalForm({
       studentId: "",
       date: new Date().toISOString().split("T")[0],
@@ -129,10 +148,11 @@ const ClassSchedulePage = () => {
   };
 
   const handleCreatePersonal = async () => {
-    if (!personalForm.studentId) return toast.error("Chọn học viên");
-    if (!personalForm.date) return toast.error("Chọn ngày");
+    if (!personalForm.studentId) return toast.error("Vui lòng chọn học viên");
+    if (!personalForm.date) return toast.error("Vui lòng chọn ngày");
+    
     try {
-      const payload = {
+      await scheduleService.create({
         student: personalForm.studentId,
         date: personalForm.date,
         startTime: personalForm.startTime,
@@ -140,22 +160,23 @@ const ClassSchedulePage = () => {
         room: personalForm.room,
         topic: personalForm.topic,
         description: personalForm.description,
-      };
-      await scheduleService.create(payload);
-      toast.success(
-        "Tạo buổi riêng thành công — học viên sẽ thấy trong thời khóa biểu"
-      );
+        type: "personal"
+      });
+      
+      toast.success("Đã tạo lịch học riêng thành công");
       setShowPersonalModal(false);
     } catch (err) {
       console.error(err);
-      toast.error("Lỗi khi tạo buổi riêng");
+      toast.error(err.response?.data?.message || "Lỗi khi tạo buổi học riêng");
     }
   };
+
+  // --- CLASS SCHEDULE HANDLERS ---
 
   const handleAddSchedule = (classItem) => {
     setSelectedClass(classItem);
     setEditingSchedule(null);
-    setScheduleForm({ dayOfWeek: "", startTime: "", endTime: "" });
+    setScheduleForm({ dayOfWeek: "1", startTime: "", endTime: "" });
     setShowScheduleModal(true);
   };
 
@@ -163,7 +184,7 @@ const ClassSchedulePage = () => {
     setSelectedClass(classItem);
     setEditingSchedule({ ...scheduleItem, index });
     setScheduleForm({
-      dayOfWeek: scheduleItem.dayOfWeek,
+      dayOfWeek: String(scheduleItem.dayOfWeek),
       startTime: scheduleItem.startTime,
       endTime: scheduleItem.endTime,
     });
@@ -171,23 +192,16 @@ const ClassSchedulePage = () => {
   };
 
   const handleDeleteSchedule = async (classItem, index) => {
-    if (!window.confirm("Bạn chắc chắn muốn xóa lịch học này?")) return;
+    if (!window.confirm("Bạn chắc chắn muốn xóa lịch này khỏi lớp học?")) return;
 
     try {
       const updatedSchedule = [...(classItem.schedule || [])];
       updatedSchedule.splice(index, 1);
 
-      await api.put(`classes/${classItem._id}`, {
-        schedule: updatedSchedule,
-      });
+      await api.put(`/classes/${classItem._id}`, { schedule: updatedSchedule });
 
-      // Update local state
-      setClasses(
-        classes.map((c) =>
-          c._id === classItem._id ? { ...c, schedule: updatedSchedule } : c
-        )
-      );
-      toast.success("Xóa lịch học thành công");
+      setClasses(prev => prev.map(c => c._id === classItem._id ? { ...c, schedule: updatedSchedule } : c));
+      toast.success("Đã xóa lịch học");
     } catch (error) {
       console.error("Error deleting schedule:", error);
       toast.error("Lỗi xóa lịch học");
@@ -195,50 +209,31 @@ const ClassSchedulePage = () => {
   };
 
   const handleSaveSchedule = async () => {
-    if (
-      !scheduleForm.dayOfWeek ||
-      !scheduleForm.startTime ||
-      !scheduleForm.endTime
-    ) {
-      toast.error("Vui lòng điền tất cả thông tin lịch học");
-      return;
+    if (!scheduleForm.startTime || !scheduleForm.endTime) {
+      return toast.error("Vui lòng nhập giờ bắt đầu và kết thúc");
     }
 
     try {
       const updatedSchedule = [...(selectedClass.schedule || [])];
+      const newItem = {
+        dayOfWeek: parseInt(scheduleForm.dayOfWeek),
+        startTime: scheduleForm.startTime,
+        endTime: scheduleForm.endTime,
+        room: editingSchedule?.room || selectedClass.room || "", 
+        teacher: editingSchedule?.teacher || selectedClass.teacher?._id || null
+      };
 
       if (editingSchedule) {
-        updatedSchedule[editingSchedule.index] = {
-          dayOfWeek: parseInt(scheduleForm.dayOfWeek),
-          startTime: scheduleForm.startTime,
-          endTime: scheduleForm.endTime,
-        };
+        updatedSchedule[editingSchedule.index] = { ...editingSchedule, ...newItem };
       } else {
-        updatedSchedule.push({
-          dayOfWeek: parseInt(scheduleForm.dayOfWeek),
-          startTime: scheduleForm.startTime,
-          endTime: scheduleForm.endTime,
-        });
+        updatedSchedule.push(newItem);
       }
 
-      await api.put(`classes/${selectedClass._id}`, {
-        schedule: updatedSchedule,
-      });
+      await api.put(`/classes/${selectedClass._id}`, { schedule: updatedSchedule });
 
-      // Update local state
-      setClasses(
-        classes.map((c) =>
-          c._id === selectedClass._id ? { ...c, schedule: updatedSchedule } : c
-        )
-      );
-
-      toast.success(
-        editingSchedule
-          ? "Cập nhật lịch học thành công"
-          : "Thêm lịch học thành công"
-      );
+      setClasses(prev => prev.map(c => c._id === selectedClass._id ? { ...c, schedule: updatedSchedule } : c));
+      toast.success(editingSchedule ? "Cập nhật thành công" : "Thêm lịch thành công");
       setShowScheduleModal(false);
-      setScheduleForm({ dayOfWeek: "", startTime: "", endTime: "" });
     } catch (error) {
       console.error("Error saving schedule:", error);
       toast.error("Lỗi lưu lịch học");
@@ -246,49 +241,42 @@ const ClassSchedulePage = () => {
   };
 
   const handleAssignRoom = async () => {
-    if (!assignForm.dayOfWeek || !assignForm.room) {
-      toast.error("Vui lòng điền thông tin phòng học");
-      return;
-    }
-
+    if (!assignForm.dayOfWeek) return toast.error("Vui lòng chọn ngày");
+    
     try {
-      const updatedSchedule = (selectedClass.schedule || []).map((s) =>
-        s.dayOfWeek === parseInt(assignForm.dayOfWeek)
-          ? {
-              ...s,
-              room: assignForm.room,
-              teacher: assignForm.teacher || s.teacher,
-            }
-          : s
-      );
-
-      await api.put(`classes/${selectedClass._id}`, {
-        schedule: updatedSchedule,
-        room: assignForm.room,
-        teacher: assignForm.teacher || selectedClass.teacher,
+      const updatedSchedule = (selectedClass.schedule || []).map((s) => {
+        if (s.dayOfWeek === parseInt(assignForm.dayOfWeek)) {
+          return {
+            ...s,
+            room: assignForm.room || s.room,
+            teacher: assignForm.teacher || s.teacher,
+          };
+        }
+        return s;
       });
 
-      // Update local state
-      setClasses(
-        classes.map((c) =>
-          c._id === selectedClass._id ? { ...c, schedule: updatedSchedule } : c
-        )
-      );
+      await api.put(`/classes/${selectedClass._id}`, {
+        schedule: updatedSchedule,
+        ...(assignForm.teacher ? { teacher: assignForm.teacher } : {}),
+        ...(assignForm.room ? { room: assignForm.room } : {})
+      });
 
-      toast.success("Cập nhật phòng học thành công");
+      setClasses(prev => prev.map(c => c._id === selectedClass._id ? { 
+         ...c, 
+         schedule: updatedSchedule,
+         teacher: assignForm.teacher ? teachers.find(t => t._id === assignForm.teacher) : c.teacher,
+         room: assignForm.room || c.room
+      } : c));
+
+      toast.success("Cập nhật phòng/giáo viên thành công");
       setShowAssignModal(false);
-      setAssignForm({ dayOfWeek: "", room: "", teacher: "" });
     } catch (error) {
-      console.error("Error assigning room:", error);
-      toast.error("Lỗi cập nhật phòng học");
+      console.error("Error assigning:", error);
+      toast.error("Lỗi cập nhật thông tin");
     }
   };
 
-  const getDayName = (dayOfWeek) => {
-    return (
-      daysOfWeek.find((d) => d.value === dayOfWeek)?.label || "Không xác định"
-    );
-  };
+  // --- RENDER ---
 
   const filteredClasses = classes.filter(
     (c) =>
@@ -296,392 +284,347 @@ const ClassSchedulePage = () => {
       c.classCode?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  if (loading) return <Loading />;
+  if (loading) return <div className="h-screen flex items-center justify-center bg-gray-50"><Loading size="large" /></div>;
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Quản Lý Lịch Học</h1>
-          <p className="text-gray-600 mt-1">Sắp xếp lịch học cho các lớp học</p>
-        </div>
-        <div>
+    <div className="min-h-screen bg-gray-50/50 p-6 md:p-8 font-sans text-gray-800">
+      <div className="max-w-[1600px] mx-auto space-y-6">
+        
+        {/* --- HEADER --- */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+          <div>
+            <h1 className="text-2xl font-bold text-[var(--color-primary)] flex items-center gap-3">
+               <div className="p-2 bg-[var(--color-primary)] rounded-lg shadow-sm">
+                  <Calendar className="w-6 h-6 text-white" />
+               </div>
+               Quản Lý Lịch Học
+            </h1>
+            <p className="text-gray-500 text-sm mt-1 ml-12">
+              Thiết lập thời khóa biểu cho các lớp và buổi học riêng
+            </p>
+          </div>
           <Button
             onClick={openPersonalModal}
-            variant="primary"
-            icon={<Plus size={16} />}
+            className="bg-[var(--color-primary)] hover:bg-[var(--color-primary-light)] text-white shadow-md flex items-center gap-2"
           >
-            Tạo Buổi Riêng
+            <Plus size={18} /> Tạo Buổi Học Riêng
           </Button>
         </div>
-      </div>
 
-      {/* Search */}
-      <div className="flex gap-4">
-        <div className="flex-1">
-          <Input
-            placeholder="Tìm kiếm lớp học..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            icon={<Calendar size={18} />}
-          />
-        </div>
-      </div>
+        {/* --- SEARCH --- */}
+        <Card className="border border-gray-200 shadow-sm">
+           <div className="p-4">
+              <div className="relative w-full">
+                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+                 <input 
+                    type="text" 
+                    placeholder="Tìm kiếm lớp học theo tên hoặc mã lớp..." 
+                    className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[var(--color-secondary)] focus:border-transparent outline-none transition-all"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                 />
+              </div>
+           </div>
+        </Card>
 
-      {/* Classes List */}
-      <div className="space-y-4">
-        {filteredClasses.length > 0 ? (
-          filteredClasses.map((classItem) => (
-            <Card key={classItem._id} className="overflow-hidden">
-              {/* Class Header */}
-              <div
-                className="p-6 cursor-pointer hover:bg-gray-50 transition-colors flex items-center justify-between"
-                onClick={() =>
-                  setExpandedClassId(
-                    expandedClassId === classItem._id ? null : classItem._id
-                  )
-                }
-              >
-                <div className="flex-1">
-                  <div className="flex items-center gap-4">
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900">
-                        {classItem.name}
-                      </h3>
-                      <div className="flex items-center gap-2 mt-1 text-sm text-gray-600">
-                        <span>Mã: {classItem.classCode}</span>
-                        <span>•</span>
-                        <span>
-                          Sức chứa:{" "}
-                          {classItem.capacity?.max ?? classItem.capacity ?? 0}
-                        </span>
-                        <span>•</span>
-                        <span>Phòng: {classItem.room || "Chưa xác định"}</span>
-                      </div>
+        {/* --- CLASS LIST --- */}
+        <div className="space-y-4">
+          {filteredClasses.length > 0 ? (
+            filteredClasses.map((classItem) => {
+               const isExpanded = expandedClassId === classItem._id;
+               const scheduleList = classItem.schedule || [];
+               
+               // Lấy capacity an toàn
+               const capacityMax = getCapacityValue(classItem.capacity);
+               const currentStudents = classItem.currentEnrollment || classItem.students?.length || 0;
+
+               return (
+                <div key={classItem._id} className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden transition-all duration-300">
+                  {/* Card Header (Clickable) */}
+                  <div 
+                    className="p-5 flex flex-col md:flex-row items-center gap-4 cursor-pointer hover:bg-gray-50"
+                    onClick={() => setExpandedClassId(isExpanded ? null : classItem._id)}
+                  >
+                    {/* Class Info */}
+                    <div className="flex-1 w-full">
+                       <div className="flex items-center gap-3 mb-1">
+                          <h3 className="text-lg font-bold text-[var(--color-primary)]">{classItem.name}</h3>
+                          <Badge variant="info" className="text-xs font-mono">{classItem.classCode}</Badge>
+                          {classItem.status === 'ongoing' && <Badge variant="success" className="text-xs">Đang học</Badge>}
+                       </div>
+                       <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500">
+                          <span className="flex items-center gap-1"><Briefcase size={14}/> {classItem.teacher?.fullName || "Chưa có GV"}</span>
+                          {/* FIX: Hiển thị capacity an toàn */}
+                          <span className="flex items-center gap-1">
+                            <Users size={14}/> {currentStudents}/{capacityMax}
+                          </span>
+                          <span className="flex items-center gap-1"><MapPin size={14}/> {classItem.room || "TBA"}</span>
+                       </div>
+                    </div>
+
+                    {/* Schedule Preview */}
+                    <div className="flex gap-2 items-center">
+                       <div className="hidden md:flex gap-1">
+                          {scheduleList.length > 0 ? (
+                             scheduleList.map((s, idx) => (
+                                <Badge key={idx} variant="secondary" className="text-xs font-normal bg-[var(--color-secondary)]/10 text-[var(--color-secondary)] border-none">
+                                   {getDayName(s.dayOfWeek).replace("Thứ ", "T")}
+                                </Badge>
+                             ))
+                          ) : (
+                             <span className="text-xs text-gray-400 italic">Chưa xếp lịch</span>
+                          )}
+                       </div>
+                       <div className={`p-2 rounded-full transition-transform duration-300 ${isExpanded ? 'bg-gray-100 rotate-180' : ''}`}>
+                          <ChevronDown size={20} className="text-gray-500" />
+                       </div>
                     </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge
-                    color={
-                      classItem.status === "ongoing"
-                        ? "blue"
-                        : classItem.status === "completed"
-                        ? "green"
-                        : "gray"
-                    }
-                  >
-                    {classItem.status === "ongoing"
-                      ? "Đang học"
-                      : classItem.status === "completed"
-                      ? "Kết thúc"
-                      : "Sắp diễn ra"}
-                  </Badge>
-                  <ChevronDown
-                    size={20}
-                    className={`text-gray-600 transition-transform ${
-                      expandedClassId === classItem._id ? "rotate-180" : ""
-                    }`}
-                  />
-                </div>
-              </div>
 
-              {/* Schedule Details */}
-              {expandedClassId === classItem._id && (
-                <div className="border-t px-6 py-4 bg-gray-50 space-y-4">
-                  {/* Current Schedule */}
-                  <div>
-                    <h4 className="font-semibold text-gray-900 mb-3">
-                      Lịch Học Hiện Tại
-                    </h4>
-                    {classItem.schedule && classItem.schedule.length > 0 ? (
-                      <div className="space-y-2">
-                        {classItem.schedule.map((schedule, idx) => (
-                          <div
-                            key={idx}
-                            className="flex items-center justify-between p-3 bg-white rounded-lg border"
-                          >
-                            <div className="flex-1">
-                              <div className="font-medium text-gray-900">
-                                {getDayName(schedule.dayOfWeek)}
-                              </div>
-                              <div className="text-sm text-gray-600 mt-1">
-                                {schedule.startTime} - {schedule.endTime}
-                                {schedule.room && ` • Phòng: ${schedule.room}`}
-                              </div>
-                            </div>
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() =>
-                                  handleEditSchedule(classItem, schedule, idx)
-                                }
-                                className="p-2 hover:bg-blue-100 text-blue-600 rounded-lg transition-colors"
-                                title="Sửa"
-                              >
-                                <Edit2 size={18} />
-                              </button>
-                              <button
-                                onClick={() =>
-                                  handleDeleteSchedule(classItem, idx)
-                                }
-                                className="p-2 hover:bg-red-100 text-red-600 rounded-lg transition-colors"
-                                title="Xóa"
-                              >
-                                <Trash2 size={18} />
-                              </button>
-                            </div>
+                  {/* Expanded Content */}
+                  {isExpanded && (
+                    <div className="border-t border-gray-100 bg-gray-50/50 p-6 animate-in fade-in slide-in-from-top-2 duration-200">
+                       <div className="flex justify-between items-center mb-4">
+                          <h4 className="font-bold text-gray-700 flex items-center gap-2">
+                             <Clock size={18} className="text-[var(--color-secondary)]" /> Chi tiết lịch học
+                          </h4>
+                          <div className="flex gap-2">
+                             <Button size="sm" variant="outline" className="h-8 text-xs bg-white" onClick={(e) => { e.stopPropagation(); setSelectedClass(classItem); setShowAssignModal(true); }}>
+                                <MapPin size={14} className="mr-1"/> Gán Phòng/GV
+                             </Button>
+                             <Button size="sm" className="h-8 text-xs bg-[var(--color-secondary)] text-white hover:bg-[var(--color-secondary-dark)]" onClick={(e) => { e.stopPropagation(); handleAddSchedule(classItem); }}>
+                                <Plus size={14} className="mr-1"/> Thêm lịch
+                             </Button>
                           </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-gray-500 text-sm">
-                        Chưa có lịch học nào
-                      </p>
-                    )}
-                  </div>
+                       </div>
 
-                  {/* Action Buttons */}
-                  <div className="flex gap-3 pt-4 border-t">
-                    <Button
-                      onClick={() => handleAddSchedule(classItem)}
-                      icon={<Plus size={18} />}
-                      variant="primary"
-                    >
-                      Thêm Lịch Học
-                    </Button>
-                    <Button
-                      onClick={() => {
-                        setSelectedClass(classItem);
-                        setShowAssignModal(true);
-                      }}
-                      variant="secondary"
-                    >
-                      Chỉ Định Phòng & Giáo Viên
-                    </Button>
-                  </div>
+                       {scheduleList.length > 0 ? (
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                             {scheduleList.map((s, idx) => (
+                                <div key={idx} className="bg-white p-3 rounded-lg border border-gray-200 shadow-sm flex justify-between items-center group">
+                                   <div>
+                                      <p className="font-bold text-[var(--color-primary)]">{getDayName(s.dayOfWeek)}</p>
+                                      <p className="text-sm text-gray-600 font-medium">{s.startTime} - {s.endTime}</p>
+                                      <p className="text-xs text-gray-400 mt-1">
+                                         {s.room || classItem.room || "Chưa có phòng"} • {s.teacher?.fullName || classItem.teacher?.fullName || "Chưa có GV"}
+                                      </p>
+                                   </div>
+                                   <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                      <button 
+                                         className="p-1.5 hover:bg-blue-50 text-blue-600 rounded"
+                                         onClick={() => handleEditSchedule(classItem, s, idx)}
+                                      >
+                                         <Edit2 size={16} />
+                                      </button>
+                                      <button 
+                                         className="p-1.5 hover:bg-red-50 text-red-600 rounded"
+                                         onClick={() => handleDeleteSchedule(classItem, idx)}
+                                      >
+                                         <Trash2 size={16} />
+                                      </button>
+                                   </div>
+                                </div>
+                             ))}
+                          </div>
+                       ) : (
+                          <div className="text-center py-8 border border-dashed border-gray-300 rounded-lg">
+                             <p className="text-gray-500 text-sm">Lớp này chưa có lịch học nào.</p>
+                          </div>
+                       )}
+                    </div>
+                  )}
                 </div>
-              )}
-            </Card>
-          ))
-        ) : (
-          <Card className="text-center py-12">
-            <Calendar size={48} className="mx-auto text-gray-400 mb-4" />
-            <p className="text-gray-500">Không tìm thấy lớp học nào</p>
-          </Card>
-        )}
+               );
+            })
+          ) : (
+            <div className="text-center py-20 bg-white rounded-xl border border-dashed border-gray-200 shadow-sm">
+               <Calendar size={48} className="mx-auto text-gray-300 mb-4" />
+               <p className="text-gray-500 font-medium">Không tìm thấy lớp học phù hợp</p>
+            </div>
+          )}
+        </div>
+
       </div>
 
-      {/* Schedule Modal */}
-      <Modal
-        isOpen={showScheduleModal}
-        onClose={() => setShowScheduleModal(false)}
-        title="Thêm/Sửa Lịch Học"
-      >
-        <div className="space-y-4">
-          <Select
-            label="Thứ"
-            value={scheduleForm.dayOfWeek}
-            onChange={(e) =>
-              setScheduleForm({ ...scheduleForm, dayOfWeek: e.target.value })
-            }
-            options={daysOfWeek}
-          />
-
-          <Input
-            type="time"
-            label="Giờ Bắt Đầu"
-            value={scheduleForm.startTime}
-            onChange={(e) =>
-              setScheduleForm({ ...scheduleForm, startTime: e.target.value })
-            }
-          />
-
-          <Input
-            type="time"
-            label="Giờ Kết Thúc"
-            value={scheduleForm.endTime}
-            onChange={(e) =>
-              setScheduleForm({ ...scheduleForm, endTime: e.target.value })
-            }
-          />
-
-          <div className="flex gap-3 pt-4">
-            <Button
-              onClick={handleSaveSchedule}
-              variant="primary"
-              className="flex-1"
-            >
-              <Check size={18} />
-              Lưu
-            </Button>
-            <Button
-              onClick={() => setShowScheduleModal(false)}
-              variant="secondary"
-              className="flex-1"
-            >
-              <X size={18} />
-              Hủy
-            </Button>
+      {/* --- SCHEDULE MODAL --- */}
+      {showScheduleModal && (
+        <Modal
+          isOpen={showScheduleModal}
+          onClose={() => setShowScheduleModal(false)}
+          title={editingSchedule ? "Cập Nhật Lịch Học" : "Thêm Lịch Học Mới"}
+          size="md"
+        >
+          <div className="space-y-4 p-1">
+             <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Thứ trong tuần</label>
+                <Select
+                   className="w-full"
+                   value={scheduleForm.dayOfWeek}
+                   onChange={(e) => setScheduleForm({ ...scheduleForm, dayOfWeek: e.target.value })}
+                   options={daysOptions}
+                />
+             </div>
+             <div className="grid grid-cols-2 gap-4">
+                <Input
+                   type="time"
+                   label="Giờ bắt đầu"
+                   value={scheduleForm.startTime}
+                   onChange={(e) => setScheduleForm({ ...scheduleForm, startTime: e.target.value })}
+                />
+                <Input
+                   type="time"
+                   label="Giờ kết thúc"
+                   value={scheduleForm.endTime}
+                   onChange={(e) => setScheduleForm({ ...scheduleForm, endTime: e.target.value })}
+                />
+             </div>
+             <div className="flex gap-3 pt-4 border-t border-gray-100 justify-end">
+                <Button variant="outline" onClick={() => setShowScheduleModal(false)}>Hủy bỏ</Button>
+                <Button 
+                   className="bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-light)]"
+                   onClick={handleSaveSchedule}
+                >
+                   {editingSchedule ? "Cập nhật" : "Thêm mới"}
+                </Button>
+             </div>
           </div>
-        </div>
-      </Modal>
+        </Modal>
+      )}
 
-      {/* Assign Room Modal */}
-      <Modal
-        isOpen={showAssignModal}
-        onClose={() => setShowAssignModal(false)}
-        title="Chỉ Định Phòng & Giáo Viên"
-      >
-        <div className="space-y-4">
-          <Select
-            label="Chọn Thứ"
-            value={assignForm.dayOfWeek}
-            onChange={(e) =>
-              setAssignForm({ ...assignForm, dayOfWeek: e.target.value })
-            }
-            options={daysOfWeek}
-          />
+      {/* --- ASSIGN MODAL --- */}
+      {showAssignModal && selectedClass && (
+        <Modal
+          isOpen={showAssignModal}
+          onClose={() => setShowAssignModal(false)}
+          title="Gán Phòng & Giáo Viên"
+          size="md"
+        >
+          <div className="space-y-4 p-1">
+             <div className="bg-blue-50 p-3 rounded-lg border border-blue-100 text-sm mb-2">
+                Đang thiết lập cho lớp: <strong>{selectedClass.name}</strong>
+             </div>
+             
+             <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Áp dụng cho ngày</label>
+                <Select
+                   className="w-full"
+                   value={assignForm.dayOfWeek}
+                   onChange={(e) => setAssignForm({ ...assignForm, dayOfWeek: e.target.value })}
+                   options={[{ value: "", label: "-- Chọn thứ --" }, ...daysOptions]}
+                />
+             </div>
 
-          <Input
-            label="Phòng Học"
-            placeholder="Ví dụ: P101, P202..."
-            value={assignForm.room}
-            onChange={(e) =>
-              setAssignForm({ ...assignForm, room: e.target.value })
-            }
-          />
+             <Input
+                label="Phòng học"
+                value={assignForm.room}
+                onChange={(e) => setAssignForm({ ...assignForm, room: e.target.value })}
+                placeholder="VD: P.101, Lab 2..."
+             />
 
-          <Select
-            label="Giáo Viên (Tùy Chọn)"
-            value={assignForm.teacher}
-            onChange={(e) =>
-              setAssignForm({ ...assignForm, teacher: e.target.value })
-            }
-            options={[
-              { value: "", label: "-- Không thay đổi --" },
-              ...(teachers.map((t) => ({ value: t._id, label: t.fullName })) ||
-                []),
-            ]}
-          />
+             <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Giáo viên (Tùy chọn)</label>
+                <Select
+                   className="w-full"
+                   value={assignForm.teacher}
+                   onChange={(e) => setAssignForm({ ...assignForm, teacher: e.target.value })}
+                   options={[
+                      { value: "", label: "-- Giữ nguyên --" },
+                      ...teachers.map(t => ({ value: t._id, label: t.fullName }))
+                   ]}
+                />
+             </div>
 
-          <div className="flex gap-3 pt-4">
-            <Button
-              onClick={handleAssignRoom}
-              variant="primary"
-              className="flex-1"
-            >
-              <Check size={18} />
-              Lưu
-            </Button>
-            <Button
-              onClick={() => setShowAssignModal(false)}
-              variant="secondary"
-              className="flex-1"
-            >
-              <X size={18} />
-              Hủy
-            </Button>
+             <div className="flex gap-3 pt-4 border-t border-gray-100 justify-end">
+                <Button variant="outline" onClick={() => setShowAssignModal(false)}>Hủy bỏ</Button>
+                <Button 
+                   className="bg-[var(--color-secondary)] text-white hover:bg-[var(--color-secondary-dark)]"
+                   onClick={handleAssignRoom}
+                >
+                   Xác nhận thay đổi
+                </Button>
+             </div>
           </div>
-        </div>
-      </Modal>
+        </Modal>
+      )}
 
-      {/* Personal Schedule Modal (for academic staff) */}
-      <Modal
-        isOpen={showPersonalModal}
-        onClose={() => setShowPersonalModal(false)}
-        title="Tạo Buổi Riêng cho Học Viên"
-      >
-        <div className="space-y-4">
-          <Select
-            label="Học viên"
-            value={personalForm.studentId}
-            onChange={(e) =>
-              setPersonalForm({ ...personalForm, studentId: e.target.value })
-            }
-            options={students.map((s) => ({
-              value: s._id,
-              label:
-                (s.fullName ||
-                  s.user?.fullName ||
-                  s.name ||
-                  s.username ||
-                  `#${s._id}`) +
-                (s.phone || s.user?.phone
-                  ? ` (${s.phone || s.user?.phone})`
-                  : ""),
-            }))}
-          />
+      {/* --- PERSONAL SCHEDULE MODAL --- */}
+      {showPersonalModal && (
+        <Modal
+          isOpen={showPersonalModal}
+          onClose={() => setShowPersonalModal(false)}
+          title="Tạo Buổi Học Riêng (1-1 / Bù)"
+          size="lg"
+        >
+          <div className="space-y-5 p-1">
+             <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Học viên <span className="text-red-500">*</span></label>
+                <Select
+                   className="w-full"
+                   value={personalForm.studentId}
+                   onChange={(e) => setPersonalForm({ ...personalForm, studentId: e.target.value })}
+                   options={[
+                      { value: "", label: "-- Chọn học viên --" },
+                      ...students.map(s => ({ value: s._id, label: `${s.fullName} (${s.studentCode || 'N/A'})` }))
+                   ]}
+                />
+             </div>
 
-          <div className="grid grid-cols-3 gap-3">
-            <Input
-              label="Ngày"
-              type="date"
-              value={personalForm.date}
-              onChange={(e) =>
-                setPersonalForm({ ...personalForm, date: e.target.value })
-              }
-            />
-            <Input
-              label="Giờ bắt đầu"
-              type="time"
-              value={personalForm.startTime}
-              onChange={(e) =>
-                setPersonalForm({ ...personalForm, startTime: e.target.value })
-              }
-            />
-            <Input
-              label="Giờ kết thúc"
-              type="time"
-              value={personalForm.endTime}
-              onChange={(e) =>
-                setPersonalForm({ ...personalForm, endTime: e.target.value })
-              }
-            />
+             <div className="grid grid-cols-3 gap-4">
+                <Input
+                   type="date"
+                   label="Ngày học"
+                   value={personalForm.date}
+                   onChange={(e) => setPersonalForm({ ...personalForm, date: e.target.value })}
+                />
+                <Input
+                   type="time"
+                   label="Bắt đầu"
+                   value={personalForm.startTime}
+                   onChange={(e) => setPersonalForm({ ...personalForm, startTime: e.target.value })}
+                />
+                <Input
+                   type="time"
+                   label="Kết thúc"
+                   value={personalForm.endTime}
+                   onChange={(e) => setPersonalForm({ ...personalForm, endTime: e.target.value })}
+                />
+             </div>
+
+             <div className="grid grid-cols-2 gap-4">
+                <Input
+                   label="Phòng học"
+                   value={personalForm.room}
+                   onChange={(e) => setPersonalForm({ ...personalForm, room: e.target.value })}
+                   placeholder="VD: Online, P.202"
+                />
+                <Input
+                   label="Chủ đề / Bài học"
+                   value={personalForm.topic}
+                   onChange={(e) => setPersonalForm({ ...personalForm, topic: e.target.value })}
+                   placeholder="VD: Ôn tập Unit 5"
+                />
+             </div>
+
+             <Input
+                label="Ghi chú thêm"
+                value={personalForm.description}
+                onChange={(e) => setPersonalForm({ ...personalForm, description: e.target.value })}
+                placeholder="VD: Học bù cho ngày nghỉ..."
+             />
+
+             <div className="flex gap-3 pt-4 border-t border-gray-100 justify-end">
+                <Button variant="outline" onClick={() => setShowPersonalModal(false)}>Hủy bỏ</Button>
+                <Button 
+                   className="bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-light)]"
+                   onClick={handleCreatePersonal}
+                >
+                   Lưu lịch riêng
+                </Button>
+             </div>
           </div>
+        </Modal>
+      )}
 
-          <Input
-            label="Phòng"
-            value={personalForm.room}
-            onChange={(e) =>
-              setPersonalForm({ ...personalForm, room: e.target.value })
-            }
-          />
-
-          <Input
-            label="Tiêu đề / Chủ đề"
-            value={personalForm.topic}
-            onChange={(e) =>
-              setPersonalForm({ ...personalForm, topic: e.target.value })
-            }
-          />
-
-          <Input
-            label="Ghi chú / Mô tả"
-            value={personalForm.description}
-            onChange={(e) =>
-              setPersonalForm({ ...personalForm, description: e.target.value })
-            }
-          />
-
-          <div className="flex gap-3 pt-2">
-            <Button
-              onClick={handleCreatePersonal}
-              variant="primary"
-              className="flex-1"
-            >
-              <Check size={18} /> Lưu
-            </Button>
-            <Button
-              onClick={() => setShowPersonalModal(false)}
-              variant="secondary"
-              className="flex-1"
-            >
-              <X size={18} /> Hủy
-            </Button>
-          </div>
-        </div>
-      </Modal>
     </div>
   );
 };

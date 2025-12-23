@@ -23,14 +23,17 @@ exports.register = async (req, res) => {
     // Validate role
     const allowedRoles = [
       "student",
-      "teacher",
       "director",
       "academic",
       "accountant",
       "enrollment",
     ];
     if (!allowedRoles.includes(role)) {
-      return errorResponse(res, "Role không hợp lệ", 400);
+      return errorResponse(
+        res,
+        "Role không hợp lệ. Teacher không thể tự đăng ký.",
+        400
+      );
     }
 
     let user;
@@ -152,6 +155,15 @@ exports.login = async (req, res) => {
       return res.status(401).json({
         success: false,
         message: "Tài khoản đã bị vô hiệu hóa",
+      });
+    }
+
+    // Block teacher login - teachers are data only, cannot login
+    if (userType === "staff" && role === "teacher") {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Giáo viên không có quyền đăng nhập hệ thống. Vui lòng liên hệ quản trị viên.",
       });
     }
 

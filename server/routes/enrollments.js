@@ -72,7 +72,7 @@ router.post("/course-enrollments", auth, async (req, res) => {
     });
 
     if (existingEnrollment) {
-      return res.status(400).json({
+      return res.status(409).json({
         success: false,
         message: "Học viên đã đăng ký khóa học này",
       });

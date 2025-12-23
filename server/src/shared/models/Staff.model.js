@@ -63,7 +63,7 @@ const staffSchema = new mongoose.Schema(
     },
     staffType: {
       type: String,
-      enum: ["academic", "accountant", "enrollment", "teacher", "director"],
+      enum: ["academic", "accountant", "enrollment", "director", "teacher"],
       required: true,
     },
     dateOfBirth: {
@@ -215,6 +215,18 @@ staffSchema.pre("save", async function (next) {
             "Xử lý đăng ký",
             "Chăm sóc khách hàng",
             "Báo cáo tuyển sinh",
+          ];
+        }
+        break;
+      case "teacher":
+        this.department = "Phòng Giảng dạy";
+        this.position = this.position || "Giảng viên";
+        if (!this.responsibilities.length) {
+          this.responsibilities = [
+            "Giảng dạy",
+            "Chấm điểm",
+            "Quản lý lớp học",
+            "Báo cáo tiến độ",
           ];
         }
         break;

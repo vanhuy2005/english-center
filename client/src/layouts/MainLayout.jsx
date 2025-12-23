@@ -3,7 +3,7 @@ import { Outlet } from "react-router-dom";
 import StudentSidebar from "./StudentSidebar";
 import DirectorSidebar from "./DirectorSidebar";
 import EnrollmentSidebar from "./EnrollmentSidebar";
-import TeacherSidebar from "./TeacherSidebar";
+
 import AcademicStaffSidebar from "./AcademicStaffSidebar";
 import AccountantSidebar from "./AccountantSidebar";
 import { useAuth } from "@hooks";
@@ -25,8 +25,7 @@ export const MainLayout = ({ menuItems = [] }) => {
       {/* Enrollment Staff Sidebar - Always visible on left */}
       {role === "enrollment" && <EnrollmentSidebar menuItems={menuItems} />}
 
-      {/* Teacher Sidebar - Always visible on left */}
-      {role === "teacher" && <TeacherSidebar menuItems={menuItems} />}
+
 
       {/* Academic Staff Sidebar - Always visible on left */}
       {role === "academic" && <AcademicStaffSidebar menuItems={menuItems} />}

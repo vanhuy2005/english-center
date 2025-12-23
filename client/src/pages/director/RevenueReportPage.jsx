@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useLanguage } from "@hooks";
-import { Card, Loading, Badge } from "@components/common";
-import { LineChart, BarChart } from "@components/charts";
-import { reportService } from "@services";
-import { formatCurrency, formatDate } from "@utils/date";
+import { Card, Loading, Badge, Table } from "@components/common";
+import { LineChart, BarChart, PieChart } from "@components/charts"; // Đảm bảo import PieChart
 import {
   DollarSign,
   TrendingUp,
@@ -11,22 +9,36 @@ import {
   Calendar,
   Download,
   Filter,
+  PieChart as PieIcon,
+  Wallet,
+  CreditCard,
+  ArrowUpRight,
+  ArrowDownRight
 } from "lucide-react";
 
+// Import dữ liệu Mock
+import {
+  revenueStats,
+  revenueTrendData,
+  revenueSourceData,
+  expenseBreakdownData,
+  recentTransactions
+} from "./mockRevenueData";
+
 /**
- * Revenue Report Page - Báo cáo doanh thu chi tiết
+ * Revenue Report Page - Báo cáo doanh thu (Polished UI)
  */
 const RevenueReportPage = () => {
   const { t } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState("month"); // day, week, month, quarter, year
-  const [revenueData, setRevenueData] = useState([]);
-  const [stats, setStats] = useState({
-    totalRevenue: 0,
-    totalProfit: 0,
-    totalExpenses: 0,
-    growth: 0,
-  });
+  
+  // State quản lý dữ liệu
+  const [stats, setStats] = useState(revenueStats);
+  const [chartData, setChartData] = useState([]);
+  const [sourceData, setSourceData] = useState([]);
+  const [expenseData, setExpenseData] = useState([]);
+  const [transactions, setTransactions] = useState([]);
 
   useEffect(() => {
     fetchRevenueData();
@@ -35,13 +47,15 @@ const RevenueReportPage = () => {
   const fetchRevenueData = async () => {
     try {
       setLoading(true);
-      const [chartRes, statsRes] = await Promise.all([
-        reportService.getRevenueChart({ period, limit: 12 }),
-        reportService.getRevenueStats({ period }),
-      ]);
+      // Giả lập call API
+      await new Promise(resolve => setTimeout(resolve, 800));
 
-      setRevenueData(chartRes.data || []);
-      setStats(statsRes.data || stats);
+      setStats(revenueStats);
+      setChartData(revenueTrendData);
+      setSourceData(revenueSourceData);
+      setExpenseData(expenseBreakdownData);
+      setTransactions(recentTransactions);
+
     } catch (error) {
       console.error("Error fetching revenue data:", error);
     } finally {
@@ -49,198 +63,260 @@ const RevenueReportPage = () => {
     }
   };
 
+  // Helper format tiền tệ VND
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
+  };
+
   const handleExport = () => {
-    // Export to CSV logic
-    console.log("Exporting revenue report...");
+    alert("Đang xuất báo cáo ra file Excel...");
   };
 
   if (loading) {
-    return <Loading fullScreen text="Đang tải báo cáo doanh thu..." />;
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+        <Loading text="Đang tổng hợp dữ liệu tài chính..." />
+      </div>
+    );
   }
 
+  // Cấu hình cột cho bảng giao dịch
+  const transactionColumns = [
+    { key: "id", label: "Mã GD", className: "text-sm text-gray-500 font-mono" },
+    { key: "content", label: "Nội Dung", className: "font-medium text-gray-900" },
+    { key: "date", label: "Ngày", className: "text-sm text-gray-500" },
+    { key: "amount", label: "Số Tiền", align: "right" },
+    { key: "status", label: "Loại", align: "center" }
+  ];
+
   return (
-    <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+    <div className="p-6 space-y-8 bg-gray-50/50 min-h-screen font-sans">
+      
+      {/* 1. Header Section */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">
-            Báo Cáo Doanh Thu
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight">
+            Báo Cáo Tài Chính
           </h1>
-          <p className="text-gray-600 mt-1">
-            Theo dõi doanh thu, chi phí và lợi nhuận
+          <p className="text-gray-500 mt-1 text-sm md:text-base">
+            Theo dõi dòng tiền, lợi nhuận và kiểm soát chi phí vận hành.
           </p>
         </div>
         <button
           onClick={handleExport}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 shadow-sm transition-all active:scale-95"
         >
           <Download className="w-4 h-4" />
           Xuất Báo Cáo
         </button>
       </div>
 
-      {/* Period Filter */}
-      <Card>
-        <div className="flex items-center gap-4">
-          <Filter className="w-5 h-5 text-gray-600" />
-          <span className="text-sm font-medium text-gray-700">Chu kỳ:</span>
-          <div className="flex gap-2">
-            {["day", "week", "month", "quarter", "year"].map((p) => (
-              <button
-                key={p}
-                onClick={() => setPeriod(p)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  period === p
-                    ? "bg-blue-600 text-white"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
-              >
-                {p === "day" && "Ngày"}
-                {p === "week" && "Tuần"}
-                {p === "month" && "Tháng"}
-                {p === "quarter" && "Quý"}
-                {p === "year" && "Năm"}
-              </button>
-            ))}
-          </div>
+      {/* 2. Filter Bar */}
+      <Card className="shadow-sm border-gray-200">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-2 text-gray-700 font-medium">
+                <Filter className="w-5 h-5 text-gray-500" />
+                <span>Bộ lọc thời gian:</span>
+            </div>
+            
+            <div className="flex bg-gray-100 p-1 rounded-lg">
+                {["week", "month", "quarter", "year"].map((p) => (
+                <button
+                    key={p}
+                    onClick={() => setPeriod(p)}
+                    className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+                    period === p
+                        ? "bg-white text-blue-600 shadow-sm"
+                        : "text-gray-500 hover:text-gray-700 hover:bg-gray-200/50"
+                    }`}
+                >
+                    {p === "week" && "Tuần này"}
+                    {p === "month" && "Tháng này"}
+                    {p === "quarter" && "Quý này"}
+                    {p === "year" && "Năm nay"}
+                </button>
+                ))}
+            </div>
         </div>
       </Card>
 
-      {/* Statistics Cards */}
+      {/* 3. Statistics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard
           title="Tổng Doanh Thu"
           value={formatCurrency(stats.totalRevenue)}
-          icon={<DollarSign className="w-8 h-8" />}
-          color="bg-blue-600"
+          icon={<DollarSign className="w-6 h-6" />}
+          variant="blue"
           growth={stats.growth}
         />
         <StatCard
-          title="Lợi Nhuận"
+          title="Lợi Nhuận Ròng"
           value={formatCurrency(stats.totalProfit)}
-          icon={<TrendingUp className="w-8 h-8" />}
-          color="bg-green-600"
+          icon={<Wallet className="w-6 h-6" />}
+          variant="green"
+          subtitle={`Tỷ suất: ${stats.margin}%`}
         />
         <StatCard
-          title="Chi Phí"
+          title="Tổng Chi Phí"
           value={formatCurrency(stats.totalExpenses)}
-          icon={<TrendingDown className="w-8 h-8" />}
-          color="bg-red-600"
+          icon={<CreditCard className="w-6 h-6" />}
+          variant="red"
+          subtitle="Chi phí vận hành"
         />
         <StatCard
-          title="Tỷ Suất Lợi Nhuận"
-          value={`${Math.round(
-            (stats.totalProfit / stats.totalRevenue) * 100
-          )}%`}
-          icon={<Calendar className="w-8 h-8" />}
-          color="bg-purple-600"
+          title="Dự Báo Tăng Trưởng"
+          value={`+${stats.growth}%`}
+          icon={<TrendingUp className="w-6 h-6" />}
+          variant="teal"
+          subtitle="So với cùng kỳ"
         />
       </div>
 
-      {/* Revenue Chart */}
-      <Card title="Biểu Đồ Doanh Thu Theo Thời Gian">
-        <LineChart
-          data={revenueData}
-          lines={[
-            {
-              dataKey: "revenue",
-              name: "Doanh thu",
-              stroke: "#2563eb",
-            },
-            {
-              dataKey: "profit",
-              name: "Lợi nhuận",
-              stroke: "#16a34a",
-            },
-            {
-              dataKey: "expenses",
-              name: "Chi phí",
-              stroke: "#dc2626",
-            },
-          ]}
-          height={400}
-        />
+      {/* 4. Main Chart (Revenue vs Expenses) */}
+      <Card title="Biểu Đồ Doanh Thu & Lợi Nhuận" className="shadow-sm border-gray-200">
+        <div className="mt-4">
+            <LineChart
+            data={chartData}
+            lines={[
+                {
+                dataKey: "revenue",
+                name: "Doanh thu",
+                stroke: "#3b82f6", // Blue-500
+                strokeWidth: 2
+                },
+                {
+                dataKey: "expenses",
+                name: "Chi phí",
+                stroke: "#ef4444", // Red-500
+                strokeWidth: 2
+                },
+                {
+                dataKey: "profit",
+                name: "Lợi nhuận",
+                stroke: "#10b981", // Emerald-500
+                strokeWidth: 2,
+                activeDot: { r: 6 } // Highlight dot
+                },
+            ]}
+            height={350}
+            />
+        </div>
       </Card>
 
-      {/* Revenue Breakdown */}
+      {/* 5. Breakdown Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card title="Phân Tích Doanh Thu Theo Nguồn">
-          <BarChart
-            data={[
-              { name: "Học phí", value: stats.totalRevenue * 0.85 },
-              { name: "Phí tài liệu", value: stats.totalRevenue * 0.1 },
-              { name: "Khác", value: stats.totalRevenue * 0.05 },
-            ]}
-            bars={[
-              {
-                dataKey: "value",
-                name: "Doanh thu",
-                fill: "#2563eb",
-              },
-            ]}
-            height={300}
-          />
+        {/* Revenue Sources (Pie Chart) */}
+        <Card title="Cơ Cấu Nguồn Thu" className="shadow-sm border-gray-200" icon={<PieIcon className="w-4 h-4 text-gray-400"/>}>
+            <div className="mt-4 flex flex-col items-center">
+                <PieChart
+                    data={sourceData}
+                    dataKey="value"
+                    nameKey="name"
+                    height={300}
+                    // Colors are defined in mock data
+                />
+            </div>
         </Card>
 
-        <Card title="Chi Phí Hoạt Động">
-          <BarChart
-            data={[
-              { name: "Lương GV", value: stats.totalExpenses * 0.5 },
-              { name: "Lương NV", value: stats.totalExpenses * 0.25 },
-              { name: "Cơ sở vật chất", value: stats.totalExpenses * 0.15 },
-              { name: "Marketing", value: stats.totalExpenses * 0.1 },
-            ]}
-            bars={[
-              {
-                dataKey: "value",
-                name: "Chi phí",
-                fill: "#dc2626",
-              },
-            ]}
-            height={300}
-          />
+        {/* Expenses Breakdown (Bar Chart) */}
+        <Card title="Phân Bổ Chi Phí" className="shadow-sm border-gray-200" icon={<CreditCard className="w-4 h-4 text-gray-400"/>}>
+            <div className="mt-4">
+                <BarChart
+                    data={expenseData}
+                    bars={[
+                        {
+                        dataKey: "value",
+                        name: "Chi phí (VND)",
+                        fill: "#f87171", // Mặc định nếu không có trong data
+                        barSize: 40,
+                        radius: [4, 4, 0, 0]
+                        },
+                    ]}
+                    height={300}
+                />
+            </div>
         </Card>
       </div>
+
+      {/* 6. Recent Transactions Table */}
+      <Card title="Giao Dịch Gần Đây" className="shadow-sm border-gray-200">
+        <div className="mt-2">
+            <Table 
+                columns={transactionColumns}
+                data={transactions.map(item => ({
+                    id: item.id,
+                    content: item.content,
+                    date: item.date,
+                    amount: (
+                        <span className={`font-semibold ${item.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
+                            {item.type === 'income' ? '+' : ''}
+                            {formatCurrency(item.amount)}
+                        </span>
+                    ),
+                    status: (
+                        <Badge variant={item.type === 'income' ? 'success' : 'error'}>
+                            {item.type === 'income' ? <ArrowUpRight className="w-3 h-3 inline mr-1"/> : <ArrowDownRight className="w-3 h-3 inline mr-1"/>}
+                            {item.type === 'income' ? 'Thu' : 'Chi'}
+                        </Badge>
+                    )
+                }))}
+            />
+        </div>
+      </Card>
+
     </div>
   );
 };
 
-/**
- * Stat Card Component
- */
-const StatCard = ({ title, value, icon, color, growth }) => {
+// --- Sub Component: StatCard (Soft UI Style) ---
+const StatCard = ({ title, value, icon, variant = "blue", growth, subtitle }) => {
+  // Map màu sắc Soft UI
+  const variants = {
+    blue: "bg-blue-50 text-blue-600 border-blue-100",
+    green: "bg-emerald-50 text-emerald-600 border-emerald-100",
+    red: "bg-red-50 text-red-600 border-red-100",
+    teal: "bg-teal-50 text-teal-600 border-teal-100",
+    purple: "bg-purple-50 text-purple-600 border-purple-100",
+  };
+  
+  const currentStyle = variants[variant] || variants.blue;
+
   return (
-    <Card className="hover:shadow-lg transition-shadow">
-      <div className="flex items-center justify-between">
-        <div className="flex-1">
-          <p className="text-gray-600 text-sm mb-1">{title}</p>
-          <p className="text-2xl font-bold text-gray-900">{value}</p>
+    <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow duration-200">
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-sm font-medium text-gray-500 mb-1">{title}</p>
+          <h3 className="text-2xl font-bold text-gray-900 tracking-tight">{value}</h3>
+          
+          {/* Growth Indicator */}
           {growth !== undefined && (
-            <div className="flex items-center gap-1 mt-2">
-              {growth >= 0 ? (
-                <TrendingUp className="w-4 h-4 text-green-500" />
-              ) : (
-                <TrendingDown className="w-4 h-4 text-red-500" />
-              )}
+            <div className="flex items-center gap-1.5 mt-2">
               <span
-                className={`text-sm font-medium ${
-                  growth >= 0 ? "text-green-500" : "text-red-500"
+                className={`flex items-center text-xs font-bold px-1.5 py-0.5 rounded ${
+                  growth >= 0 
+                  ? "bg-green-100 text-green-700" 
+                  : "bg-red-100 text-red-700"
                 }`}
               >
-                {growth >= 0 ? "+" : ""}
-                {growth}%
+                {growth >= 0 ? <TrendingUp className="w-3 h-3 mr-1" /> : <TrendingDown className="w-3 h-3 mr-1" />}
+                {growth > 0 ? "+" : ""}{growth}%
               </span>
-              <span className="text-xs text-gray-500 ml-1">
-                so với kỳ trước
-              </span>
+              <span className="text-xs text-gray-400">so với kỳ trước</span>
             </div>
           )}
+
+          {/* Subtitle (Alternative to Growth) */}
+          {subtitle && (
+             <p className="text-xs text-gray-400 mt-2">{subtitle}</p>
+          )}
         </div>
-        <div className={`${color} text-white p-3 rounded-lg shadow-md`}>
+        
+        {/* Icon Container with shrink-0 */}
+        <div className={`p-3 rounded-xl shrink-0 ${currentStyle}`}>
           {icon}
         </div>
       </div>
-    </Card>
+    </div>
   );
 };
 

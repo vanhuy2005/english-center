@@ -512,27 +512,19 @@ exports.getMySchedules = async (req, res) => {
     if (userRole === "teacher" || req.role === "teacher") {
       filter.teacher = userId;
     } else if (userRole === "student" || req.role === "student") {
-      // Get student's enrolled classes and include personal schedules
-      const Student = require("../../shared/models/Student.model");
-      const student = await Student.findById(userId).populate(
-        "enrolledCourses"
-      );
-
-      // Get classes for enrolled courses (may be empty)
+      // Find classes where this student is enrolled (via students array)
       const Class = require("../../shared/models/Class.model");
-      const classes =
-        student && student.enrolledCourses && student.enrolledCourses.length > 0
-          ? await Class.find({
-              course: { $in: student.enrolledCourses },
-            }).select("_id")
-          : [];
+      const classes = await Class.find({
+        "students.student": userId,
+        "students.status": "active",
+      }).select("_id");
 
       const classIds = classes.map((c) => c._id);
 
       // Filter: schedules for student's classes OR schedules explicitly assigned to the student
       filter = {
         $or: [
-          { class: classIds.length > 0 ? { $in: classIds } : null },
+          classIds.length > 0 ? { class: { $in: classIds } } : null,
           { student: userId },
         ].filter(Boolean),
       };

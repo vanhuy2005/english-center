@@ -27,7 +27,13 @@ const TransactionDetailPage = () => {
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
-    // Only fetch if id exists
+    // Prevent fetching if id is 'create' or 'new' (route mismatch)
+    if (id === 'create' || id === 'new') {
+      navigate("/accountant/transactions/create", { replace: true });
+      return;
+    }
+    
+    // Only fetch if id exists and is valid
     if (id) {
       fetchTransactionDetails();
     } else {

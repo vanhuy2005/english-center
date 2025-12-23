@@ -80,7 +80,6 @@ const accountantRoutes = require("./modules/staff/accountant/accountant.routes")
 const courseRoutes = require("./modules/course/course.routes");
 const studentRoutes = require("./modules/student/student.routes");
 const teacherRoutes = require("./modules/teacher/teacher.routes");
-const teacherController = require("./modules/teacher/teacher.controller");
 const directorController = require("./modules/director/director.controller");
 
 // Register routes
@@ -90,16 +89,7 @@ app.use("/api/staff/academic", academicRoutes);
 app.use("/api/staff/accountant", accountantRoutes);
 app.use("/api/courses", courseRoutes);
 app.use("/api/students", studentRoutes);
-// In development allow a public GET /api/teachers to avoid 403 during UI development
-if (process.env.NODE_ENV === "development") {
-  app.get("/api/teachers", (req, res, next) => {
-    // Delegate to controller directly (no auth)
-    return teacherController.getAll(req, res, next);
-  });
-}
 app.use("/api/teachers", teacherRoutes);
-// Also provide non-/api aliases used by the client (development convenience)
-app.use("/teachers", teacherRoutes);
 
 // Expose report endpoints at /reports/* matching client calls
 app.get("/reports/revenue-chart", directorController.getRevenueChart);

@@ -2,6 +2,9 @@ import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
   Button,
   Loading,
   Badge,
@@ -18,9 +21,20 @@ import {
   BookOpen,
   Calendar,
   Plus,
+  Clock,
+  CheckCircle,
+  AlertCircle,
+  GraduationCap,
+  MoreVertical,
+  Edit
 } from "lucide-react";
 import api from "../../../services/api";
 import toast from "react-hot-toast";
+
+// Helper: Format tiền tệ
+const formatCurrency = (amount) => {
+  return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(amount);
+};
 
 const StudentDetailPage = () => {
   const { id } = useParams();
@@ -28,6 +42,7 @@ const StudentDetailPage = () => {
   const [student, setStudent] = useState(null);
   const [loading, setLoading] = useState(true);
   const [enrollments, setEnrollments] = useState([]);
+  const [activeTab, setActiveTab] = useState("overview"); // 'overview' | 'courses' | 'history'
   const [isEnrollModalOpen, setIsEnrollModalOpen] = useState(false);
 
   useEffect(() => {
@@ -38,35 +53,21 @@ const StudentDetailPage = () => {
     try {
       setLoading(true);
       const response = await api.get(`/staff/enrollment/students/${id}`);
-      console.log("📚 Student detail response:", response.data);
+      
+      // Safe data extraction
+      const data = response.data?.data || response.data || {};
+      const studentInfo = data.student || data;
+      
+      setStudent(studentInfo);
 
-      const responseData = response.data?.data || response.data;
-      console.log("📚 Response data:", responseData);
+      // Normalize enrollments data
+      const enrolls = data.classes || studentInfo.enrolledCourses || [];
+      setEnrollments(Array.isArray(enrolls) ? enrolls : []);
 
-      // Handle if the response is a success response with data wrapper
-      const studentData = responseData?.student || responseData;
-      console.log("📚 Student data:", studentData);
-
-      setStudent(studentData);
-
-      // Get student's classes from the response
-      const classesData = responseData?.classes || studentData?.classes || [];
-      const enrollmentData = studentData?.enrollmentHistory || [];
-
-      setEnrollments(
-        Array.isArray(classesData)
-          ? classesData
-          : Array.isArray(enrollmentData)
-          ? enrollmentData
-          : []
-      );
     } catch (error) {
       console.error("Error fetching student details:", error);
-      console.error("Error response:", error.response?.data);
-      toast.error(
-        error.response?.data?.message || "Không thể tải thông tin học viên"
-      );
-      navigate("/enrollment/classes");
+      toast.error("Không thể tải thông tin học viên");
+      navigate("/enrollment/students");
     } finally {
       setLoading(false);
     }
@@ -74,206 +75,221 @@ const StudentDetailPage = () => {
 
   const handleEnrollmentSuccess = () => {
     setIsEnrollModalOpen(false);
-    // Refresh student data
     fetchStudentDetail();
     toast.success("Ghi danh thành công!");
   };
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-screen">
-        <Loading />
-      </div>
-    );
-  }
+  if (loading) return <div className="h-screen flex items-center justify-center"><Loading size="large" /></div>;
 
-  if (!student) {
-    return (
-      <div className="text-center py-12">
-        <p className="text-gray-500 mb-4">Không tìm thấy thông tin học viên</p>
-        <Button onClick={() => navigate("/enrollment/classes")}>
-          Quay lại
-        </Button>
-      </div>
-    );
-  }
+  if (!student) return (
+    <div className="flex flex-col items-center justify-center h-screen bg-gray-50">
+      <AlertCircle size={48} className="text-gray-400 mb-4" />
+      <p className="text-lg font-medium text-gray-600">Không tìm thấy học viên</p>
+      <Button variant="outline" className="mt-4" onClick={() => navigate(-1)}>Quay lại</Button>
+    </div>
+  );
 
   return (
-    <div className="space-y-6 p-6 bg-gray-50 min-h-screen">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <Button
-          variant="secondary"
-          size="small"
-          onClick={() => navigate(-1)}
-          className="flex items-center gap-2"
-        >
-          <ArrowLeft size={16} />
-          Quay lại
-        </Button>
-        <h1 className="text-3xl font-bold text-gray-900">Chi Tiết Học Viên</h1>
-      </div>
-
-      {/* Student Information */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {/* Basic Info Card */}
-        <Card className="p-6 md:col-span-2">
-          <div className="flex items-start gap-6">
-            <div className="w-24 h-24 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
-              <User size={48} className="text-blue-600" />
-            </div>
-            <div className="flex-1">
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                {student.fullName}
-              </h2>
-              <div className="space-y-2 text-sm text-gray-600">
-                <div className="flex items-center gap-2">
-                  <FileText size={16} />
-                  <span>
-                    <strong>Mã học viên:</strong> {student.studentCode}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Calendar size={16} />
-                  <span>
-                    <strong>Ngày sinh:</strong>{" "}
-                    {student.dateOfBirth
-                      ? new Date(student.dateOfBirth).toLocaleDateString(
-                          "vi-VN"
-                        )
-                      : "N/A"}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </Card>
-
-        {/* Status Card */}
-        <Card className="p-6">
-          <h3 className="text-lg font-semibold mb-4 text-gray-900">
-            Trạng thái
-          </h3>
-          <div className="space-y-3">
-            <div>
-              <p className="text-sm text-gray-500 mb-1">Trạng thái học viên</p>
-              <Badge
-                variant={
-                  student.status === "active"
-                    ? "success"
-                    : student.status === "inactive"
-                    ? "error"
-                    : "warning"
-                }
-              >
-                {student.status === "active"
-                  ? "Đang học"
-                  : student.status === "inactive"
-                  ? "Bị khóa"
-                  : "Tạm dừng"}
-              </Badge>
-            </div>
-            {student.enrollmentDate && (
-              <div>
-                <p className="text-sm text-gray-500 mb-1">Ngày đăng ký</p>
-                <p className="font-medium">
-                  {new Date(student.enrollmentDate).toLocaleDateString("vi-VN")}
-                </p>
-              </div>
-            )}
-          </div>
-        </Card>
-      </div>
-
-      {/* Contact Information */}
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4 text-gray-900">
-          Thông Tin Liên Hệ
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <label className="text-sm text-gray-500 flex items-center gap-2 mb-2">
-              <Mail size={16} />
-              Email
-            </label>
-            <p className="font-medium text-gray-900">
-              {student.email || "N/A"}
-            </p>
-          </div>
-          <div>
-            <label className="text-sm text-gray-500 flex items-center gap-2 mb-2">
-              <Phone size={16} />
-              Số điện thoại
-            </label>
-            <p className="font-medium text-gray-900">
-              {student.phone || "N/A"}
-            </p>
-          </div>
-          <div className="md:col-span-2">
-            <label className="text-sm text-gray-500 flex items-center gap-2 mb-2">
-              <MapPin size={16} />
-              Địa chỉ
-            </label>
-            <p className="font-medium text-gray-900">
-              {student.address || "N/A"}
-            </p>
+    <div className="min-h-screen bg-gray-50/50 p-6 md:p-8 font-sans">
+      <div className="max-w-[1600px] mx-auto space-y-6">
+        
+        {/* --- Header & Actions --- */}
+        <div className="flex items-center justify-between">
+          <Button 
+            variant="ghost" 
+            className="text-gray-500 hover:text-[var(--color-primary)] -ml-2"
+            onClick={() => navigate(-1)}
+          >
+            <ArrowLeft size={20} className="mr-2" /> Quay lại danh sách
+          </Button>
+          <div className="flex gap-3">
+            <Button variant="outline" className="border-gray-300 text-gray-700">
+              <Edit size={16} className="mr-2" /> Chỉnh sửa
+            </Button>
+            <Button 
+              className="bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-light)] shadow-md"
+              onClick={() => setIsEnrollModalOpen(true)}
+            >
+              <Plus size={18} className="mr-2" /> Ghi danh khóa mới
+            </Button>
           </div>
         </div>
-      </Card>
 
-      {/* Enrollments */}
-      {enrollments.length > 0 && (
-        <Card className="p-6">
-          <h3 className="text-lg font-semibold mb-4 text-gray-900 flex items-center gap-2">
-            <BookOpen size={20} />
-            Khóa Học Đã Đăng Ký
-          </h3>
-          <div className="space-y-3">
-            {enrollments.map((enrollment) => (
-              <div
-                key={enrollment._id}
-                className="flex items-center justify-between p-3 bg-gray-50 rounded"
-              >
-                <div>
-                  <p className="font-medium text-gray-900">
-                    {enrollment.course?.name || "N/A"}
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    {enrollment.course?.courseCode || ""}
-                  </p>
+        {/* --- Main Content Grid --- */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          
+          {/* Left Column: Student Profile Card (4 cols) */}
+          <div className="lg:col-span-4 space-y-6">
+            <Card className="border border-gray-200 shadow-sm overflow-hidden">
+              <div className="h-32 bg-[var(--color-primary)] relative">
+                <div className="absolute -bottom-12 left-6 p-1 bg-white rounded-full">
+                  <div className="w-24 h-24 rounded-full bg-gray-100 flex items-center justify-center text-4xl font-bold text-[var(--color-primary)] border border-gray-200">
+                    {student.fullName?.charAt(0).toUpperCase()}
+                  </div>
                 </div>
-                <Badge
-                  variant={
-                    enrollment.status === "active" ? "success" : "warning"
-                  }
-                >
-                  {enrollment.status === "active"
-                    ? "Đang học"
-                    : "Đã hoàn thành"}
-                </Badge>
               </div>
-            ))}
-          </div>
-        </Card>
-      )}
+              <CardContent className="pt-16 pb-6 px-6">
+                <h2 className="text-2xl font-bold text-gray-900">{student.fullName}</h2>
+                <div className="flex items-center gap-2 mt-1 mb-4">
+                  <Badge variant="outline" className="font-mono text-xs bg-gray-50 text-gray-600 border-gray-200">
+                    {student.studentCode || "NO-ID"}
+                  </Badge>
+                  <Badge variant={student.academicStatus === 'active' ? 'success' : 'secondary'}>
+                    {student.academicStatus === 'active' ? 'Đang học' : 'Chưa ghi danh'}
+                  </Badge>
+                </div>
 
-      {/* Actions */}
-      <div className="flex gap-3">
-        <Button variant="secondary" onClick={() => navigate(-1)}>
-          Quay lại
-        </Button>
-        <Button
-          variant="primary"
-          onClick={() => setIsEnrollModalOpen(true)}
-          className="flex items-center gap-2"
-        >
-          <Plus size={16} />
-          Ghi Danh Lớp Học
-        </Button>
+                <div className="space-y-4 mt-6 pt-6 border-t border-gray-100">
+                  <InfoItem icon={Mail} label="Email" value={student.email} />
+                  <InfoItem icon={Phone} label="Điện thoại" value={student.phone} />
+                  <InfoItem 
+                    icon={Calendar} 
+                    label="Ngày sinh" 
+                    value={student.dateOfBirth ? new Date(student.dateOfBirth).toLocaleDateString("vi-VN") : "---"} 
+                  />
+                  <InfoItem icon={MapPin} label="Địa chỉ" value={student.address} />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Quick Stats (Optional) */}
+            <div className="grid grid-cols-2 gap-4">
+              <Card className="border-none shadow-sm bg-blue-50/50 p-4 text-center">
+                <div className="text-2xl font-bold text-blue-700">{enrollments.length}</div>
+                <div className="text-xs text-blue-600 font-medium uppercase">Khóa học</div>
+              </Card>
+              <Card className="border-none shadow-sm bg-emerald-50/50 p-4 text-center">
+                <div className="text-2xl font-bold text-emerald-700">
+                  {enrollments.filter(e => e.status === 'completed').length}
+                </div>
+                <div className="text-xs text-emerald-600 font-medium uppercase">Hoàn thành</div>
+              </Card>
+            </div>
+          </div>
+
+          {/* Right Column: Tabs & Details (8 cols) */}
+          <div className="lg:col-span-8">
+            <Card className="border border-gray-200 shadow-sm min-h-[600px]">
+              {/* Tabs Header */}
+              <div className="flex border-b border-gray-100">
+                <button
+                  onClick={() => setActiveTab("overview")}
+                  className={`px-6 py-4 text-sm font-bold border-b-2 transition-colors ${
+                    activeTab === "overview" 
+                      ? "border-[var(--color-secondary)] text-[var(--color-secondary)]" 
+                      : "border-transparent text-gray-500 hover:text-gray-700"
+                  }`}
+                >
+                  Tổng quan
+                </button>
+                <button
+                  onClick={() => setActiveTab("courses")}
+                  className={`px-6 py-4 text-sm font-bold border-b-2 transition-colors ${
+                    activeTab === "courses" 
+                      ? "border-[var(--color-secondary)] text-[var(--color-secondary)]" 
+                      : "border-transparent text-gray-500 hover:text-gray-700"
+                  }`}
+                >
+                  Lịch sử Khóa học
+                </button>
+              </div>
+
+              <CardContent className="p-6">
+                {/* TAB: OVERVIEW */}
+                {activeTab === "overview" && (
+                  <div className="space-y-8">
+                    {/* Current Courses */}
+                    <div>
+                      <h3 className="text-lg font-bold text-[var(--color-primary)] mb-4 flex items-center gap-2">
+                        <BookOpen size={20} className="text-[var(--color-secondary)]" />
+                        Khóa học đang diễn ra
+                      </h3>
+                      {enrollments.filter(e => e.status === 'active' || e.status === 'ongoing').length > 0 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {enrollments.filter(e => e.status === 'active' || e.status === 'ongoing').map(course => (
+                            <CourseCard key={course._id} course={course} />
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="p-8 text-center bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                          <p className="text-gray-500">Học viên chưa đăng ký khóa học nào.</p>
+                          <Button 
+                            variant="link" 
+                            className="text-[var(--color-secondary)] mt-2"
+                            onClick={() => setIsEnrollModalOpen(true)}
+                          >
+                            Đăng ký ngay
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Additional Info Section (Placeholder for future data like Notes, Parents info) */}
+                    <div>
+                      <h3 className="text-lg font-bold text-[var(--color-primary)] mb-4 flex items-center gap-2">
+                        <FileText size={20} className="text-gray-400" />
+                        Ghi chú
+                      </h3>
+                      <textarea 
+                        className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[var(--color-secondary)] focus:border-transparent outline-none transition-all"
+                        placeholder="Thêm ghi chú về học viên này..."
+                        rows={3}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* TAB: COURSES HISTORY */}
+                {activeTab === "courses" && (
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-bold text-[var(--color-primary)] mb-4">Lịch sử ghi danh</h3>
+                    {enrollments.length > 0 ? (
+                      <div className="border border-gray-200 rounded-xl overflow-hidden">
+                        <table className="w-full text-sm text-left">
+                          <thead className="bg-gray-50 text-gray-500 font-semibold border-b border-gray-200">
+                            <tr>
+                              <th className="px-6 py-4">Khóa học / Lớp</th>
+                              <th className="px-6 py-4">Ngày bắt đầu</th>
+                              <th className="px-6 py-4">Học phí</th>
+                              <th className="px-6 py-4">Trạng thái</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                            {enrollments.map((enrollment) => (
+                              <tr key={enrollment._id} className="hover:bg-gray-50 transition-colors">
+                                <td className="px-6 py-4">
+                                  <p className="font-bold text-gray-800">{enrollment.course?.name || enrollment.class?.name}</p>
+                                  <p className="text-xs text-gray-500 mt-0.5">{enrollment.course?.code || enrollment.class?.code}</p>
+                                </td>
+                                <td className="px-6 py-4 text-gray-600">
+                                  {enrollment.enrollmentDate ? new Date(enrollment.enrollmentDate).toLocaleDateString("vi-VN") : "---"}
+                                </td>
+                                <td className="px-6 py-4 font-medium text-gray-700">
+                                  {enrollment.course?.tuitionFee ? formatCurrency(enrollment.course.tuitionFee) : "---"}
+                                </td>
+                                <td className="px-6 py-4">
+                                  <Badge variant={enrollment.status === 'active' ? 'success' : enrollment.status === 'completed' ? 'info' : 'secondary'}>
+                                    {enrollment.status === 'active' ? 'Đang học' : enrollment.status === 'completed' ? 'Hoàn thành' : enrollment.status}
+                                  </Badge>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <p className="text-center text-gray-500 py-8">Chưa có lịch sử khóa học.</p>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </div>
 
-      {/* Enroll Modal */}
-      <EnrollStudentModal
+      {/* --- Enroll Modal --- */}
+      <EnrollStudentModal 
         isOpen={isEnrollModalOpen}
         onClose={() => setIsEnrollModalOpen(false)}
         student={student}
@@ -283,250 +299,175 @@ const StudentDetailPage = () => {
   );
 };
 
-// Enroll Student Modal Component
+// --- SUB-COMPONENTS ---
+
+const InfoItem = ({ icon: Icon, label, value }) => (
+  <div className="flex items-start gap-3">
+    <div className="p-2 bg-gray-50 rounded-lg text-gray-400 shrink-0">
+      <Icon size={16} />
+    </div>
+    <div className="flex-1 min-w-0">
+      <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">{label}</p>
+      <p className="text-sm font-semibold text-gray-800 truncate" title={value}>{value || "---"}</p>
+    </div>
+  </div>
+);
+
+const CourseCard = ({ course }) => (
+  <div className="p-4 rounded-xl border border-gray-200 bg-white hover:shadow-md transition-shadow group">
+    <div className="flex justify-between items-start mb-3">
+      <div className="flex items-center gap-2">
+        <div className="p-1.5 bg-blue-50 text-blue-600 rounded-md">
+          <GraduationCap size={18} />
+        </div>
+        <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+          {course.course?.code || course.class?.code}
+        </span>
+      </div>
+      <Badge variant="success" className="text-[10px] px-2 py-0.5">Đang học</Badge>
+    </div>
+    
+    <h4 className="font-bold text-gray-800 mb-1 line-clamp-1">{course.course?.name || course.class?.name}</h4>
+    
+    <div className="space-y-2 mt-4 pt-4 border-t border-gray-100">
+      <div className="flex justify-between text-xs">
+        <span className="text-gray-500 flex items-center gap-1"><Clock size={12}/> Thời lượng</span>
+        <span className="font-medium">{course.course?.duration?.hours || 0} giờ</span>
+      </div>
+      <div className="flex justify-between text-xs">
+        <span className="text-gray-500 flex items-center gap-1"><Calendar size={12}/> Bắt đầu</span>
+        <span className="font-medium">
+          {course.startDate ? new Date(course.startDate).toLocaleDateString("vi-VN") : "---"}
+        </span>
+      </div>
+    </div>
+  </div>
+);
+
+// --- MODAL: Enroll Student (Reused logic, improved UI) ---
 const EnrollStudentModal = ({ isOpen, onClose, student, onSuccess }) => {
   const [classes, setClasses] = useState([]);
   const [selectedClass, setSelectedClass] = useState("");
   const [selectedClassDetail, setSelectedClassDetail] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [loadingClasses, setLoadingClasses] = useState(true);
+  const [loadingClasses, setLoadingClasses] = useState(false);
 
   useEffect(() => {
-    if (isOpen) {
-      fetchAvailableClasses();
-    }
+    if (isOpen) fetchClasses();
   }, [isOpen]);
 
-  const fetchAvailableClasses = async () => {
+  const fetchClasses = async () => {
     try {
       setLoadingClasses(true);
-      const response = await api.get("/staff/enrollment/classes", {
-        params: { limit: 100 }, // Fetch all classes without status filter
-      });
-      console.log("🔍 Classes API Response:", response.data);
-
-      // Handle response structure - the API returns { success, data: { classes, pagination } }
-      let classList = [];
-      if (response.data?.success && response.data?.data?.classes) {
-        classList = response.data.data.classes;
-        console.log("📚 Classes from response.data.data.classes:", classList);
-      } else if (response.data?.classes) {
-        classList = response.data.classes;
-        console.log("📚 Classes from response.data.classes:", classList);
-      } else if (Array.isArray(response.data)) {
-        classList = response.data;
-        console.log("📚 Classes from direct array:", classList);
-      } else {
-        console.warn("⚠️ Unexpected API response structure:", response.data);
-      }
-
-      console.log("📊 Total classes loaded:", classList.length);
-      setClasses(classList);
-    } catch (error) {
-      console.error("❌ Error fetching classes:", error);
-      console.error("Error response:", error.response?.data);
-      console.error("Error details:", error.message);
-      toast.error("Không thể tải danh sách lớp học");
-      setClasses([]);
+      const res = await api.get("/staff/enrollment/classes", { params: { status: "upcoming,ongoing" } });
+      const data = res.data?.data?.classes || res.data?.data || res.data || [];
+      setClasses(Array.isArray(data) ? data : []);
+    } catch {
+      toast.error("Lỗi tải danh sách lớp");
     } finally {
       setLoadingClasses(false);
     }
   };
 
-  const handleSelectClass = (classId) => {
-    setSelectedClass(classId);
-    const classDetail = classes.find((c) => c._id === classId);
-    setSelectedClassDetail(classDetail);
+  const handleSelectClass = (id) => {
+    setSelectedClass(id);
+    setSelectedClassDetail(classes.find(c => c._id === id));
   };
 
-  const handleEnroll = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!selectedClass) {
-      toast.error("Vui lòng chọn lớp học");
-      return;
-    }
-
+    if (!selectedClass) return;
     try {
       setLoading(true);
-      const response = await api.post(
-        `/staff/enrollment/students/${student._id}/enroll`,
-        { classId: selectedClass }
-      );
-
-      if (response.data.success) {
-        toast.success("Đã ghi danh học viên vào lớp thành công!");
-        setSelectedClass("");
-        setSelectedClassDetail(null);
-        onSuccess();
-      }
-    } catch (error) {
-      console.error("Error enrolling student:", error);
-      toast.error(
-        error.response?.data?.message || "Không thể ghi danh học viên"
-      );
+      await api.post(`/staff/enrollment/students/${student._id}/enroll`, { classId: selectedClass });
+      onSuccess();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Lỗi ghi danh");
     } finally {
       setLoading(false);
     }
   };
 
-  if (!isOpen || !student) return null;
+  if (!isOpen) return null;
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      title={`📝 Ghi danh học viên: ${student.fullName}`}
-      size="large"
-    >
-      <form onSubmit={handleEnroll} className="space-y-4">
-        {/* Student Info */}
-        <div className="p-4 bg-blue-50 rounded-lg space-y-2 border border-blue-200">
-          <p className="text-sm">
-            <span className="font-medium">Mã học viên:</span>{" "}
-            {student.studentCode || "Chưa có"}
-          </p>
-          <p className="text-sm">
-            <span className="font-medium">Họ tên:</span> {student.fullName}
-          </p>
-          <p className="text-sm">
-            <span className="font-medium">Email:</span> {student.email || "N/A"}
-          </p>
-          <p className="text-sm">
-            <span className="font-medium">Số điện thoại:</span>{" "}
-            {student.phone || "N/A"}
-          </p>
-        </div>
-
+    <Modal isOpen={isOpen} onClose={onClose} title="Ghi Danh Lớp Mới" size="large">
+      <form onSubmit={handleSubmit} className="space-y-6">
+        
         {/* Class Selection */}
         <div>
-          <label className="block text-sm font-medium mb-3">
-            Chọn lớp học *
-          </label>
+          <label className="block text-sm font-bold text-gray-700 mb-3">Chọn lớp học đang mở:</label>
+          
           {loadingClasses ? (
-            <div className="flex justify-center py-6">
-              <Loading size="small" />
-            </div>
+            <div className="py-8 text-center"><Loading size="small" /></div>
           ) : classes.length === 0 ? (
-            <div className="text-center py-6 bg-gray-50 rounded-lg">
-              <p className="text-gray-600">Không có lớp học nào khả dụng</p>
+            <div className="p-4 bg-gray-50 rounded-lg text-center text-gray-500 text-sm">
+              Không có lớp nào khả dụng.
             </div>
           ) : (
-            <div className="space-y-3 max-h-64 overflow-y-auto">
-              {classes.map((classItem) => (
-                <div
-                  key={classItem._id}
-                  className={`p-3 border rounded-lg cursor-pointer transition ${
-                    selectedClass === classItem._id
-                      ? "border-teal-500 bg-teal-50"
-                      : "border-gray-200 bg-white hover:border-gray-300"
-                  } ${classItem.isFull ? "opacity-60" : ""}`}
-                  onClick={() =>
-                    !classItem.isFull && handleSelectClass(classItem._id)
-                  }
-                >
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <p className="font-semibold text-gray-900">
-                        {classItem.name}
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        {classItem.course?.name} ({classItem.course?.courseCode}
-                        )
-                      </p>
-                      <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
-                        <p>
-                          <span className="text-gray-600">Giáo viên:</span>{" "}
-                          <span className="font-medium">
-                            {classItem.teacher?.fullName || "Chưa assign"}
-                          </span>
-                        </p>
-                        <p>
-                          <span className="text-gray-600">Phòng:</span>{" "}
-                          <span className="font-medium">
-                            {classItem.room || "N/A"}
-                          </span>
-                        </p>
-                        <p>
-                          <span className="text-gray-600">Ngày bắt đầu:</span>{" "}
-                          <span className="font-medium">
-                            {new Date(classItem.startDate).toLocaleDateString(
-                              "vi-VN"
-                            )}
-                          </span>
-                        </p>
-                        <p>
-                          <span className="text-gray-600">Sức chứa:</span>{" "}
-                          <span className="font-medium">
-                            {classItem.currentEnrollment}/{classItem.capacity}
-                          </span>
-                        </p>
-                      </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+              {classes.map(cls => {
+                const max = cls.capacity?.max || cls.maxStudents || 30;
+                const current = cls.currentEnrollment || 0;
+                const available = max - current;
+                const isFull = available <= 0;
+
+                return (
+                  <div 
+                    key={cls._id}
+                    onClick={() => !isFull && handleSelectClass(cls._id)}
+                    className={`
+                      p-3 rounded-xl border cursor-pointer transition-all relative
+                      ${selectedClass === cls._id 
+                        ? 'border-[var(--color-secondary)] bg-[var(--color-secondary)]/5 ring-1 ring-[var(--color-secondary)]' 
+                        : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'}
+                      ${isFull ? 'opacity-50 cursor-not-allowed bg-gray-50' : ''}
+                    `}
+                  >
+                    <div className="flex justify-between items-start mb-1">
+                      <span className="font-bold text-gray-800 text-sm">{cls.name}</span>
+                      {selectedClass === cls._id && <CheckCircle size={16} className="text-[var(--color-secondary)]" />}
                     </div>
-                    <Badge
-                      variant={classItem.isFull ? "danger" : "success"}
-                      className="ml-2"
-                    >
-                      {classItem.isFull
-                        ? "Đã đầy"
-                        : `Còn ${classItem.availableSlots}`}
-                    </Badge>
+                    <div className="text-xs text-gray-500 mb-2">{cls.course?.name}</div>
+                    
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="flex items-center gap-1 text-gray-500">
+                        <Clock size={12} /> {cls.schedule || "T2-T4-T6"}
+                      </span>
+                      <span className={`font-bold ${isFull ? 'text-red-500' : 'text-emerald-600'}`}>
+                        {isFull ? "Hết chỗ" : `Còn ${available} chỗ`}
+                      </span>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
 
-        {/* Selected Class Details */}
+        {/* Selected Details Preview */}
         {selectedClassDetail && (
-          <div className="p-4 bg-green-50 rounded-lg border border-green-200 space-y-2">
-            <p className="font-medium text-green-900">
-              ✓ Thông tin lớp học đã chọn
-            </p>
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              <p>
-                <span className="text-gray-600">Lớp:</span>{" "}
-                {selectedClassDetail.name}
-              </p>
-              <p>
-                <span className="text-gray-600">Mã lớp:</span>{" "}
-                {selectedClassDetail.classCode || "N/A"}
-              </p>
-              <p>
-                <span className="text-gray-600">Khóa học:</span>{" "}
-                {selectedClassDetail.course?.name}
-              </p>
-              <p>
-                <span className="text-gray-600">Học phí:</span>{" "}
-                {selectedClassDetail.course?.tuitionFee?.toLocaleString(
-                  "vi-VN"
-                )}
-                đ
-              </p>
-              <p>
-                <span className="text-gray-600">Khoá học:</span>{" "}
-                {typeof selectedClassDetail.course?.duration === "object"
-                  ? `${selectedClassDetail.course.duration?.weeks || 0} tuần (${
-                      selectedClassDetail.course.duration?.hours || 0
-                    } giờ)`
-                  : `${selectedClassDetail.course?.duration} tháng`}
-              </p>
+          <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl space-y-2">
+            <h4 className="font-bold text-[var(--color-primary)] text-sm mb-2 flex items-center gap-2">
+              <CheckCircle size={16} /> Xác nhận thông tin
+            </h4>
+            <div className="grid grid-cols-2 gap-y-2 text-sm text-gray-600">
+              <p>Lớp: <span className="font-medium text-gray-900">{selectedClassDetail.name}</span></p>
+              <p>Học phí: <span className="font-bold text-[var(--color-primary)]">{selectedClassDetail.course?.tuitionFee ? formatCurrency(selectedClassDetail.course.tuitionFee) : "---"}</span></p>
+              <p>Ngày khai giảng: <span className="font-medium text-gray-900">{selectedClassDetail.startDate ? new Date(selectedClassDetail.startDate).toLocaleDateString("vi-VN") : "TBA"}</span></p>
             </div>
           </div>
         )}
 
-        {/* Buttons */}
-        <div className="flex gap-3 justify-end pt-4 border-t">
-          <Button variant="secondary" onClick={onClose}>
-            Hủy
-          </Button>
-          <Button
-            type="submit"
-            variant="primary"
+        <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
+          <Button variant="outline" onClick={onClose} type="button">Hủy bỏ</Button>
+          <Button 
+            type="submit" 
+            className="bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-light)]"
             disabled={!selectedClass || loading}
             loading={loading}
           >
-            Xác Nhận Ghi Danh
+            Xác nhận ghi danh
           </Button>
         </div>
       </form>

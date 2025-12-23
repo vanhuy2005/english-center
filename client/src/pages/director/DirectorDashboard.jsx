@@ -1,45 +1,68 @@
 import React, { useState, useEffect } from "react";
-import { useLanguage } from "@hooks";
-import { Card, Loading, Badge } from "@components/common";
-import { LineChart, BarChart, PieChart } from "@components/charts";
-import apiClient from "@services/api";
-import { formatCurrency, formatDate } from "@utils/date";
+import { 
+  Card, 
+  Loading, 
+  Badge 
+} from "@components/common";
+import { 
+  LineChart, 
+  BarChart, 
+  PieChart 
+} from "@components/charts";
+import { directorService } from "@services/directorService"; // Import Service vừa tạo
 import {
   Users,
   GraduationCap,
   DollarSign,
   BookOpen,
   TrendingUp,
-  TrendingDown,
-  Calendar,
+  Activity,
+  CheckCircle,
+  AlertCircle,
+  Briefcase,
+  Clock
 } from "lucide-react";
 
 /**
- * Director Dashboard - Tổng quan hệ thống
- * Hiển thị:
- * - Statistics cards (học viên, giáo viên, doanh thu, khóa học)
- * - Line chart: Doanh thu theo thời gian
- * - Bar chart: Chuyên cần học viên
- * - Pie chart: Phân bổ học viên theo khóa học
- * - Table: Hoạt động gần đây
+ * Director Dashboard - Polished & Connected
+ * Theme: Primary #132440 | Secondary #3b9797
  */
-
 const DirectorDashboard = () => {
-  const { t } = useLanguage();
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  
+  // State dữ liệu thực
   const [stats, setStats] = useState({
     totalStudents: 0,
     totalTeachers: 0,
     totalRevenue: 0,
     totalCourses: 0,
-    newStudentsThisMonth: 0,
-    revenueGrowth: 0,
+    revenueGrowth: 12.5, // Giả lập số liệu so sánh
   });
+  
   const [revenueData, setRevenueData] = useState([]);
-  const [attendanceData, setAttendanceData] = useState([]);
-  const [studentDistribution, setStudentDistribution] = useState([]);
-  const [recentActivities, setRecentActivities] = useState([]);
+  
+  // Mock data cho các phần chưa có API (để UI không bị trống)
+  const attendanceData = [
+    { day: "T2", present: 85, absent: 5, late: 10 },
+    { day: "T3", present: 88, absent: 8, late: 4 },
+    { day: "T4", present: 90, absent: 3, late: 7 },
+    { day: "T5", present: 82, absent: 10, late: 8 },
+    { day: "T6", present: 95, absent: 2, late: 3 },
+    { day: "T7", present: 70, absent: 15, late: 15 },
+  ];
+
+  const studentDistribution = [
+    { name: "IELTS", value: 45 },
+    { name: "TOEIC", value: 30 },
+    { name: "Giao tiếp", value: 55 },
+    { name: "Thiếu nhi", value: 20 },
+  ];
+
+  const recentActivities = [
+    { type: "enrollment", title: "Nguyễn Văn A", desc: "Đăng ký khóa IELTS 6.5", time: "10:30", status: "success" },
+    { type: "payment", title: "Trần Thị B", desc: "Thanh toán học phí 5tr", time: "09:15", status: "success" },
+    { type: "class", title: "Lớp TOEIC-01", desc: "Bắt đầu buổi học", time: "08:00", status: "info" },
+  ];
 
   useEffect(() => {
     fetchDashboardData();
@@ -48,441 +71,258 @@ const DirectorDashboard = () => {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      setError(null);
-
-      // Fetch data với error handling cho từng request
-      const [
-        studentsRes,
-        teachersRes,
-        coursesRes,
-        financeRes,
-        revenueChartRes,
-        attendanceChartRes,
-        distributionRes,
-        activitiesRes,
-      ] = await Promise.allSettled([
-        apiClient.get("/students", { params: { page: 1, pageSize: 1 } }),
-        apiClient.get("/teachers", { params: { page: 1, pageSize: 1 } }),
-        apiClient.get("/courses", { params: { page: 1, pageSize: 1 } }),
-        apiClient.get("/finance/overview"),
-        apiClient.get("/reports/revenue-chart", {
-          params: { period: "month", limit: 6 },
-        }),
-        apiClient.get("/reports/attendance-chart", {
-          params: { period: "week" },
-        }),
-        apiClient.get("/reports/student-distribution"),
-        apiClient.get("/reports/recent-activities", { params: { limit: 10 } }),
+      
+      // 1. Gọi dữ liệu song song từ Service
+      const [overview, revenueChart] = await Promise.all([
+        directorService.getOverviewStats(),
+        directorService.getRevenueChartData()
       ]);
 
-      // Helper để lấy data từ Promise.allSettled với mock data fallback
-      // Return axios response.data when fulfilled, otherwise return provided mock
-      const getData = (result, mockData = {}) => {
-        if (result.status === "fulfilled") {
-          return result.value.data;
-        }
-        console.warn("API call failed, using mock data");
-        return mockData;
-      };
+      // 2. Cập nhật State nếu có dữ liệu
+      if (overview) {
+        setStats(prev => ({ ...prev, ...overview }));
+      }
+      if (revenueChart) {
+        setRevenueData(revenueChart);
+      }
 
-      const students = getData(studentsRes, { pagination: { total: 156 } });
-      const teachers = getData(teachersRes, { pagination: { total: 24 } });
-      const courses = getData(coursesRes, { pagination: { total: 12 } });
-      const finance = getData(financeRes, {
-        totalRevenue: 450000000,
-        newStudentsThisMonth: 23,
-        revenueGrowth: 12.5,
-      });
-      const revenueChart = getData(revenueChartRes, {
-        data: [
-          {
-            month: "T1",
-            revenue: 75000000,
-            profit: 25000000,
-            expenses: 50000000,
-          },
-          {
-            month: "T2",
-            revenue: 68000000,
-            profit: 22000000,
-            expenses: 46000000,
-          },
-          {
-            month: "T3",
-            revenue: 82000000,
-            profit: 28000000,
-            expenses: 54000000,
-          },
-          {
-            month: "T4",
-            revenue: 91000000,
-            profit: 32000000,
-            expenses: 59000000,
-          },
-          {
-            month: "T5",
-            revenue: 78000000,
-            profit: 26000000,
-            expenses: 52000000,
-          },
-          {
-            month: "T6",
-            revenue: 95000000,
-            profit: 35000000,
-            expenses: 60000000,
-          },
-        ],
-      });
-      const attendanceChart = getData(attendanceChartRes, {
-        data: [
-          { day: "T2", present: 140, absent: 8, late: 12 },
-          { day: "T3", present: 135, absent: 12, late: 13 },
-          { day: "T4", present: 142, absent: 6, late: 12 },
-          { day: "T5", present: 138, absent: 10, late: 12 },
-          { day: "T6", present: 145, absent: 5, late: 10 },
-          { day: "T7", present: 130, absent: 15, late: 15 },
-        ],
-      });
-      const distribution = getData(distributionRes, {
-        data: [
-          { name: "IELTS", value: 45 },
-          { name: "TOEIC", value: 35 },
-          { name: "Giao tiếp", value: 52 },
-          { name: "Thiếu nhi", value: 24 },
-        ],
-      });
-      const activities = getData(activitiesRes, {
-        data: [
-          {
-            type: "enrollment",
-            title: "Học viên mới đăng ký",
-            description: "Nguyễn Văn A đã đăng ký khóa IELTS 6.5",
-            status: "success",
-            statusText: "Thành công",
-            timestamp: new Date().toISOString(),
-          },
-          {
-            type: "payment",
-            title: "Thanh toán học phí",
-            description: "Trần Thị B đã thanh toán 5.000.000đ",
-            status: "success",
-            statusText: "Đã thanh toán",
-            timestamp: new Date(Date.now() - 3600000).toISOString(),
-          },
-          {
-            type: "class",
-            title: "Lớp học mới",
-            description: "Lớp TOEIC Basic 01 đã được tạo",
-            status: "info",
-            statusText: "Mới",
-            timestamp: new Date(Date.now() - 7200000).toISOString(),
-          },
-        ],
-      });
-
-      // Set statistics
-      setStats({
-        totalStudents: students.pagination?.total || 0,
-        totalTeachers: teachers.pagination?.total || 0,
-        totalRevenue: finance.data?.totalRevenue || 0,
-        totalCourses: courses.pagination?.total || 0,
-        newStudentsThisMonth: finance.data?.newStudentsThisMonth || 0,
-        revenueGrowth: finance.data?.revenueGrowth || 0,
-      });
-
-      // Set chart data
-      setRevenueData(revenueChart.data || []);
-      setAttendanceData(attendanceChart.data || []);
-      setStudentDistribution(distribution.data || []);
-      setRecentActivities(
-        Array.isArray(activities.data) ? activities.data : activities || []
-      );
     } catch (error) {
-      console.error("Error fetching dashboard data:", error);
-      // Không set error để vẫn hiển thị mock data
-      // setError(error);
+      console.error("Dashboard Load Error:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  if (loading) {
-    return <Loading fullScreen text={t("Đang tải")} />;
-  }
+  const formatCurrency = (val) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(val);
+
+  if (loading) return <div className="h-screen flex items-center justify-center bg-gray-50"><Loading size="large" /></div>;
 
   return (
-    <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-primary">
-            {t("Dashboard Giám Đốc")}
-          </h1>
-          <p className="text-gray-600 mt-1">
-            {formatDate(new Date(), "EEEE, dd MMMM yyyy")}
-          </p>
+    <div className="min-h-screen bg-gray-50/50 p-6 md:p-8 font-sans text-gray-800">
+      <div className="max-w-[1600px] mx-auto space-y-6">
+        
+        {/* Header */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+          <div>
+            <h1 className="text-2xl font-bold text-[#132440] flex items-center gap-3">
+               <div className="p-2 bg-[#132440] rounded-lg shadow-sm">
+                  <Activity className="w-6 h-6 text-white" />
+               </div>
+               Dashboard Giám Đốc
+            </h1>
+            <p className="text-gray-500 text-sm mt-1 ml-12">
+              Tổng quan tình hình hoạt động của trung tâm
+            </p>
+          </div>
+          <div className="flex items-center gap-2 text-sm text-gray-500 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100">
+             <Clock size={16} />
+             <span>Cập nhật: {new Date().toLocaleDateString("vi-VN")}</span>
+          </div>
         </div>
-        <button
-          onClick={fetchDashboardData}
-          className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-dark transition-colors"
-        >
-          {t("Tải lại")}
-        </button>
-      </div>
 
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {/* Total Students */}
-        <StatCard
-          title={t("Tổng số học viên")}
-          value={stats.totalStudents}
-          icon={<Users className="w-8 h-8" />}
-          color="bg-blue-500"
-          subtitle={`+${stats.newStudentsThisMonth} ${t(
-            " học viên mới tháng này"
-          )}`}
-        />
+        {/* Statistics Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <StatCard
+            title="Tổng Học Viên"
+            value={stats.totalStudents}
+            icon={<Users className="w-6 h-6" />}
+            colorClass="text-blue-600"
+            bgClass="bg-blue-50"
+            subtitle="Học viên đang theo học"
+          />
 
-        {/* Total Teachers */}
-        <StatCard
-          title={t("Tổng số giáo viên")}
-          value={stats.totalTeachers}
-          icon={<GraduationCap className="w-8 h-8" />}
-          color="bg-green-500"
-        />
+          <StatCard
+            title="Tổng Giáo Viên"
+            value={stats.totalTeachers}
+            icon={<GraduationCap className="w-6 h-6" />}
+            colorClass="text-emerald-600"
+            bgClass="bg-emerald-50"
+            subtitle="Đội ngũ giảng dạy"
+          />
 
-        {/* Total Revenue */}
-        <StatCard
-          title={t("Tổng doanh thu")}
-          value={formatCurrency(stats.totalRevenue)}
-          icon={<DollarSign className="w-8 h-8" />}
-          color="bg-secondary"
-          subtitle={
-            <div className="flex items-center gap-1">
-              {stats.revenueGrowth >= 0 ? (
-                <TrendingUp className="w-4 h-4 text-green-500" />
-              ) : (
-                <TrendingDown className="w-4 h-4 text-red-500" />
-              )}
-              <span
-                className={
-                  stats.revenueGrowth >= 0 ? "text-green-500" : "text-red-500"
-                }
-              >
-                {stats.revenueGrowth}%
+          <StatCard
+            title="Tổng Doanh Thu"
+            value={formatCurrency(stats.totalRevenue)}
+            icon={<DollarSign className="w-6 h-6" />}
+            colorClass="text-[#3b9797]"
+            bgClass="bg-[#3b9797]/10"
+            subtitle={
+              <span className="flex items-center gap-1 text-emerald-600 font-medium">
+                <TrendingUp size={14} /> +{stats.revenueGrowth}% so với tháng trước
               </span>
-            </div>
-          }
-        />
-
-        {/* Total Courses */}
-        <StatCard
-          title={t("Tổng số khóa học")}
-          value={stats.totalCourses}
-          icon={<BookOpen className="w-8 h-8" />}
-          color="bg-accent"
-        />
-      </div>
-
-      {/* Charts Row 1 */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Revenue Chart */}
-        <Card title={t("Biểu đồ doanh thu")}>
-          <LineChart
-            data={revenueData}
-            lines={[
-              {
-                dataKey: "revenue",
-                name: t("Doanh thu"),
-                stroke: "#132440",
-              },
-              {
-                dataKey: "profit",
-                name: t("Lợi nhuận"),
-                stroke: "#3B9797",
-              },
-              {
-                dataKey: "expenses",
-                name: t("Chi phí"),
-                stroke: "#BF092F",
-              },
-            ]}
-            height={300}
+            }
           />
-        </Card>
 
-        {/* Attendance Chart */}
-        <Card title={t("Biểu đồ điểm danh")}>
-          <BarChart
-            data={attendanceData}
-            bars={[
-              {
-                dataKey: "present",
-                name: t("Có mặt"),
-                fill: "#3B9797",
-              },
-              {
-                dataKey: "absent",
-                name: t("Vắng mặt"),
-                fill: "#BF092F",
-              },
-              {
-                dataKey: "late",
-                name: t("Trễ"),
-                fill: "#FFA500",
-              },
-            ]}
-            height={300}
-            stacked
+          <StatCard
+            title="Khóa Học Hoạt Động"
+            value={stats.totalCourses}
+            icon={<BookOpen className="w-6 h-6" />}
+            colorClass="text-purple-600"
+            bgClass="bg-purple-50"
+            subtitle="Lớp đang mở"
           />
-        </Card>
-      </div>
+        </div>
 
-      {/* Charts Row 2 */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Student Distribution */}
-        <Card title={t("Phân bố học viên")} className="lg:col-span-1">
-          <PieChart
-            data={studentDistribution}
-            dataKey="value"
-            nameKey="name"
-            height={300}
-          />
-        </Card>
-
-        {/* Recent Activities */}
-        <Card title={t("Hoạt động gần đây")} className="lg:col-span-2">
-          <div className="space-y-3 max-h-[300px] overflow-y-auto">
-            {recentActivities.length === 0 ? (
-              <p className="text-gray-500 text-center py-8">
-                {t("Không có hoạt động gần đây")}
-              </p>
+        {/* Charts Row 1 */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Revenue Chart */}
+          <Card className="border border-gray-200 shadow-sm p-5">
+            <h3 className="font-bold text-gray-800 mb-6 flex items-center gap-2 text-lg">
+                <TrendingUp size={20} className="text-[#132440]" /> Biểu Đồ Doanh Thu (6 Tháng)
+            </h3>
+            {revenueData.length > 0 ? (
+                <LineChart
+                  data={revenueData}
+                  lines={[
+                    { dataKey: "revenue", name: "Doanh thu", stroke: "#132440" },
+                    { dataKey: "profit", name: "Lợi nhuận", stroke: "#3B9797" },
+                    { dataKey: "expenses", name: "Chi phí", stroke: "#ef4444" },
+                  ]}
+                  height={300}
+                />
             ) : (
-              recentActivities.map((activity, index) => (
-                <ActivityItem key={index} activity={activity} />
-              ))
+                <div className="h-[300px] flex items-center justify-center text-gray-400 bg-gray-50 rounded-lg">Chưa có dữ liệu giao dịch</div>
             )}
+          </Card>
+
+          {/* Attendance Chart */}
+          <Card className="border border-gray-200 shadow-sm p-5">
+            <h3 className="font-bold text-gray-800 mb-6 flex items-center gap-2 text-lg">
+                <Users size={20} className="text-[#3B9797]" /> Chuyên Cần Tuần Này
+            </h3>
+            <BarChart
+              data={attendanceData}
+              bars={[
+                { dataKey: "present", name: "Có mặt", fill: "#3B9797" },
+                { dataKey: "absent", name: "Vắng mặt", fill: "#ef4444" },
+                { dataKey: "late", name: "Trễ", fill: "#f59e0b" },
+              ]}
+              height={300}
+              stacked
+            />
+          </Card>
+        </div>
+
+        {/* Charts Row 2 & Activities */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Student Distribution */}
+          <Card className="lg:col-span-1 border border-gray-200 shadow-sm p-5">
+            <h3 className="font-bold text-gray-800 mb-6 flex items-center gap-2 text-lg">
+                <BookOpen size={20} className="text-blue-600" /> Phân Bố Học Viên
+            </h3>
+            <PieChart
+              data={studentDistribution}
+              dataKey="value"
+              nameKey="name"
+              height={300}
+            />
+          </Card>
+
+          {/* Recent Activities */}
+          <Card className="lg:col-span-2 border border-gray-200 shadow-sm p-5">
+            <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2 text-lg">
+                <Clock size={20} className="text-gray-500" /> Hoạt Động Gần Đây
+            </h3>
+            <div className="space-y-3">
+              {recentActivities.map((activity, index) => (
+                <ActivityItem key={index} activity={activity} />
+              ))}
+            </div>
+          </Card>
+        </div>
+
+        {/* Department Overview */}
+        <Card className="border border-gray-200 shadow-sm p-6">
+          <h3 className="font-bold text-gray-800 mb-6 flex items-center gap-2 text-lg">
+             <Briefcase size={20} className="text-[#132440]" /> Tổng Quan Các Bộ Phận
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <DepartmentCard
+              name="Tuyển sinh"
+              stats={{ "Khách mới": 45, "Chờ xử lý": 12 }}
+              status="good"
+            />
+            <DepartmentCard
+              name="Học vụ"
+              stats={{ "Lớp active": 28, "Chuyên cần TB": "92%" }}
+              status="good"
+            />
+            <DepartmentCard
+              name="Kế toán"
+              stats={{ "Tỉ lệ thu": "88%", "Công nợ": 15 }}
+              status="warning"
+            />
           </div>
         </Card>
       </div>
-
-      {/* Department Overview */}
-      <Card title={t("Tổng quan các bộ phận")}>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <DepartmentCard
-            name={t("Bộ phận Tuyển sinh")}
-            stats={{
-              newEnrollments: 45,
-              pendingApplications: 12,
-            }}
-            status="good"
-            t={t}
-          />
-          <DepartmentCard
-            name={t("Bộ phận học vụ")}
-            stats={{
-              activeClasses: 28,
-              avgAttendance: "92%",
-            }}
-            status="Tốt"
-            t={t}
-          />
-          <DepartmentCard
-            name={t("Bộ phận kế toán")}
-            stats={{
-              collectionRate: "88%",
-              pendingPayments: 15,
-            }}
-            status="warning"
-            t={t}
-          />
-        </div>
-      </Card>
     </div>
   );
 };
 
-/**
- * Stat Card Component
- */
-const StatCard = ({ title, value, icon, color, subtitle }) => {
-  return (
-    <Card className="hover:shadow-lg transition-shadow">
-      <div className="flex items-center justify-between">
-        <div className="flex-1">
-          <p className="text-gray-600 text-sm mb-1">{title}</p>
-          <p className="text-2xl font-bold text-gray-900">{value}</p>
-          {subtitle && (
-            <div className="text-sm text-gray-500 mt-1">{subtitle}</div>
-          )}
-        </div>
-        <div className={`${color} text-white p-3 rounded-lg`}>{icon}</div>
-      </div>
-    </Card>
-  );
-};
+// --- SUB-COMPONENTS ---
 
-/**
- * Activity Item Component
- */
+const StatCard = ({ title, value, icon, colorClass, bgClass, subtitle }) => (
+  <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all">
+    <div className="flex items-start justify-between">
+      <div>
+        <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">{title}</p>
+        <h3 className={`text-2xl font-extrabold ${colorClass}`}>{value}</h3>
+        {subtitle && <div className="text-xs text-gray-500 mt-2">{subtitle}</div>}
+      </div>
+      <div className={`p-3 rounded-xl ${bgClass} ${colorClass}`}>
+        {icon}
+      </div>
+    </div>
+  </div>
+);
+
 const ActivityItem = ({ activity }) => {
-  const getActivityIcon = (type) => {
-    switch (type) {
-      case "enrollment":
-        return <Users className="w-5 h-5 text-blue-500" />;
-      case "payment":
-        return <DollarSign className="w-5 h-5 text-green-500" />;
-      case "class":
-        return <Calendar className="w-5 h-5 text-purple-500" />;
-      default:
-        return <BookOpen className="w-5 h-5 text-gray-500" />;
+  const getIcon = (type) => {
+    switch(type) {
+        case 'enrollment': return <Users size={16} className="text-blue-500"/>;
+        case 'payment': return <DollarSign size={16} className="text-green-500"/>;
+        default: return <BookOpen size={16} className="text-purple-500"/>;
     }
-  };
-
+  }
+  
   return (
-    <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-      <div className="flex-shrink-0 mt-1">{getActivityIcon(activity.type)}</div>
+    <div className="flex items-center gap-4 p-3 bg-gray-50 rounded-xl border border-gray-100 hover:bg-white hover:shadow-sm transition-all">
+      <div className="p-2 bg-white rounded-lg border border-gray-200 shadow-sm">
+        {getIcon(activity.type)}
+      </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-gray-900">{activity.title}</p>
-        <p className="text-xs text-gray-500 mt-1">{activity.description}</p>
+        <p className="text-sm font-bold text-gray-800">{activity.title}</p>
+        <p className="text-xs text-gray-500">{activity.desc}</p>
       </div>
-      <div className="flex-shrink-0">
-        <Badge variant={activity.status}>{activity.statusText}</Badge>
-      </div>
-      <div className="flex-shrink-0 text-xs text-gray-400">
-        {formatDate(activity.timestamp, "HH:mm")}
+      <div className="text-right">
+         <Badge variant={activity.status} className="text-[10px] px-2 py-0.5 mb-1 block w-fit ml-auto">
+            {activity.status === 'success' ? 'Hoàn thành' : 'Thông tin'}
+         </Badge>
+         <span className="text-[10px] text-gray-400">{activity.time}</span>
       </div>
     </div>
   );
 };
 
-/**
- * Department Card Component
- */
-const DepartmentCard = ({ name, stats, status, t }) => {
-  const statusColors = {
-    good: "bg-green-100 text-green-800",
-    warning: "bg-yellow-100 text-yellow-800",
-    danger: "bg-red-100 text-red-800",
-  };
+const DepartmentCard = ({ name, stats, status }) => {
+  const config = {
+    good: { color: "text-emerald-700", bg: "bg-emerald-50", border: "border-emerald-100", icon: <CheckCircle size={14} />, text: "Ổn định" },
+    warning: { color: "text-amber-700", bg: "bg-amber-50", border: "border-amber-100", icon: <AlertCircle size={14} />, text: "Cần chú ý" },
+  }[status];
 
   return (
-    <div className="p-4 bg-gray-50 rounded-lg">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="font-semibold text-gray-900">{name}</h3>
-        <span
-          className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[status]}`}
-        >
-          {t(`Tình trạng: ${status}`)}
+    <div className={`p-5 rounded-xl border ${config.border} ${config.bg}`}>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className={`font-bold ${config.color}`}>{name}</h3>
+        <span className={`flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold bg-white/60 ${config.color}`}>
+          {config.icon} {config.text}
         </span>
       </div>
       <div className="space-y-2">
         {Object.entries(stats).map(([key, value]) => (
-          <div key={key} className="flex justify-between text-sm">
-            <span className="text-gray-600 capitalize">
-              {key.replace(/([A-Z])/g, " $1").trim()}:
-            </span>
-            <span className="font-medium text-gray-900">{value}</span>
+          <div key={key} className="flex justify-between text-xs font-medium text-gray-600 border-b border-black/5 pb-1 last:border-0">
+            <span>{key}:</span>
+            <span className="font-bold text-gray-800">{value}</span>
           </div>
         ))}
       </div>

@@ -8,20 +8,20 @@ import {
   LogOut,
   Key,
   AlertCircle,
-  Target,
-  UserCircle,
-  Bell,
-  Calendar,
-  DollarSign,
-  Award,
-  BookOpen,
-  RefreshCw,
+  LayoutDashboard, // Thay cho Target (Tiến độ)
+  UserCircle,      // Thông tin cá nhân
+  Bell,            // Thông báo
+  CalendarDays,    // Thay cho Calendar thường (Lịch học)
+  CreditCard,      // Thay cho Dollar (Tài chính)
+  GraduationCap,   // Thay cho Award (Kết quả học tập)
+  BookOpenCheck,   // Thay cho Edit (Đăng ký môn)
+  FileClock,       // Thay cho Refresh (Xin nghỉ/Bù)
   ChevronRight,
-  Edit,
+  School,          // Logo
 } from "lucide-react";
 
 /**
- * Modern Left Sidebar Component - Always Visible
+ * Modern White Sidebar - Fixed Icons Strategy
  */
 export const StudentSidebar = ({ menuItems = [] }) => {
   const location = useLocation();
@@ -29,19 +29,30 @@ export const StudentSidebar = ({ menuItems = [] }) => {
   const { user, logout } = useAuth();
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
 
-  const isActive = (path) => {
-    // Exact match
-    if (location.pathname === path) return true;
+  // --- LOGIC MAP ICON DỰA TRÊN PATH ---
+  // Cách này giúp icon luôn đồng bộ style Lucide, không phụ thuộc vào emoji/icon lạ từ API/Parent
+  const getMenuIcon = (path) => {
+    // Chuẩn hóa path để so sánh
+    const p = path.toLowerCase();
 
-    // Nested route match - prevent "/" from matching all routes
-    if (
-      path !== "/" &&
-      path !== "" &&
-      location.pathname.startsWith(path + "/")
-    ) {
+    if (p.includes("dashboard") || p === "/student") return <LayoutDashboard size={20} />;
+    if (p.includes("profile") || p.includes("info")) return <UserCircle size={20} />;
+    if (p.includes("notification")) return <Bell size={20} />;
+    if (p.includes("schedule") || p.includes("timetable")) return <CalendarDays size={20} />;
+    if (p.includes("tuition") || p.includes("payment") || p.includes("finance")) return <CreditCard size={20} />;
+    if (p.includes("grade") || p.includes("result") || p.includes("score")) return <GraduationCap size={20} />;
+    if (p.includes("enroll") || p.includes("course-register")) return <BookOpenCheck size={20} />;
+    if (p.includes("request") || p.includes("leave")) return <FileClock size={20} />;
+    
+    // Default fallback
+    return <LayoutDashboard size={20} />;
+  };
+
+  const isActive = (path) => {
+    if (location.pathname === path) return true;
+    if (path !== "/" && path !== "" && location.pathname.startsWith(path + "/")) {
       return true;
     }
-
     return false;
   };
 
@@ -52,90 +63,95 @@ export const StudentSidebar = ({ menuItems = [] }) => {
     }
   };
 
-  // Icon mapping
-  const iconMap = {
-    "📊": <Target className="w-5 h-5" />,
-    "👤": <UserCircle className="w-5 h-5" />,
-    "🔔": <Bell className="w-5 h-5" />,
-    "📅": <Calendar className="w-5 h-5" />,
-    "💵": <DollarSign className="w-5 h-5" />,
-    "💰": <DollarSign className="w-5 h-5" />,
-    "🏆": <Award className="w-5 h-5" />,
-    "📝": <BookOpen className="w-5 h-5" />,
-    "✏️": <Edit className="w-5 h-5" />,
-    "🔄": <RefreshCw className="w-5 h-5" />,
-  };
-
   return (
     <>
-      <aside className="fixed left-0 top-0 h-screen w-72 bg-white border-r border-gray-200 shadow-lg z-40 flex flex-col">
-        {/* Header */}
-        <div className="px-6 py-6 border-b border-gray-200">
-          <div className="text-center">
-            <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">
-              hocVienPage
-            </h2>
-            <div className="flex items-center gap-3 mt-4">
-              <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
-                <User className="w-6 h-6 text-blue-600" />
+      <aside className="fixed left-0 top-0 h-screen w-72 bg-white border-r border-gray-200 shadow-xl z-50 flex flex-col transition-all duration-300 font-sans">
+        
+        {/* Brand Header */}
+        <div className="h-16 flex items-center px-6 border-b border-gray-100">
+           <div className="flex items-center gap-3">
+              <div className="p-2 bg-[var(--color-primary)] rounded-lg text-white shadow-md flex items-center justify-center">
+                 <School size={22} strokeWidth={2.5} />
               </div>
-              <div className="text-left flex-1 min-w-0">
-                <p className="text-sm font-semibold text-gray-900 truncate">
-                  {user?.fullName || "Nguyễn Văn An"}
-                </p>
-                <p className="text-xs text-gray-500 truncate">
-                  Mã học viên:{" "}
-                  {user?.studentCode || user?.profile?.studentCode || "SV001"}
-                </p>
+              <div className="flex flex-col justify-center">
+                <span className="text-lg font-extrabold text-[var(--color-primary)] tracking-tight leading-none">
+                  ENGLISH HUB
+                </span>
+                <span className="text-[10px] text-gray-400 font-bold tracking-widest uppercase mt-0.5">
+                  STUDENT PORTAL
+                </span>
               </div>
+           </div>
+        </div>
+
+        {/* User Info Section */}
+        <div className="p-5 pb-2">
+          <div className="flex items-center gap-3 p-3.5 rounded-xl bg-gray-50/80 border border-gray-100/80">
+            <div className="relative shrink-0">
+              <div className="w-10 h-10 rounded-full bg-white border-2 border-[var(--color-secondary)] flex items-center justify-center text-[var(--color-primary)] font-bold shadow-sm text-sm">
+                {user?.fullName?.charAt(0).toUpperCase() || "U"}
+              </div>
+              <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
+            </div>
+            <div className="flex-1 min-w-0 overflow-hidden">
+              <p className="text-sm font-bold text-[var(--color-primary)] truncate">
+                {user?.fullName || "Học Viên"}
+              </p>
+              <p className="text-[11px] text-gray-500 truncate font-medium">
+                ID: <span className="text-[var(--color-secondary)]">{user?.studentCode || user?.profile?.studentCode || "HV---"}</span>
+              </p>
             </div>
           </div>
         </div>
 
         {/* Navigation Menu */}
-        <nav className="flex-1 px-4 py-6 space-y-6 overflow-y-auto">
+        <nav className="flex-1 px-4 py-2 space-y-6 overflow-y-auto custom-scrollbar">
           {menuItems.map((section, sectionIndex) => (
             <div key={sectionIndex}>
               {section.title && (
-                <h3 className="px-3 mb-3 text-xs font-bold text-gray-700 uppercase tracking-wider">
+                <h3 className="px-4 mb-2 text-[11px] font-bold text-gray-400 uppercase tracking-widest">
                   {section.title}
                 </h3>
               )}
               <div className="space-y-1">
                 {section.items.map((item) => {
-                  const isItemActive = isActive(item.path);
+                  const active = isActive(item.path);
+                  
+                  // Tự động chọn icon chuẩn dựa trên path thay vì dùng item.icon cũ
+                  const IconComponent = getMenuIcon(item.path);
+
                   return (
                     <Link
                       key={item.path}
                       to={item.path}
                       className={clsx(
-                        "group flex items-center px-3 py-3 rounded-lg text-sm font-medium transition-all duration-200",
-                        isItemActive
-                          ? "bg-blue-600 text-white shadow-md"
-                          : "text-gray-700 hover:bg-red-50 hover:text-red-700"
+                        "group flex items-center px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 relative overflow-hidden",
+                        active
+                          ? "bg-[var(--color-primary)] text-white shadow-md shadow-blue-900/10"
+                          : "text-gray-600 hover:bg-gray-50 hover:text-[var(--color-primary)]"
                       )}
                     >
-                      <span
-                        className={clsx(
-                          "transition-transform group-hover:scale-110",
-                          isItemActive ? "scale-110 text-white" : ""
-                        )}
-                      >
-                        {iconMap[item.icon] || item.icon}
-                      </span>
-                      <div className="flex-1 ml-3 min-w-0">
-                        <div className="font-medium">{item.label}</div>
-                        {item.description && !isItemActive && (
-                          <div className="text-xs text-gray-500 mt-0.5 truncate">
-                            {item.description}
-                          </div>
-                        )}
-                      </div>
-                      {isItemActive && (
-                        <ChevronRight className="w-4 h-4 ml-2" />
+                      {/* Active Indicator Bar */}
+                      {active && (
+                        <div className="absolute left-0 top-1/2 -translate-y-1/2 h-6 w-1 bg-[var(--color-secondary)] rounded-r-full"></div>
                       )}
+
+                      <span className={clsx(
+                         "mr-3 transition-transform duration-200 shrink-0",
+                         active ? "text-[var(--color-secondary)]" : "text-gray-400 group-hover:text-[var(--color-secondary)] group-hover:scale-110"
+                      )}>
+                        {IconComponent}
+                      </span>
+                      
+                      <span className="flex-1 truncate tracking-wide">{item.label}</span>
+                      
+                      {active && <ChevronRight size={16} className="text-white/30" />}
+                      
                       {item.badge && (
-                        <span className="ml-2 px-2 py-0.5 text-xs bg-red-500 text-white rounded-full font-semibold">
+                        <span className={clsx(
+                          "ml-auto px-2 py-0.5 text-[10px] rounded-full font-bold",
+                          active ? "bg-white/20 text-white" : "bg-red-50 text-red-600"
+                        )}>
                           {item.badge}
                         </span>
                       )}
@@ -148,27 +164,35 @@ export const StudentSidebar = ({ menuItems = [] }) => {
         </nav>
 
         {/* Footer Actions */}
-        <div className="px-4 py-4 border-t border-gray-200 space-y-2">
-          {/* Change Password */}
-          <button
-            onClick={() => setShowPasswordDialog(true)}
-            className="flex items-center w-full px-3 py-2.5 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors group"
-          >
-            <Key className="w-4 h-4 mr-3 text-gray-500 group-hover:text-blue-600 transition-colors" />
-            <span className="flex-1 text-left">Đổi mật khẩu</span>
-            {user?.isFirstLogin && (
-              <AlertCircle className="w-4 h-4 text-red-500 animate-pulse" />
-            )}
-          </button>
+        <div className="p-4 border-t border-gray-100 bg-gray-50/30">
+          <div className="space-y-1">
+             {/* Change Password */}
+             <button
+                onClick={() => setShowPasswordDialog(true)}
+                className="flex items-center w-full px-4 py-2.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-white hover:text-[var(--color-primary)] hover:shadow-sm transition-all group"
+             >
+                <Key size={18} className="mr-3 text-gray-400 group-hover:text-[var(--color-secondary)] transition-colors" />
+                <span className="flex-1 text-left">Đổi mật khẩu</span>
+                {user?.isFirstLogin && (
+                   <AlertCircle size={16} className="text-[var(--color-danger)] animate-pulse" />
+                )}
+             </button>
 
-          {/* Logout */}
-          <button
-            onClick={handleLogout}
-            className="flex items-center w-full px-3 py-2.5 rounded-lg text-sm font-medium text-red-700 hover:bg-red-50 transition-colors group"
-          >
-            <LogOut className="w-4 h-4 mr-3 group-hover:rotate-12 transition-transform" />
-            <span className="flex-1 text-left">Đăng xuất</span>
-          </button>
+             {/* Logout */}
+             <button
+                onClick={handleLogout}
+                className="flex items-center w-full px-4 py-2.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-red-50 hover:text-[var(--color-danger)] transition-all group"
+             >
+                <LogOut size={18} className="mr-3 text-gray-400 group-hover:text-[var(--color-danger)] transition-colors" />
+                <span className="flex-1 text-left">Đăng xuất</span>
+             </button>
+          </div>
+          
+          <div className="mt-4 text-center">
+             <p className="text-[10px] text-gray-400 font-medium">
+               © 2024 English Hub System
+             </p>
+          </div>
         </div>
       </aside>
 

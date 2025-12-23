@@ -578,6 +578,23 @@ function App() {
             </ProtectedRoute>
           }
         />
+        {/* Create route MUST come before :id route */}
+        <Route
+          path="/accountant/transactions/create"
+          element={
+            <ProtectedRoute allowedRoles={["accountant", "director"]}>
+              <CreateReceiptPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/accountant/receipts/create"
+          element={
+            <ProtectedRoute allowedRoles={["accountant", "director"]}>
+              <CreateReceiptPage />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/accountant/transactions/:id"
           element={

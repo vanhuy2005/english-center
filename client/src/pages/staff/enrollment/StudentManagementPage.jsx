@@ -2,26 +2,42 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
   Button,
   Loading,
   Badge,
   Modal,
   Input,
-  Table,
 } from "../../../components/common";
 import {
   Users,
   UserPlus,
   Search,
   Eye,
-  Edit,
   BookOpen,
   Filter,
   ChevronLeft,
   ChevronRight,
+  MoreVertical,
+  Phone,
+  Mail,
+  Calendar,
+  RefreshCw,
+  GraduationCap
 } from "lucide-react";
 import api from "../../../services/api";
 import toast from "react-hot-toast";
+
+// Helper: Safe data extraction
+const safeExtract = (res) => {
+  if (!res) return [];
+  if (res.data?.data?.students) return res.data.data.students;
+  if (Array.isArray(res.data?.data)) return res.data.data;
+  if (Array.isArray(res.data)) return res.data;
+  return [];
+};
 
 const StudentManagementPage = () => {
   const navigate = useNavigate();
@@ -29,7 +45,7 @@ const StudentManagementPage = () => {
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState({
     page: 1,
-    limit: 20,
+    limit: 10,
     total: 0,
     totalPages: 0,
   });
@@ -37,13 +53,15 @@ const StudentManagementPage = () => {
     search: "",
     status: "",
   });
+  
+  // Modal states
   const [showNewStudentModal, setShowNewStudentModal] = useState(false);
   const [showEnrollModal, setShowEnrollModal] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState(null);
 
   useEffect(() => {
     fetchStudents();
-  }, [pagination.page, filters]);
+  }, [pagination.page, filters]); 
 
   const fetchStudents = async () => {
     try {
@@ -56,25 +74,23 @@ const StudentManagementPage = () => {
         },
       });
 
-      console.log("API Response:", response);
-      console.log("Response data:", response.data);
-
-      const responseData = response.data?.data || response.data;
-      const studentsList = responseData?.students || responseData || [];
-
-      console.log("Students list:", studentsList);
-
-      setStudents(Array.isArray(studentsList) ? studentsList : []);
+      const studentsList = safeExtract(response);
+      setStudents(studentsList);
 
       if (response.data?.pagination) {
         setPagination((prev) => ({
           ...prev,
           ...response.data.pagination,
         }));
+      } else {
+         setPagination(prev => ({
+            ...prev,
+            total: studentsList.length,
+            totalPages: Math.ceil(studentsList.length / prev.limit) || 1
+         }));
       }
     } catch (error) {
       console.error("Error fetching students:", error);
-      console.error("Error response:", error.response);
       toast.error("Không thể tải danh sách học viên");
       setStudents([]);
     } finally {
@@ -92,679 +108,449 @@ const StudentManagementPage = () => {
     setPagination((prev) => ({ ...prev, page: 1 }));
   };
 
-  const handleViewDetails = (student) => {
-    if (!student?._id) return;
-    navigate(`/enrollment/students/${student._id}`);
+  // --- RENDERING HELPERS ---
+
+  const getStatusBadge = (status) => {
+    const config = {
+      active: { color: "success", label: "Đang học" },
+      inactive: { color: "secondary", label: "Chưa ghi danh" },
+      paused: { color: "warning", label: "Bảo lưu" },
+      completed: { color: "info", label: "Hoàn thành" },
+      dropped: { color: "danger", label: "Nghỉ học" },
+    };
+    const { color, label } = config[status] || { color: "secondary", label: status || "N/A" };
+    return <Badge variant={color} className="whitespace-nowrap">{label}</Badge>;
   };
-
-  const handleEnrollClick = (student) => {
-    if (!student) return;
-    setSelectedStudent(student);
-    setShowEnrollModal(true);
-  };
-
-  const columns = [
-    {
-      key: "studentCode",
-      label: "Mã học viên",
-      render: (fieldValue, student) => (
-        <span className="font-mono font-semibold">
-          {student?.studentCode || "N/A"}
-        </span>
-      ),
-    },
-    {
-      key: "fullName",
-      label: "Họ và tên",
-      render: (fieldValue, student) => (
-        <div>
-          <p className="font-medium">{student?.fullName || "N/A"}</p>
-          <p className="text-sm text-gray-600">{student?.email || "N/A"}</p>
-        </div>
-      ),
-    },
-    {
-      key: "phone",
-      label: "Số điện thoại",
-      render: (fieldValue, student) => student?.phone || "N/A",
-    },
-    {
-      key: "academicStatus",
-      label: "Trạng thái",
-      render: (fieldValue, student) => {
-        const statusConfig = {
-          active: { variant: "success", label: "Đang học" },
-          inactive: { variant: "secondary", label: "Chưa ghi danh" },
-          paused: { variant: "warning", label: "Bảo lưu" },
-          completed: { variant: "info", label: "Hoàn thành" },
-          dropped: { variant: "danger", label: "Nghỉ học" },
-        };
-        const config = statusConfig[student?.academicStatus] || {
-          variant: "secondary",
-          label: student?.academicStatus || "Chưa xác định",
-        };
-        return <Badge variant={config.variant}>{config.label}</Badge>;
-      },
-    },
-    {
-      key: "enrolledCourses",
-      label: "Khóa học",
-      render: (fieldValue, student) => (
-        <div className="flex flex-wrap gap-1">
-          {student?.enrolledCourses && student.enrolledCourses.length > 0 ? (
-            student.enrolledCourses.map((course) => (
-              <Badge key={course._id} variant="info">
-                {course.courseCode || course.name}
-              </Badge>
-            ))
-          ) : (
-            <span className="text-gray-500 text-sm">Chưa ghi danh</span>
-          )}
-        </div>
-      ),
-    },
-    {
-      key: "createdAt",
-      label: "Ngày tạo",
-      render: (fieldValue, student) =>
-        student?.createdAt
-          ? new Date(student.createdAt).toLocaleDateString("vi-VN")
-          : "N/A",
-    },
-    {
-      key: "actions",
-      label: "Thao tác",
-      render: (fieldValue, student) => (
-        <div className="flex gap-2">
-          <Button
-            size="small"
-            variant="primary"
-            onClick={() => handleViewDetails(student)}
-          >
-            <Eye className="w-4 h-4 mr-1 inline" />
-            Chi tiết
-          </Button>
-          {student?.academicStatus !== "active" && (
-            <Button
-              size="small"
-              variant="success"
-              onClick={() => handleEnrollClick(student)}
-            >
-              <BookOpen className="w-4 h-4 mr-1 inline" />
-              Ghi danh
-            </Button>
-          )}
-        </div>
-      ),
-    },
-  ];
-
-  if (loading && students.length === 0) {
-    return (
-      <div className="flex justify-center items-center h-screen">
-        <Loading size="large" />
-      </div>
-    );
-  }
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-[#132440] to-[#16476A] bg-clip-text text-transparent flex items-center gap-3">
-            <Users className="w-8 h-8 text-[#132440]" />
-            Quản Lý Học Viên
-          </h1>
-          <p className="text-gray-600 mt-1">
-            Danh sách tất cả học viên trong hệ thống
-          </p>
-        </div>
-        <Button variant="primary" onClick={() => setShowNewStudentModal(true)}>
-          <UserPlus className="w-5 h-5 mr-2 inline" />
-          Thêm học viên mới
-        </Button>
-      </div>
-
-      {/* Filters */}
-      <Card>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-            <Input
-              placeholder="Tìm kiếm theo tên, mã, email..."
-              value={filters.search}
-              onChange={(e) => handleSearch(e.target.value)}
-              className="pl-10"
-            />
+    <div className="min-h-screen bg-gray-50/50 p-6 md:p-8 font-sans text-gray-800">
+      <div className="max-w-[1600px] mx-auto space-y-6">
+        
+        {/* --- HEADER --- */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+          <div>
+            <h1 className="text-2xl font-bold text-[var(--color-primary)] flex items-center gap-3">
+               <div className="p-2 bg-[var(--color-primary)] rounded-lg shadow-sm">
+                  <Users className="w-6 h-6 text-white" />
+               </div>
+               Quản Lý Học Viên
+            </h1>
+            <p className="text-gray-500 text-sm mt-1 ml-12">
+              Danh sách và thông tin chi tiết học viên toàn hệ thống
+            </p>
           </div>
-          <div className="relative">
-            <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-            <select
-              className="w-full pl-10 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3B9797]"
-              value={filters.status}
-              onChange={(e) => handleFilterChange("status", e.target.value)}
-            >
-              <option value="">Tất cả trạng thái</option>
-              <option value="active">Đang học</option>
-              <option value="inactive">Chưa ghi danh</option>
-              <option value="paused">Bảo lưu</option>
-              <option value="completed">Hoàn thành</option>
-              <option value="dropped">Nghỉ học</option>
-            </select>
-          </div>
-          <Button
-            variant="secondary"
-            onClick={() => {
-              setFilters({ search: "", status: "" });
-              setPagination((prev) => ({ ...prev, page: 1 }));
-            }}
+          <Button 
+            className="bg-[var(--color-primary)] hover:bg-[var(--color-primary-light)] text-white shadow-md flex items-center gap-2 px-5 py-2.5 whitespace-nowrap"
+            onClick={() => setShowNewStudentModal(true)}
           >
-            🔄 Đặt lại bộ lọc
+            <UserPlus size={18} /> Thêm học viên
           </Button>
         </div>
-      </Card>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="bg-gradient-to-br from-blue-50 to-blue-100">
-          <div className="text-center">
-            <p className="text-2xl font-bold text-blue-600">
-              {pagination.total}
-            </p>
-            <p className="text-sm text-gray-600">Tổng học viên</p>
-          </div>
-        </Card>
-        <Card className="bg-gradient-to-br from-green-50 to-green-100">
-          <div className="text-center">
-            <p className="text-2xl font-bold text-green-600">
-              {students.filter((s) => s?.academicStatus === "active").length}
-            </p>
-            <p className="text-sm text-gray-600">Đang học</p>
-          </div>
-        </Card>
-        <Card className="bg-gradient-to-br from-yellow-50 to-yellow-100">
-          <div className="text-center">
-            <p className="text-2xl font-bold text-yellow-600">
-              {students.filter((s) => s?.academicStatus === "paused").length}
-            </p>
-            <p className="text-sm text-gray-600">Bảo lưu</p>
-          </div>
-        </Card>
-        <Card className="bg-gradient-to-br from-gray-50 to-gray-100">
-          <div className="text-center">
-            <p className="text-2xl font-bold text-gray-600">
-              {students.filter((s) => s?.academicStatus === "inactive").length}
-            </p>
-            <p className="text-sm text-gray-600">Chưa ghi danh</p>
-          </div>
-        </Card>
-      </div>
+        {/* --- FILTERS & SEARCH --- */}
+        <Card className="border border-gray-200 shadow-sm">
+          <CardContent className="p-4">
+            <div className="flex flex-col md:flex-row gap-4 items-center">
+              
+              {/* Search Box */}
+              <div className="relative flex-1 w-full">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <input
+                  type="text"
+                  placeholder="Tìm kiếm theo tên, mã học viên, email..."
+                  value={filters.search}
+                  onChange={(e) => handleSearch(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[var(--color-secondary)] focus:border-transparent outline-none transition-all text-sm"
+                />
+              </div>
 
-      {/* Table */}
-      <Card>
-        <Table
-          columns={columns}
-          data={students}
-          loading={loading}
-          emptyMessage="Không có học viên nào"
-        />
+              {/* Status Filter */}
+              <div className="relative w-full md:w-64">
+                <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <select
+                  className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[var(--color-secondary)] outline-none appearance-none cursor-pointer text-sm"
+                  value={filters.status}
+                  onChange={(e) => handleFilterChange("status", e.target.value)}
+                >
+                  <option value="">Tất cả trạng thái</option>
+                  <option value="active">Đang học</option>
+                  <option value="inactive">Chưa ghi danh</option>
+                  <option value="paused">Bảo lưu</option>
+                  <option value="completed">Hoàn thành</option>
+                  <option value="dropped">Nghỉ học</option>
+                </select>
+                <ChevronRight className="absolute right-3 top-1/2 transform -translate-y-1/2 rotate-90 text-gray-400 w-4 h-4 pointer-events-none" />
+              </div>
 
-        {/* Pagination */}
-        {pagination.totalPages > 1 && (
-          <div className="flex justify-between items-center mt-4 pt-4 border-t">
-            <p className="text-sm text-gray-600">
-              Hiển thị {(pagination.page - 1) * pagination.limit + 1} -{" "}
-              {Math.min(pagination.page * pagination.limit, pagination.total)}{" "}
-              trong tổng số {pagination.total} học viên
-            </p>
-            <div className="flex gap-2">
+              {/* Reset Button */}
               <Button
-                size="small"
-                variant="secondary"
-                disabled={pagination.page === 1}
-                onClick={() =>
-                  setPagination((prev) => ({ ...prev, page: prev.page - 1 }))
-                }
+                variant="outline"
+                className="w-full md:w-auto border-gray-300 text-gray-600 hover:bg-gray-100 hover:text-[var(--color-primary)] whitespace-nowrap"
+                onClick={() => {
+                  setFilters({ search: "", status: "" });
+                  setPagination((prev) => ({ ...prev, page: 1 }));
+                }}
               >
-                ← Trước
-              </Button>
-              <span className="px-4 py-2 border rounded-lg">
-                Trang {pagination.page} / {pagination.totalPages}
-              </span>
-              <Button
-                size="small"
-                variant="secondary"
-                disabled={pagination.page === pagination.totalPages}
-                onClick={() =>
-                  setPagination((prev) => ({ ...prev, page: prev.page + 1 }))
-                }
-              >
-                Sau →
+                <RefreshCw size={18} className="mr-2" /> Đặt lại
               </Button>
             </div>
-          </div>
-        )}
-      </Card>
+          </CardContent>
+        </Card>
 
-      {/* New Student Modal */}
-      <NewStudentModal
-        isOpen={showNewStudentModal}
-        onClose={() => setShowNewStudentModal(false)}
-        onSuccess={() => {
-          setShowNewStudentModal(false);
-          fetchStudents();
-        }}
-      />
+        {/* --- STUDENTS TABLE --- */}
+        <Card className="border border-gray-200 shadow-sm overflow-hidden bg-white">
+          {loading ? (
+             <div className="h-64 flex items-center justify-center">
+                <Loading size="large" />
+             </div>
+          ) : students.length > 0 ? (
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left">
+                  <thead className="bg-gray-50/80 text-gray-500 font-semibold text-xs uppercase border-b border-gray-200">
+                    <tr>
+                      <th className="px-6 py-4 whitespace-nowrap">Học Viên</th>
+                      <th className="px-6 py-4 whitespace-nowrap">Liên Hệ</th>
+                      <th className="px-6 py-4 whitespace-nowrap">Trạng Thái</th>
+                      <th className="px-6 py-4 whitespace-nowrap">Khóa Học Đang Học</th>
+                      <th className="px-6 py-4 whitespace-nowrap">Ngày Tạo</th>
+                      <th className="px-6 py-4 text-right whitespace-nowrap">Thao tác</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 bg-white">
+                    {students.map((student) => (
+                      <tr key={student._id} className="hover:bg-blue-50/30 transition-colors group">
+                        
+                        {/* Column: Student Info */}
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-700 font-bold shrink-0">
+                              {student.fullName?.charAt(0).toUpperCase()}
+                            </div>
+                            <div className="min-w-[140px]">
+                              <p className="font-bold text-[var(--color-primary)] truncate max-w-[180px]" title={student.fullName}>{student.fullName}</p>
+                              <p className="text-xs text-gray-500 font-mono bg-gray-100 px-1.5 py-0.5 rounded inline-block mt-1">
+                                {student.studentCode}
+                              </p>
+                            </div>
+                          </div>
+                        </td>
 
-      {/* Enroll Modal */}
-      <EnrollStudentModal
-        isOpen={showEnrollModal}
-        onClose={() => {
-          setShowEnrollModal(false);
-          setSelectedStudent(null);
-        }}
-        student={selectedStudent}
-        onSuccess={() => {
-          setShowEnrollModal(false);
-          setSelectedStudent(null);
-          fetchStudents();
-        }}
-      />
+                        {/* Column: Contact */}
+                        <td className="px-6 py-4">
+                          <div className="space-y-1.5 min-w-[160px]">
+                            <div className="flex items-center gap-2 text-gray-600 text-xs">
+                               <Mail size={14} className="text-gray-400 shrink-0" /> 
+                               <span className="truncate max-w-[150px]" title={student.email}>{student.email}</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-gray-600 text-xs">
+                               <Phone size={14} className="text-gray-400 shrink-0" /> 
+                               <span>{student.phone || "N/A"}</span>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Column: Status */}
+                        <td className="px-6 py-4">
+                          {getStatusBadge(student.academicStatus)}
+                        </td>
+
+                        {/* Column: Courses (Updated to show Name) */}
+                        <td className="px-6 py-4">
+                          <div className="flex flex-col gap-1.5 min-w-[180px] max-w-[250px]">
+                            {student.enrolledCourses && student.enrolledCourses.length > 0 ? (
+                              student.enrolledCourses.slice(0, 2).map((course, idx) => (
+                                <div key={idx} className="flex items-center gap-2 text-xs text-gray-700 bg-gray-50 px-2 py-1 rounded border border-gray-100">
+                                  <GraduationCap size={14} className="text-[var(--color-secondary)] shrink-0" />
+                                  <span className="truncate font-medium" title={course.name}>{course.name || course.courseCode || "Khóa học"}</span>
+                                </div>
+                              ))
+                            ) : (
+                              <span className="text-gray-400 italic text-xs pl-1">Chưa có lớp</span>
+                            )}
+                            {student.enrolledCourses?.length > 2 && (
+                               <span className="text-xs text-blue-600 font-medium pl-1 hover:underline cursor-pointer">
+                                 +{student.enrolledCourses.length - 2} khóa khác
+                               </span>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* Column: Created Date */}
+                        <td className="px-6 py-4 text-gray-500 text-xs whitespace-nowrap">
+                           <div className="flex items-center gap-2">
+                              <Calendar size={14} />
+                              {new Date(student.createdAt).toLocaleDateString("vi-VN")}
+                           </div>
+                        </td>
+
+                        {/* Column: Actions (Fix Visibility & Layout) */}
+                        <td className="px-6 py-4 text-right">
+                          <div className="flex justify-end gap-2">
+                            {/* Nút Ghi danh luôn hiển thị nếu trạng thái cho phép */}
+                            {student.academicStatus !== "active" && (
+                              <Button 
+                                size="small" 
+                                variant="success" 
+                                className="h-8 px-3 text-xs shadow-sm hover:shadow-md transition-all whitespace-nowrap flex items-center"
+                                onClick={(e) => { 
+                                   e.stopPropagation(); // Ngăn sự kiện click vào row
+                                   setSelectedStudent(student); 
+                                   setShowEnrollModal(true); 
+                                }}
+                              >
+                                <BookOpen size={14} className="mr-1.5" /> Ghi danh
+                              </Button>
+                            )}
+                            <Button 
+                              size="small" 
+                              variant="outline" 
+                              className="h-8 px-3 text-xs border-gray-300 text-gray-600 hover:bg-gray-50 hover:text-[var(--color-primary)] transition-all whitespace-nowrap flex items-center"
+                              onClick={() => navigate(`/enrollment/students/${student._id}`)}
+                            >
+                              <Eye size={14} className="mr-1.5" /> Chi tiết
+                            </Button>
+                          </div>
+                        </td>
+
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* --- PAGINATION (Improved UI) --- */}
+              <div className="p-4 border-t border-gray-200 bg-gray-50/50 flex flex-col md:flex-row justify-between items-center gap-4">
+                <span className="text-sm text-gray-500 font-medium">
+                  Hiển thị <span className="text-gray-900 font-bold">{(pagination.page - 1) * pagination.limit + 1}-{Math.min(pagination.page * pagination.limit, pagination.total)}</span> của <span className="text-gray-900 font-bold">{pagination.total}</span> học viên
+                </span>
+                
+                <div className="flex items-center gap-2 bg-white p-1 rounded-lg border border-gray-200 shadow-sm">
+                  <button
+                    disabled={pagination.page === 1}
+                    onClick={() => setPagination(p => ({ ...p, page: p.page - 1 }))}
+                    className="p-2 rounded-md hover:bg-gray-100 text-gray-600 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                  >
+                    <ChevronLeft size={18} />
+                  </button>
+                  
+                  <div className="flex items-center px-2 gap-1">
+                    {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
+                       let p = i + 1;
+                       if (pagination.totalPages > 5 && pagination.page > 3) {
+                          p = pagination.page - 2 + i;
+                          if (p > pagination.totalPages) p = pagination.totalPages - (4 - i);
+                       }
+                       if (p <= 0) p = 1;
+                       
+                       return (
+                         <button
+                           key={p}
+                           onClick={() => setPagination(prev => ({ ...prev, page: p }))}
+                           className={`w-8 h-8 rounded-md text-sm font-bold transition-all ${
+                             pagination.page === p
+                               ? "bg-[var(--color-primary)] text-white shadow-md transform scale-105"
+                               : "text-gray-500 hover:bg-gray-100 hover:text-[var(--color-primary)]"
+                           }`}
+                         >
+                           {p}
+                         </button>
+                       );
+                    })}
+                  </div>
+
+                  <button
+                    disabled={pagination.page === pagination.totalPages}
+                    onClick={() => setPagination(p => ({ ...p, page: p.page + 1 }))}
+                    className="p-2 rounded-md hover:bg-gray-100 text-gray-600 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                  >
+                    <ChevronRight size={18} />
+                  </button>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-24 text-gray-400">
+               <div className="p-6 bg-gray-50 rounded-full mb-4 shadow-inner">
+                  <Search size={40} className="text-gray-300" />
+               </div>
+               <p className="text-lg font-bold text-gray-600">Không tìm thấy học viên nào</p>
+               <p className="text-sm text-gray-400 mt-1">Hãy thử thay đổi bộ lọc hoặc thêm học viên mới</p>
+               <Button 
+                  className="mt-6 bg-[var(--color-primary)] text-white"
+                  onClick={() => { setFilters({ search: "", status: "" }); setPagination(p => ({...p, page: 1})); }}
+               >
+                  Xóa bộ lọc
+               </Button>
+            </div>
+          )}
+        </Card>
+
+      </div>
+
+      {/* --- MODALS --- */}
+      {/* QUAN TRỌNG: 
+          Ở phiên bản trước, EnrollStudentModal trả về null nên modal không hiện.
+          Dưới đây là Code đầy đủ cho EnrollStudentModal.
+      */}
+      {showNewStudentModal && (
+         <NewStudentModal 
+            isOpen={showNewStudentModal} 
+            onClose={() => setShowNewStudentModal(false)} 
+            onSuccess={() => { setShowNewStudentModal(false); fetchStudents(); }} 
+         />
+      )}
+      
+      {showEnrollModal && selectedStudent && (
+         <EnrollStudentModal 
+            isOpen={showEnrollModal} 
+            onClose={() => { setShowEnrollModal(false); setSelectedStudent(null); }} 
+            student={selectedStudent} 
+            onSuccess={() => { setShowEnrollModal(false); fetchStudents(); }} 
+         />
+      )}
+
     </div>
   );
 };
 
-// New Student Modal Component
+// --- MODAL COMPONENTS ---
+
 const NewStudentModal = ({ isOpen, onClose, onSuccess }) => {
-  const [formData, setFormData] = useState({
-    fullName: "",
-    email: "",
-    phone: "",
-    dateOfBirth: "",
-    gender: "male",
-    address: "",
-  });
+  const [formData, setFormData] = useState({ fullName: "", email: "", phoneNumber: "", dateOfBirth: "", gender: "male", address: "" });
+  const [loading, setLoading] = useState(false);
+  const handleSubmit = async (e) => { 
+    e.preventDefault(); 
+    try { 
+      setLoading(true); 
+      await api.post("/staff/enrollment/students", formData); 
+      toast.success("Thêm thành công"); 
+      onSuccess(); 
+    } catch(e) { 
+      toast.error("Lỗi"); 
+    } finally { 
+      setLoading(false); 
+    } 
+  };
+  
+  if(!isOpen) return null;
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Thêm Học Viên" size="large">
+       <form onSubmit={handleSubmit} className="space-y-6 p-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+             <Input label="Họ tên" required value={formData.fullName} onChange={e=>setFormData({...formData, fullName: e.target.value})} placeholder="Nguyễn Văn A" />
+             <Input label="Email" required value={formData.email} onChange={e=>setFormData({...formData, email: e.target.value})} placeholder="email@example.com" />
+             <Input label="SĐT" required value={formData.phoneNumber} onChange={e=>setFormData({...formData, phoneNumber: e.target.value})} placeholder="09xxxxxxx" />
+             <Input label="Ngày sinh" type="date" required value={formData.dateOfBirth} onChange={e=>setFormData({...formData, dateOfBirth: e.target.value})} />
+             <div>
+                <label className="block text-sm font-medium mb-2 text-gray-700">Giới tính</label>
+                <select className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--color-secondary)] focus:border-transparent outline-none transition-all" value={formData.gender} onChange={e=>setFormData({...formData, gender: e.target.value})}>
+                   <option value="male">Nam</option>
+                   <option value="female">Nữ</option>
+                   <option value="other">Khác</option>
+                </select>
+             </div>
+             <Input label="Địa chỉ" value={formData.address} onChange={e=>setFormData({...formData, address: e.target.value})} placeholder="Nhập địa chỉ..." />
+          </div>
+          <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
+             <Button variant="outline" onClick={onClose} className="border-gray-300 text-gray-600">Hủy</Button>
+             <Button type="submit" loading={loading} className="bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-light)]">Lưu hồ sơ</Button>
+          </div>
+       </form>
+    </Modal>
+  );
+};
+
+// --- FIX LỖI MODAL GHI DANH ---
+const EnrollStudentModal = ({ isOpen, onClose, student, onSuccess }) => {
+  const [classes, setClasses] = useState([]);
+  const [selectedClass, setSelectedClass] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e) => {
+  useEffect(() => { 
+    if (isOpen) fetchClasses(); 
+  }, [isOpen]);
+  
+  const fetchClasses = async () => {
+    try {
+      // Lấy danh sách lớp sắp mở hoặc đang mở
+      const res = await api.get("/staff/enrollment/classes", { params: { status: "upcoming,ongoing" } });
+      
+      // Xử lý data an toàn
+      let classList = [];
+      if (res.data?.data?.classes) classList = res.data.data.classes;
+      else if (Array.isArray(res.data?.data)) classList = res.data.data;
+      else if (Array.isArray(res.data)) classList = res.data;
+      
+      setClasses(classList);
+    } catch { 
+      toast.error("Không thể tải danh sách lớp học"); 
+    }
+  };
+
+  const handleEnroll = async (e) => {
     e.preventDefault();
+    if (!selectedClass) return toast.error("Vui lòng chọn lớp học");
     try {
       setLoading(true);
-      const response = await api.post("/staff/enrollment/students", formData);
-
-      if (response.data.success) {
-        toast.success("Đã thêm học viên mới thành công!");
-        toast.success(
-          `Mật khẩu mặc định: ${response.data.data.defaultPassword}`,
-          {
-            duration: 5000,
-          }
-        );
-        onSuccess();
-        setFormData({
-          fullName: "",
-          email: "",
-          phone: "",
-          dateOfBirth: "",
-          gender: "male",
-          address: "",
-        });
-      }
-    } catch (error) {
-      console.error("Error creating student:", error);
-      toast.error(
-        error.response?.data?.message || "Không thể thêm học viên mới"
-      );
-    } finally {
-      setLoading(false);
+      await api.post(`/staff/enrollment/students/${student?._id}/enroll`, { classId: selectedClass });
+      toast.success("Ghi danh thành công!");
+      onSuccess();
+    } catch (e) { 
+      toast.error(e.response?.data?.message || "Lỗi ghi danh"); 
+    } finally { 
+      setLoading(false); 
     }
   };
 
   if (!isOpen) return null;
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      title="➕ Thêm học viên mới"
-      size="large"
-    >
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-          <p className="text-sm text-blue-800">
-            ℹ️ Mật khẩu mặc định sẽ là <strong>123456</strong>. Học viên sẽ được
-            yêu cầu đổi mật khẩu khi đăng nhập lần đầu.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Input
-            label="Họ và tên *"
-            required
-            value={formData.fullName}
-            onChange={(e) =>
-              setFormData({ ...formData, fullName: e.target.value })
-            }
-            placeholder="Nguyễn Văn A"
-          />
-          <Input
-            label="Số điện thoại *"
-            required
-            value={formData.phone}
-            onChange={(e) =>
-              setFormData({ ...formData, phone: e.target.value })
-            }
-            placeholder="0123456789"
-          />
-          <Input
-            label="Email"
-            type="email"
-            value={formData.email}
-            onChange={(e) =>
-              setFormData({ ...formData, email: e.target.value })
-            }
-            placeholder="example@email.com"
-          />
-          <Input
-            label="Ngày sinh"
-            type="date"
-            value={formData.dateOfBirth}
-            onChange={(e) =>
-              setFormData({ ...formData, dateOfBirth: e.target.value })
-            }
-          />
-          <div>
-            <label className="block text-sm font-medium mb-2">Giới tính</label>
-            <select
-              className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-              value={formData.gender}
-              onChange={(e) =>
-                setFormData({ ...formData, gender: e.target.value })
-              }
-            >
-              <option value="male">Nam</option>
-              <option value="female">Nữ</option>
-              <option value="other">Khác</option>
-            </select>
-          </div>
-          <Input
-            label="Địa chỉ"
-            value={formData.address}
-            onChange={(e) =>
-              setFormData({ ...formData, address: e.target.value })
-            }
-            placeholder="Số nhà, đường, quận, thành phố"
-          />
-        </div>
-
-        <div className="flex gap-3 justify-end pt-4 border-t">
-          <Button variant="secondary" onClick={onClose} disabled={loading}>
-            Hủy
-          </Button>
-          <Button variant="primary" type="submit" loading={loading}>
-            Thêm học viên
-          </Button>
-        </div>
-      </form>
-    </Modal>
-  );
-};
-
-// Enroll Student Modal Component
-const EnrollStudentModal = ({ isOpen, onClose, student, onSuccess }) => {
-  const [classes, setClasses] = useState([]);
-  const [selectedClass, setSelectedClass] = useState("");
-  const [selectedClassDetail, setSelectedClassDetail] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [loadingClasses, setLoadingClasses] = useState(true);
-
-  useEffect(() => {
-    if (isOpen) {
-      fetchAvailableClasses();
-    }
-  }, [isOpen]);
-
-  const fetchAvailableClasses = async () => {
-    try {
-      setLoadingClasses(true);
-      const response = await api.get("/staff/enrollment/classes", {
-        params: { limit: 100 }, // Fetch more classes without status filter
-      });
-      console.log("🔍 Classes API Response:", response.data);
-
-      // Handle response structure - the API returns { success, data: { classes, pagination } }
-      let classList = [];
-      if (response.data?.success && response.data?.data?.classes) {
-        classList = response.data.data.classes;
-        console.log("📚 Classes from response.data.data.classes:", classList);
-      } else if (response.data?.classes) {
-        classList = response.data.classes;
-        console.log("📚 Classes from response.data.classes:", classList);
-      } else if (Array.isArray(response.data)) {
-        classList = response.data;
-        console.log("📚 Classes from direct array:", classList);
-      } else {
-        console.warn("⚠️ Unexpected API response structure:", response.data);
-      }
-
-      console.log("📊 Total classes loaded:", classList.length);
-      setClasses(classList);
-    } catch (error) {
-      console.error("❌ Error fetching classes:", error);
-      console.error("Error response:", error.response?.data);
-      console.error("Error details:", error.message);
-      toast.error("Không thể tải danh sách lớp học");
-      setClasses([]);
-    } finally {
-      setLoadingClasses(false);
-    }
-  };
-
-  const handleSelectClass = (classId) => {
-    setSelectedClass(classId);
-    const classDetail = classes.find((c) => c._id === classId);
-    setSelectedClassDetail(classDetail);
-  };
-
-  const handleEnroll = async (e) => {
-    e.preventDefault();
-    if (!selectedClass) {
-      toast.error("Vui lòng chọn lớp học");
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const response = await api.post(
-        `/staff/enrollment/students/${student._id}/enroll`,
-        { classId: selectedClass }
-      );
-
-      if (response.data.success) {
-        toast.success("Đã ghi danh học viên vào lớp thành công!");
-        onSuccess();
-      }
-    } catch (error) {
-      console.error("Error enrolling student:", error);
-      toast.error(
-        error.response?.data?.message || "Không thể ghi danh học viên"
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (!isOpen || !student) return null;
-
-  return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      title={`📝 Ghi danh học viên: ${student.fullName}`}
-      size="large"
-    >
-      <form onSubmit={handleEnroll} className="space-y-4">
-        {/* Student Info */}
-        <div className="p-4 bg-blue-50 rounded-lg space-y-2 border border-blue-200">
-          <p className="text-sm">
-            <span className="font-medium">Mã học viên:</span>{" "}
-            {student.studentCode || "Chưa có"}
-          </p>
-          <p className="text-sm">
-            <span className="font-medium">Họ tên:</span> {student.fullName}
-          </p>
-          <p className="text-sm">
-            <span className="font-medium">Email:</span> {student.email || "N/A"}
-          </p>
-          <p className="text-sm">
-            <span className="font-medium">Số điện thoại:</span>{" "}
-            {student.phone || "N/A"}
-          </p>
-        </div>
-
-        {/* Class Selection */}
-        <div>
-          <label className="block text-sm font-medium mb-3">
-            Chọn lớp học *
-          </label>
-          {loadingClasses ? (
-            <div className="flex justify-center py-6">
-              <Loading size="small" />
-            </div>
-          ) : classes.length === 0 ? (
-            <div className="text-center py-6 bg-gray-50 rounded-lg">
-              <p className="text-gray-600">Không có lớp học nào khả dụng</p>
-            </div>
-          ) : (
-            <div className="space-y-3 max-h-64 overflow-y-auto">
-              {classes.map((classItem) => (
-                <div
-                  key={classItem._id}
-                  className={`p-3 border rounded-lg cursor-pointer transition ${
-                    selectedClass === classItem._id
-                      ? "border-teal-500 bg-teal-50"
-                      : "border-gray-200 bg-white hover:border-gray-300"
-                  } ${classItem.isFull ? "opacity-60" : ""}`}
-                  onClick={() =>
-                    !classItem.isFull && handleSelectClass(classItem._id)
-                  }
-                >
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <p className="font-semibold text-gray-900">
-                        {classItem.name}
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        {classItem.course?.name} ({classItem.course?.courseCode}
-                        )
-                      </p>
-                      <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
-                        <p>
-                          <span className="text-gray-600">Giáo viên:</span>{" "}
-                          <span className="font-medium">
-                            {classItem.teacher?.fullName || "Chưa assign"}
-                          </span>
-                        </p>
-                        <p>
-                          <span className="text-gray-600">Phòng:</span>{" "}
-                          <span className="font-medium">
-                            {classItem.room || "N/A"}
-                          </span>
-                        </p>
-                        <p>
-                          <span className="text-gray-600">Ngày bắt đầu:</span>{" "}
-                          <span className="font-medium">
-                            {new Date(classItem.startDate).toLocaleDateString(
-                              "vi-VN"
-                            )}
-                          </span>
-                        </p>
-                        <p>
-                          <span className="text-gray-600">Sức chứa:</span>{" "}
-                          <span className="font-medium">
-                            {classItem.currentEnrollment}/
-                            {classItem.capacity?.max ?? classItem.capacity ?? 0}
-                          </span>
-                        </p>
-                      </div>
-                    </div>
-                    <Badge
-                      variant={classItem.isFull ? "danger" : "success"}
-                      className="ml-2"
-                    >
-                      {classItem.isFull
-                        ? "Đã đầy"
-                        : `Còn ${classItem.availableSlots}`}
-                    </Badge>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Selected Class Details */}
-        {selectedClassDetail && (
-          <div className="p-4 bg-green-50 rounded-lg border border-green-200 space-y-2">
-            <p className="font-medium text-green-900">
-              ✓ Thông tin lớp học đã chọn
-            </p>
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              <p>
-                <span className="text-gray-600">Lớp:</span>{" "}
-                {selectedClassDetail.name}
-              </p>
-              <p>
-                <span className="text-gray-600">Mã lớp:</span>{" "}
-                {selectedClassDetail.classCode || "N/A"}
-              </p>
-              <p>
-                <span className="text-gray-600">Khóa học:</span>{" "}
-                {selectedClassDetail.course?.name}
-              </p>
-              <p>
-                <span className="text-gray-600">Học phí:</span>{" "}
-                {selectedClassDetail.course?.tuitionFee?.toLocaleString(
-                  "vi-VN"
-                )}
-                đ
-              </p>
-              <p>
-                <span className="text-gray-600">Khoá học:</span>{" "}
-                {typeof selectedClassDetail.course?.duration === "object"
-                  ? `${selectedClassDetail.course.duration?.weeks || 0} tuần (${
-                      selectedClassDetail.course.duration?.hours || 0
-                    } giờ)`
-                  : selectedClassDetail.course?.duration || "N/A"}
-              </p>
-              <p>
-                <span className="text-gray-600">Trạng thái:</span>{" "}
-                <Badge variant="info">{selectedClassDetail.status}</Badge>
-              </p>
-            </div>
+    <Modal isOpen={isOpen} onClose={onClose} title="Xếp Lớp Học Viên" size="medium">
+      <form onSubmit={handleEnroll} className="space-y-6 p-2">
+        {student && (
+          <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl flex gap-4 items-center">
+             <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center font-bold text-blue-600 shrink-0 shadow-sm text-lg border border-blue-200">
+               {student.fullName?.[0]?.toUpperCase()}
+             </div>
+             <div>
+               <p className="font-bold text-[var(--color-primary)] text-lg">{student.fullName}</p>
+               <p className="text-xs text-gray-500 uppercase tracking-wider font-semibold">Mã HV: {student.studentCode}</p>
+             </div>
           </div>
         )}
-
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-          <p className="text-sm text-yellow-800">
-            ⚠️ Sau khi ghi danh, hệ thống sẽ tự động tạo hóa đơn học phí cho học
-            viên.
-          </p>
+        <div>
+          <label className="text-sm font-bold text-[var(--color-primary)] mb-2 block">Chọn lớp học phù hợp <span className="text-red-500">*</span></label>
+          <div className="relative">
+            <select 
+              className="w-full pl-4 pr-10 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[var(--color-secondary)] outline-none appearance-none transition-all cursor-pointer hover:bg-white text-sm" 
+              value={selectedClass} 
+              onChange={e => setSelectedClass(e.target.value)} 
+              required
+            >
+              <option value="">-- Danh sách lớp đang mở --</option>
+              {classes.map(c => {
+                 // Tính chỗ trống an toàn
+                 let max = c.capacity?.max || c.maxStudents || 30;
+                 let current = c.capacity?.current || c.currentEnrollment || 0;
+                 const available = max - current;
+                 
+                 return (
+                   <option key={c._id} value={c._id} disabled={available <= 0}>
+                     {c.name} ({c.course?.courseCode}) - Còn {available} chỗ
+                   </option>
+                 );
+              })}
+            </select>
+            {/* Custom Arrow */}
+            <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+            </div>
+          </div>
         </div>
-
-        <div className="flex gap-3 justify-end pt-4 border-t">
-          <Button variant="secondary" onClick={onClose} disabled={loading}>
-            Hủy
-          </Button>
-          <Button
-            variant="primary"
-            type="submit"
-            loading={loading}
-            disabled={!selectedClass}
-          >
-            Ghi danh
-          </Button>
+        <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
+          <Button variant="outline" onClick={onClose} className="border-gray-300 text-gray-600">Hủy bỏ</Button>
+          <Button className="bg-[var(--color-secondary)] text-white hover:bg-[var(--color-secondary-dark)]" type="submit" loading={loading}>Xác nhận ghi danh</Button>
         </div>
       </form>
     </Modal>

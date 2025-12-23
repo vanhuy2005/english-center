@@ -2,33 +2,48 @@ import React, { useState, useEffect } from "react";
 import { useLanguage } from "@hooks";
 import { Card, Loading, Badge, Table } from "@components/common";
 import { LineChart, PieChart, BarChart } from "@components/charts";
-import { reportService } from "@services";
 import {
   TrendingDown,
   UserX,
-  Pause,
+  PauseCircle,
   AlertTriangle,
   Users,
   Clock,
+  Calendar,
+  MoreHorizontal,
+  Activity,
+  DollarSign,
+  Phone,
+  UserCheck
 } from "lucide-react";
 
+// Import dữ liệu Mock MỚI
+import {
+  retentionStats,
+  retentionTrendData,
+  dropoutReasonData,
+  courseAnalysisData,
+  studentLists,
+  breakdownData,
+  teacherRetentionData // Thêm cái này
+} from "./mockRetentionData";
+
 /**
- * Retention Report Page - Tỉ lệ nghỉ học và bảo lưu
+ * Retention Report Page - Full Option
  */
 const RetentionReportPage = () => {
   const { t } = useLanguage();
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({
-    dropoutRate: 0,
-    pauseRate: 0,
-    totalDropouts: 0,
-    totalPauses: 0,
-    atRiskStudents: 0,
-  });
+  const [activeTab, setActiveTab] = useState("atRisk"); // Tab state: atRisk | dropped | paused
+  
+  // State
+  const [stats, setStats] = useState(retentionStats);
   const [trendData, setTrendData] = useState([]);
   const [reasonData, setReasonData] = useState([]);
-  const [atRiskList, setAtRiskList] = useState([]);
+  const [lists, setLists] = useState({ atRisk: [], dropped: [], paused: [] });
   const [courseAnalysis, setCourseAnalysis] = useState([]);
+  const [teachers, setTeachers] = useState([]); // State giáo viên
+  const [breakdown, setBreakdown] = useState({ reasonsDetailed: [], duration: [], ageGroup: [] });
 
   useEffect(() => {
     fetchRetentionData();
@@ -37,283 +52,278 @@ const RetentionReportPage = () => {
   const fetchRetentionData = async () => {
     try {
       setLoading(true);
-      const [statsRes, trendRes, reasonRes, atRiskRes, courseRes] =
-        await Promise.all([
-          reportService.getRetentionStats(),
-          reportService.getRetentionTrend({ limit: 12 }),
-          reportService.getDropoutReasons(),
-          reportService.getAtRiskStudents({ limit: 20 }),
-          reportService.getRetentionByCourse(),
-        ]);
+      await new Promise(resolve => setTimeout(resolve, 800));
 
-      setStats(statsRes.data || stats);
-      setTrendData(trendRes.data || []);
-      setReasonData(reasonRes.data || []);
+      setStats(retentionStats);
+      setTrendData(retentionTrendData);
+      setReasonData(dropoutReasonData);
+      setLists(studentLists); // Load cả 3 danh sách
+      setCourseAnalysis(courseAnalysisData);
+      setTeachers(teacherRetentionData);
+      setBreakdown(breakdownData);
 
-      // Handle atRiskList - ensure it's always an array
-      const atRiskListData = atRiskRes?.data?.data || atRiskRes?.data || [];
-      setAtRiskList(Array.isArray(atRiskListData) ? atRiskListData : []);
-
-      setCourseAnalysis(courseRes.data || []);
     } catch (error) {
-      console.error("Error fetching retention data:", error);
+      console.error("Error loading data:", error);
     } finally {
       setLoading(false);
     }
   };
 
   if (loading) {
-    return <Loading fullScreen text="Đang tải báo cáo nghỉ học..." />;
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+        <Loading text="Đang phân tích dữ liệu..." />
+      </div>
+    );
   }
 
-  const tableColumns = [
-    { key: "studentCode", label: "Mã HV" },
-    { key: "fullName", label: "Họ và Tên" },
-    { key: "course", label: "Khóa Học" },
-    { key: "attendance", label: "Chuyên Cần" },
-    { key: "lastAttendance", label: "Lần Cuối Học" },
-    { key: "riskLevel", label: "Mức Độ Rủi Ro" },
-    { key: "action", label: "Hành Động" },
-  ];
+  // Helper format tiền tệ
+  const formatCurrency = (value) => {
+    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value);
+  };
+
+  // Cấu hình cột bảng động theo Tab
+  const getTableColumns = () => {
+    const common = [
+      { key: "studentInfo", label: "Học Viên", width: "250px" },
+      { key: "course", label: "Khóa Học" },
+      { key: "contact", label: "Liên Hệ" },
+    ];
+
+    if (activeTab === "atRisk") {
+      return [
+        ...common,
+        { key: "metrics", label: "Chỉ Số Rủi Ro" },
+        { key: "riskLevel", label: "Mức Độ", align: "center" },
+        { key: "action", label: "Hành Động", align: "right" },
+      ];
+    } else if (activeTab === "dropped") {
+      return [
+        ...common,
+        { key: "reason", label: "Lý Do Nghỉ" },
+        { key: "date", label: "Ngày Nghỉ" },
+        { key: "status", label: "Trạng Thái", align: "center" },
+      ];
+    } else { // paused
+      return [
+        ...common,
+        { key: "reason", label: "Lý Do" },
+        { key: "duration", label: "Thời Gian" }, // Từ ngày - Đến ngày
+        { key: "status", label: "Trạng Thái", align: "center" },
+      ];
+    }
+  };
+
+  // Render Data cho bảng theo Tab
+  const getTableData = () => {
+    const currentList = lists[activeTab] || [];
+    
+    return currentList.map((student) => ({
+      studentInfo: (
+        <div>
+            <div className="font-semibold text-gray-900">{student.fullName}</div>
+            <div className="text-xs text-gray-500 font-mono">{student.studentCode}</div>
+        </div>
+      ),
+      course: student.course,
+      contact: (
+        <div className="flex items-center gap-1 text-sm text-gray-600">
+            <Phone className="w-3 h-3" /> {student.phone}
+        </div>
+      ),
+      // Fields cho AtRisk
+      metrics: activeTab === "atRisk" && (
+        <div className="text-sm">
+            <div>CC: <span className={student.attendanceRate < 50 ? "text-red-600 font-bold" : "text-gray-700"}>{student.attendanceRate}%</span></div>
+            <div className="text-xs text-gray-400">Last: {student.lastAttendance}</div>
+        </div>
+      ),
+      riskLevel: activeTab === "atRisk" && (
+        <Badge variant={student.riskLevel === "high" ? "error" : "warning"}>
+            {student.riskLevel === "high" ? "Cao" : "Trung bình"}
+        </Badge>
+      ),
+      action: activeTab === "atRisk" && (
+        <button className="px-3 py-1.5 bg-blue-50 text-blue-600 text-xs font-semibold rounded hover:bg-blue-100 transition-colors">
+            Xử lý
+        </button>
+      ),
+      // Fields cho Dropped/Paused
+      reason: (activeTab !== "atRisk") && student.reason,
+      date: (activeTab === "dropped") && student.leaveDate,
+      duration: (activeTab === "paused") && (
+        <div className="text-sm">
+            <div>{student.startDate}</div>
+            <div className="text-gray-400 text-xs">đến {student.endDate}</div>
+        </div>
+      ),
+      status: (activeTab !== "atRisk") && (
+        <Badge variant="secondary">
+            {activeTab === "dropped" ? "Đã nghỉ" : "Bảo lưu"}
+        </Badge>
+      )
+    }));
+  };
 
   return (
-    <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+    <div className="p-6 space-y-8 bg-gray-50/50 min-h-screen font-sans">
+      
+      {/* 1. Header Section */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">
-            Tỉ Lệ Nghỉ Học & Bảo Lưu
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight">
+            Báo Cáo Giữ Chân (Retention)
           </h1>
-          <p className="text-gray-600 mt-1">
-            Theo dõi và phân tích tình trạng nghỉ học, bảo lưu
+          <p className="text-gray-500 mt-1 text-sm md:text-base">
+            Kiểm soát tỉ lệ nghỉ học và tối ưu hóa doanh thu trung tâm.
           </p>
         </div>
+        
+        <div className="flex items-center gap-2">
+           <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 shadow-sm">
+             <Calendar className="w-4 h-4" /> Tháng này
+           </button>
+         </div>
       </div>
 
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-        <StatCard
-          title="Tỉ Lệ Nghỉ Học"
-          value={`${stats.dropoutRate}%`}
-          icon={<UserX className="w-8 h-8" />}
-          color="bg-red-600"
-        />
-        <StatCard
-          title="Tỉ Lệ Bảo Lưu"
-          value={`${stats.pauseRate}%`}
-          icon={<Pause className="w-8 h-8" />}
-          color="bg-orange-600"
-        />
-        <StatCard
-          title="Số HV Nghỉ"
-          value={stats.totalDropouts}
-          icon={<TrendingDown className="w-8 h-8" />}
-          color="bg-gray-600"
-        />
-        <StatCard
-          title="Số HV Bảo Lưu"
-          value={stats.totalPauses}
-          icon={<Clock className="w-8 h-8" />}
-          color="bg-yellow-600"
-        />
-        <StatCard
-          title="HV Có Rủi Ro"
-          value={stats.atRiskStudents}
-          icon={<AlertTriangle className="w-8 h-8" />}
-          color="bg-purple-600"
-        />
-      </div>
-
-      {/* Alert Banner */}
-      {stats.atRiskStudents > 0 && (
-        <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-lg">
-          <div className="flex items-center gap-3">
-            <AlertTriangle className="w-6 h-6 text-red-600" />
-            <div>
-              <h3 className="text-sm font-bold text-red-900">
-                Cảnh Báo: {stats.atRiskStudents} học viên có nguy cơ nghỉ học
-                cao!
-              </h3>
-              <p className="text-xs text-red-700 mt-1">
-                Cần liên hệ và tư vấn kịp thời để giữ chân học viên
-              </p>
+      {/* 2. Statistics Cards (Updated with Revenue) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+        <StatCard title="Tỉ Lệ Nghỉ" value={`${stats.dropoutRate}%`} icon={<UserX className="w-5 h-5" />} variant="red" />
+        <StatCard title="Tỉ Lệ Bảo Lưu" value={`${stats.pauseRate}%`} icon={<PauseCircle className="w-5 h-5" />} variant="orange" />
+        <StatCard title="HV Rủi Ro" value={stats.atRiskStudents} icon={<AlertTriangle className="w-5 h-5" />} variant="rose" subtitle="Cần xử lý gấp" />
+        <StatCard title="Cứu Thành Công" value={`${stats.retentionSuccessRate}%`} icon={<UserCheck className="w-5 h-5" />} variant="green" subtitle="Tháng này" />
+        {/* Card Doanh Thu Mất Đi - Quan trọng */}
+        <div className="xl:col-span-2 bg-white p-5 rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between">
+                <div>
+                    <p className="text-sm font-medium text-gray-500">Thất Thoát Dự Kiến</p>
+                    <h3 className="text-2xl font-bold text-red-600">{formatCurrency(stats.revenueLoss)}</h3>
+                    <p className="text-xs text-gray-400 mt-1">Do học viên nghỉ/bảo lưu</p>
+                </div>
+                <div className="p-3 rounded-xl bg-red-50 text-red-600"><DollarSign className="w-6 h-6"/></div>
             </div>
-          </div>
         </div>
-      )}
+      </div>
 
-      {/* Charts Row */}
+      {/* 3. Charts & Teacher Analysis */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Retention Trend */}
-        <Card title="Xu Hướng Nghỉ Học & Bảo Lưu" className="lg:col-span-2">
-          <LineChart
-            data={trendData}
-            lines={[
-              {
-                dataKey: "dropoutRate",
-                name: "Tỉ lệ nghỉ học",
-                stroke: "#dc2626",
-              },
-              {
-                dataKey: "pauseRate",
-                name: "Tỉ lệ bảo lưu",
-                stroke: "#f59e0b",
-              },
-            ]}
-            height={300}
-          />
+        <Card title="Xu Hướng Biến Động" className="lg:col-span-2 shadow-sm border-gray-200">
+          <div className="mt-4">
+            <LineChart
+              data={trendData}
+              lines={[
+                { dataKey: "dropoutRate", name: "Tỉ lệ nghỉ", stroke: "#f43f5e", strokeWidth: 2 },
+                { dataKey: "pauseRate", name: "Tỉ lệ bảo lưu", stroke: "#f59e0b", strokeWidth: 2 },
+              ]}
+              height={280}
+            />
+          </div>
         </Card>
 
-        {/* Dropout Reasons */}
-        <Card title="Lý Do Nghỉ Học">
-          <PieChart
-            data={reasonData}
-            dataKey="value"
-            nameKey="name"
-            height={300}
-          />
+        {/* Teacher Performance (New) */}
+        <Card title="Top Giáo Viên Giữ Chân" className="shadow-sm border-gray-200">
+            <div className="space-y-4 mt-2">
+                {teachers.slice(0, 5).map((teacher, index) => (
+                    <div key={index} className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${index < 3 ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-500'}`}>
+                                {index + 1}
+                            </div>
+                            <div>
+                                <div className="text-sm font-medium text-gray-900">{teacher.name}</div>
+                                <div className="text-xs text-gray-500">{teacher.studentCount} HV</div>
+                            </div>
+                        </div>
+                        <div className="text-right">
+                            <div className={`font-bold text-sm ${teacher.retentionRate >= 95 ? 'text-green-600' : teacher.retentionRate >= 90 ? 'text-blue-600' : 'text-orange-500'}`}>
+                                {teacher.retentionRate}%
+                            </div>
+                        </div>
+                    </div>
+                ))}
+            </div>
         </Card>
       </div>
 
-      {/* Course Analysis */}
-      <Card title="Phân Tích Theo Khóa Học">
-        <BarChart
-          data={courseAnalysis}
-          bars={[
-            {
-              dataKey: "dropoutRate",
-              name: "Tỉ lệ nghỉ",
-              fill: "#dc2626",
-            },
-            {
-              dataKey: "pauseRate",
-              name: "Tỉ lệ bảo lưu",
-              fill: "#f59e0b",
-            },
-          ]}
-          height={300}
-        />
-      </Card>
-
-      {/* At-Risk Students Table */}
-      <Card title="Danh Sách Học Viên Có Nguy Cơ Cao">
-        <Table
-          columns={tableColumns}
-          data={atRiskList.map((student) => ({
-            studentCode: student.studentCode,
-            fullName: student.fullName,
-            course: student.course,
-            attendance: (
-              <Badge
-                variant={
-                  student.attendanceRate < 50
-                    ? "danger"
-                    : student.attendanceRate < 70
-                    ? "warning"
-                    : "default"
-                }
-              >
-                {student.attendanceRate}%
-              </Badge>
-            ),
-            lastAttendance: student.lastAttendance,
-            riskLevel: (
-              <Badge
-                variant={
-                  student.riskLevel === "high"
-                    ? "danger"
-                    : student.riskLevel === "medium"
-                    ? "warning"
-                    : "default"
-                }
-              >
-                {student.riskLevel === "high"
-                  ? "Cao"
-                  : student.riskLevel === "medium"
-                  ? "Trung Bình"
-                  : "Thấp"}
-              </Badge>
-            ),
-            action: (
-              <button className="px-3 py-1 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition-colors">
-                Liên Hệ
-              </button>
-            ),
-          }))}
-        />
-      </Card>
-
-      {/* Statistics Breakdown */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card title="Lý Do Nghỉ Học Chi Tiết">
-          <div className="space-y-3">
-            <StatusItem label="Học phí cao" count={15} color="bg-red-500" />
-            <StatusItem
-              label="Chất lượng giảng dạy"
-              count={8}
-              color="bg-orange-500"
-            />
-            <StatusItem
-              label="Không phù hợp"
-              count={12}
-              color="bg-yellow-500"
-            />
-            <StatusItem label="Lý do cá nhân" count={10} color="bg-gray-500" />
-          </div>
+         {/* Course Analysis */}
+         <Card title="Phân Tích Theo Khóa Học" className="lg:col-span-2 shadow-sm border-gray-200">
+            <div className="mt-4">
+                <BarChart
+                data={courseAnalysis}
+                bars={[
+                    { dataKey: "dropoutRate", name: "Tỉ lệ nghỉ (%)", fill: "#f43f5e", barSize: 30, radius: [4, 4, 0, 0] },
+                    { dataKey: "pauseRate", name: "Tỉ lệ bảo lưu (%)", fill: "#fbbf24", barSize: 30, radius: [4, 4, 0, 0] },
+                ]}
+                height={250}
+                />
+            </div>
         </Card>
-
-        <Card title="Thời Gian Nghỉ">
-          <div className="space-y-3">
-            <StatusItem label="< 1 tháng" count={5} color="bg-red-500" />
-            <StatusItem label="1-3 tháng" count={12} color="bg-orange-500" />
-            <StatusItem label="3-6 tháng" count={18} color="bg-yellow-500" />
-            <StatusItem label="> 6 tháng" count={10} color="bg-gray-500" />
-          </div>
-        </Card>
-
-        <Card title="Tỉ Lệ Theo Độ Tuổi">
-          <div className="space-y-3">
-            <StatusItem label="6-12 tuổi" count="8%" color="bg-blue-500" />
-            <StatusItem label="13-17 tuổi" count="12%" color="bg-indigo-500" />
-            <StatusItem label="18-25 tuổi" count="15%" color="bg-purple-500" />
-            <StatusItem label="26+ tuổi" count="10%" color="bg-pink-500" />
-          </div>
+        
+        {/* Reason Pie Chart */}
+        <Card title="Nguyên Nhân Chính" className="shadow-sm border-gray-200">
+             <div className="mt-4">
+                 <PieChart data={reasonData} dataKey="value" nameKey="name" height={250} />
+            </div>
         </Card>
       </div>
+
+      {/* 4. Detailed Student Lists with Tabs (Major Update) */}
+      <Card className="shadow-sm border-gray-200">
+        <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 gap-4">
+            <h3 className="font-bold text-lg text-gray-900">Danh Sách Chi Tiết</h3>
+            
+            {/* Tabs Navigation */}
+            <div className="flex p-1 bg-gray-100 rounded-lg">
+                <button 
+                    onClick={() => setActiveTab("atRisk")}
+                    className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${activeTab === "atRisk" ? "bg-white text-rose-600 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
+                >
+                    <AlertTriangle className="w-4 h-4 inline-block mr-1 mb-0.5"/> Nguy Cơ Cao ({lists.atRisk.length})
+                </button>
+                <button 
+                    onClick={() => setActiveTab("dropped")}
+                    className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${activeTab === "dropped" ? "bg-white text-red-600 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
+                >
+                    <UserX className="w-4 h-4 inline-block mr-1 mb-0.5"/> Đã Nghỉ ({lists.dropped.length})
+                </button>
+                <button 
+                    onClick={() => setActiveTab("paused")}
+                    className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${activeTab === "paused" ? "bg-white text-orange-600 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
+                >
+                    <PauseCircle className="w-4 h-4 inline-block mr-1 mb-0.5"/> Bảo Lưu ({lists.paused.length})
+                </button>
+            </div>
+        </div>
+        
+        <Table columns={getTableColumns()} data={getTableData()} />
+      </Card>
     </div>
   );
 };
 
-/**
- * Stat Card Component
- */
-const StatCard = ({ title, value, icon, color }) => {
-  return (
-    <Card className="hover:shadow-lg transition-shadow">
-      <div className="flex items-center justify-between">
-        <div className="flex-1">
-          <p className="text-gray-600 text-sm mb-1">{title}</p>
-          <p className="text-2xl font-bold text-gray-900">{value}</p>
-        </div>
-        <div className={`${color} text-white p-3 rounded-lg shadow-md`}>
-          {icon}
-        </div>
-      </div>
-    </Card>
-  );
-};
+// --- Helper Component ---
+const StatCard = ({ title, value, icon, variant = "gray", subtitle }) => {
+  const variants = {
+    red: "bg-red-50 text-red-600 border-red-100",
+    rose: "bg-rose-50 text-rose-600 border-rose-100",
+    orange: "bg-orange-50 text-orange-600 border-orange-100",
+    green: "bg-emerald-50 text-emerald-600 border-emerald-100",
+    gray: "bg-gray-100 text-gray-600 border-gray-200",
+  };
+  const currentStyle = variants[variant] || variants.gray;
 
-/**
- * Status Item Component
- */
-const StatusItem = ({ label, count, color }) => {
   return (
-    <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-      <div className="flex items-center gap-3">
-        <div className={`w-3 h-3 rounded-full ${color}`}></div>
-        <span className="text-sm font-medium text-gray-700">{label}</span>
+    <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">{title}</p>
+          <h3 className="text-xl font-bold text-gray-900">{value}</h3>
+          {subtitle && <p className="text-[11px] text-gray-400 mt-1">{subtitle}</p>}
+        </div>
+        <div className={`p-2.5 rounded-lg shrink-0 ${currentStyle}`}>{icon}</div>
       </div>
-      <span className="text-sm font-bold text-gray-900">{count}</span>
     </div>
   );
 };

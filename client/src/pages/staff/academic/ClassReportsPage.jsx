@@ -7,9 +7,13 @@ import {
   AlertCircle,
   Download,
   Printer,
+  Search,
+  School,
+  CheckCircle,
+  BarChart2
 } from "lucide-react";
-import { Card, Button, Badge, Loading, Select } from "@components/common";
-import api from "@services/api";
+import { Card, Button, Badge, Loading, Select } from "../../../components/common"; // Import path đúng
+import api from "../../../services/api";
 import { toast } from "react-hot-toast";
 
 const ClassReportsPage = () => {
@@ -25,13 +29,14 @@ const ClassReportsPage = () => {
   useEffect(() => {
     if (selectedClass) {
       fetchClassStats(selectedClass);
+    } else {
+        setClassStats(null);
     }
   }, [selectedClass]);
 
   const fetchClasses = async () => {
     try {
       const response = await api.get("/classes");
-      console.log("[ClassReportsPage] GET /classes response:", response);
       const data = response.data?.data || response.data || [];
       setClasses(Array.isArray(data) ? data : []);
     } catch (error) {
@@ -48,25 +53,20 @@ const ClassReportsPage = () => {
       const response = await api.get(`/classes/${classId}`);
       const classData = response.data?.data || response.data;
 
-      console.log("Class data:", classData);
-      console.log("Students in class:", classData.students);
-
-      // Danh sách học viên - structure: students[{student: {...}, status: "...", enrolledDate: ...}]
+      // Danh sách học viên
       let students = [];
       if (Array.isArray(classData.students)) {
+        // Fetch details if needed (mock for now or assume populated)
         students = classData.students
           .map((item) => {
-            // Lấy student data từ nested field hoặc fallback
             const studentData = item?.student || item;
             return {
               ...studentData,
-              enrollmentStatus: item?.status || "active", // Save enrollment status
+              enrollmentStatus: item?.status || "active", 
             };
           })
-          .filter((s) => s && s._id); // Filter out null/undefined
+          .filter((s) => s && s._id);
       }
-
-      console.log("Processed students:", students);
 
       // Tính toán thống kê
       const stats = calculateStats(classData, students);
@@ -81,20 +81,19 @@ const ClassReportsPage = () => {
 
   const calculateStats = (classData, students) => {
     const totalStudents = students.length;
-    // Lọc học viên đang học (có thể từ status field hoặc enrollmentStatus)
     const activeStudents = students.filter(
       (s) => s.enrollmentStatus === "active" || s.status === "active"
     ).length;
 
-    // Giả sử có điểm trong database (cần model Score hoặc field score trong Student)
-    // Đây là mock data, bạn cần thay đổi theo cấu trúc database thực tế
-    const scores = students.map(() => Math.floor(Math.random() * 10) + 1); // Mock scores 1-10
+    // Mock scores (Replace with real data logic)
+    // Giả sử lấy điểm từ API grades nếu có, ở đây mock tạm để demo UI
+    const scores = students.map(() => Math.floor(Math.random() * 4) + 6); // Mock 6-10
 
     const scoreRanges = {
-      excellent: scores.filter((s) => s >= 9).length, // 9-10
-      good: scores.filter((s) => s >= 7 && s < 9).length, // 7-8
-      average: scores.filter((s) => s >= 5 && s < 7).length, // 5-6
-      belowAverage: scores.filter((s) => s < 5).length, // 1-4
+      excellent: scores.filter((s) => s >= 9).length,
+      good: scores.filter((s) => s >= 7 && s < 9).length,
+      average: scores.filter((s) => s >= 5 && s < 7).length,
+      belowAverage: scores.filter((s) => s < 5).length,
     };
 
     const averageScore =
@@ -104,9 +103,7 @@ const ClassReportsPage = () => {
 
     const passRate =
       scores.length > 0
-        ? ((scores.filter((s) => s >= 5).length / scores.length) * 100).toFixed(
-            1
-          )
+        ? ((scores.filter((s) => s >= 5).length / scores.length) * 100).toFixed(1)
         : 0;
 
     return {
@@ -123,538 +120,227 @@ const ClassReportsPage = () => {
   };
 
   const exportToExcel = () => {
-    if (!classStats) {
-      toast.error("Vui lòng chọn lớp học trước");
-      return;
-    }
+    if (!classStats) return toast.error("Vui lòng chọn lớp học trước");
 
     try {
-      // Tạo dữ liệu Excel
       const data = [
         ["BÁO CÁO THỐNG KÊ LỚP HỌC"],
         [],
-        [
-          "Tên lớp:",
-          classStats.classInfo.name || classStats.classInfo.className,
-        ],
+        ["Tên lớp:", classStats.classInfo.name || classStats.classInfo.className],
         ["Mã lớp:", classStats.classInfo.classCode],
         ["Khóa học:", classStats.course?.name || "N/A"],
         ["Giáo viên:", classStats.teacher?.fullName || "Chưa phân công"],
         [],
         ["THỐNG KÊ HỌC VIÊN"],
-        ["Tổng số học viên:", classStats.totalStudents],
-        ["Học viên đang học:", classStats.activeStudents],
-        ["Sức chứa:", classStats.capacity],
+        ["Tổng số:", classStats.totalStudents],
+        ["Đang học:", classStats.activeStudents],
         [],
         ["PHÂN BỐ ĐIỂM"],
-        ["Xuất sắc (9-10):", classStats.scoreRanges.excellent],
-        ["Giỏi (7-8):", classStats.scoreRanges.good],
-        ["Trung bình (5-6):", classStats.scoreRanges.average],
-        ["Dưới trung bình (1-4):", classStats.scoreRanges.belowAverage],
+        ["Xuất sắc:", classStats.scoreRanges.excellent],
+        ["Giỏi:", classStats.scoreRanges.good],
+        ["Khá:", classStats.scoreRanges.average],
+        ["Yếu:", classStats.scoreRanges.belowAverage],
         [],
-        ["THỐNG KÊ CHUNG"],
-        ["Điểm trung bình:", classStats.averageScore],
+        ["KẾT QUẢ"],
+        ["Điểm TB:", classStats.averageScore],
         ["Tỷ lệ đạt:", classStats.passRate + "%"],
-        [],
-        ["Ngày xuất báo cáo:", new Date().toLocaleDateString("vi-VN")],
       ];
 
-      // Tạo CSV content
       const csvContent = data.map((row) => row.join(",")).join("\n");
-
-      // Download CSV (dùng CSV thay vì Excel vì không cài xlsx)
       const element = document.createElement("a");
-      element.setAttribute(
-        "href",
-        "data:text/csv;charset=utf-8," + encodeURIComponent(csvContent)
-      );
-      element.setAttribute(
-        "download",
-        `BaoCao_${classStats.classInfo.classCode}_${new Date().getTime()}.csv`
-      );
-      element.style.display = "none";
+      element.setAttribute("href", "data:text/csv;charset=utf-8," + encodeURIComponent(csvContent));
+      element.setAttribute("download", `BaoCao_${classStats.classInfo.classCode}_${Date.now()}.csv`);
       document.body.appendChild(element);
       element.click();
       document.body.removeChild(element);
-
-      toast.success("Xuất báo cáo thành công!");
+      toast.success("Đã tải xuống báo cáo");
     } catch (error) {
-      console.error("Error exporting report:", error);
-      toast.error("Không thể xuất báo cáo");
+      toast.error("Lỗi xuất file");
     }
   };
 
   const printReport = () => {
-    if (!classStats) {
-      toast.error("Vui lòng chọn lớp học trước");
-      return;
-    }
-
-    try {
-      const printWindow = window.open("", "_blank");
-      printWindow.document.write(`
-        <html>
-          <head>
-            <title>Báo cáo lớp học - ${
-              classStats.classInfo.name || classStats.classInfo.className
-            }</title>
-            <style>
-              body {
-                font-family: Arial, sans-serif;
-                margin: 20px;
-                color: #333;
-              }
-              .header {
-                text-align: center;
-                margin-bottom: 30px;
-              }
-              .header h1 {
-                font-size: 24px;
-                margin: 10px 0;
-              }
-              .section {
-                margin-bottom: 30px;
-                page-break-inside: avoid;
-              }
-              .section h2 {
-                font-size: 16px;
-                border-bottom: 2px solid #3B9797;
-                padding-bottom: 10px;
-                margin-bottom: 15px;
-              }
-              .info-row {
-                display: flex;
-                justify-content: space-between;
-                padding: 8px 0;
-                border-bottom: 1px solid #eee;
-              }
-              .info-label {
-                font-weight: bold;
-                width: 40%;
-              }
-              .info-value {
-                width: 60%;
-              }
-              .stats-grid {
-                display: grid;
-                grid-template-columns: 1fr 1fr;
-                gap: 20px;
-              }
-              .stat-box {
-                border: 1px solid #ddd;
-                padding: 15px;
-                border-radius: 5px;
-              }
-              .stat-label {
-                font-size: 12px;
-                color: #666;
-              }
-              .stat-value {
-                font-size: 24px;
-                font-weight: bold;
-                color: #3B9797;
-              }
-              .footer {
-                margin-top: 40px;
-                text-align: right;
-                font-size: 12px;
-                color: #999;
-              }
-              @media print {
-                body { margin: 0; }
-              }
-            </style>
-          </head>
-          <body>
-            <div class="header">
-              <h1>BÁO CÁO THỐNG KÊ LỚP HỌC</h1>
-              <p>English Center Management System</p>
-            </div>
-
-            <div class="section">
-              <h2>Thông tin lớp học</h2>
-              <div class="info-row">
-                <span class="info-label">Tên lớp:</span>
-                <span class="info-value">${
-                  classStats.classInfo.name || classStats.classInfo.className
-                }</span>
-              </div>
-              <div class="info-row">
-                <span class="info-label">Mã lớp:</span>
-                <span class="info-value">${
-                  classStats.classInfo.classCode
-                }</span>
-              </div>
-              <div class="info-row">
-                <span class="info-label">Khóa học:</span>
-                <span class="info-value">${
-                  classStats.course?.name || "N/A"
-                }</span>
-              </div>
-              <div class="info-row">
-                <span class="info-label">Giáo viên:</span>
-                <span class="info-value">${
-                  classStats.teacher?.fullName || "Chưa phân công"
-                }</span>
-              </div>
-            </div>
-
-            <div class="section">
-              <h2>Thống kê học viên</h2>
-              <div class="stats-grid">
-                <div class="stat-box">
-                  <div class="stat-label">Tổng số học viên</div>
-                  <div class="stat-value">${classStats.totalStudents}</div>
-                </div>
-                <div class="stat-box">
-                  <div class="stat-label">Đang học</div>
-                  <div class="stat-value">${classStats.activeStudents}</div>
-                </div>
-                <div class="stat-box">
-                  <div class="stat-label">Sức chứa</div>
-                  <div class="stat-value">${classStats.capacity}</div>
-                </div>
-                <div class="stat-box">
-                  <div class="stat-label">Tỷ lệ lấp đầy</div>
-                  <div class="stat-value">${
-                    classStats.totalStudents > 0
-                      ? Math.round(
-                          (classStats.totalStudents / classStats.capacity) * 100
-                        )
-                      : 0
-                  }%</div>
-                </div>
-              </div>
-            </div>
-
-            <div class="section">
-              <h2>Phân bố điểm</h2>
-              <div class="info-row">
-                <span class="info-label">Xuất sắc (9-10):</span>
-                <span class="info-value">${
-                  classStats.scoreRanges.excellent
-                } học viên</span>
-              </div>
-              <div class="info-row">
-                <span class="info-label">Giỏi (7-8):</span>
-                <span class="info-value">${
-                  classStats.scoreRanges.good
-                } học viên</span>
-              </div>
-              <div class="info-row">
-                <span class="info-label">Trung bình (5-6):</span>
-                <span class="info-value">${
-                  classStats.scoreRanges.average
-                } học viên</span>
-              </div>
-              <div class="info-row">
-                <span class="info-label">Dưới trung bình (1-4):</span>
-                <span class="info-value">${
-                  classStats.scoreRanges.belowAverage
-                } học viên</span>
-              </div>
-            </div>
-
-            <div class="section">
-              <h2>Thống kê chung</h2>
-              <div class="info-row">
-                <span class="info-label">Điểm trung bình:</span>
-                <span class="info-value">${classStats.averageScore}/10</span>
-              </div>
-              <div class="info-row">
-                <span class="info-label">Tỷ lệ đạt:</span>
-                <span class="info-value">${classStats.passRate}%</span>
-              </div>
-            </div>
-
-            <div class="footer">
-              <p>Ngày xuất báo cáo: ${new Date().toLocaleDateString(
-                "vi-VN"
-              )} ${new Date().toLocaleTimeString("vi-VN")}</p>
-            </div>
-          </body>
-        </html>
-      `);
-      printWindow.document.close();
-      printWindow.print();
-    } catch (error) {
-      console.error("Error printing report:", error);
-      toast.error("Không thể in báo cáo");
-    }
+    if (!classStats) return toast.error("Vui lòng chọn lớp học trước");
+    window.print();
   };
 
+  if (loading && !classStats) return <div className="h-screen flex items-center justify-center bg-gray-50"><Loading size="large" /></div>;
+
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <FileText className="w-8 h-8 text-[#3B9797]" />
-        <h1 className="text-2xl font-bold text-gray-800">Báo cáo lớp học</h1>
-      </div>
-
-      {/* Class Selection */}
-      <Card>
-        <Select
-          label="Chọn lớp học"
-          value={selectedClass}
-          onChange={(e) => setSelectedClass(e.target.value)}
-          required
-          placeholder="-- Vui lòng chọn lớp học --"
-          options={classes.map((cls) => ({
-            value: cls._id,
-            label: `${cls.name || cls.className} (${cls.classCode || "N/A"})`,
-          }))}
-        />
-      </Card>
-
-      {/* Statistics */}
-      {selectedClass && classStats && (
-        <div className="space-y-6">
-          {/* Overview Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Card>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Tổng học viên</p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {classStats.totalStudents}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Sức chứa: {classStats.capacity}
-                  </p>
-                </div>
-                <Users className="w-10 h-10 text-blue-500" />
-              </div>
-            </Card>
-
-            <Card>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Đang học</p>
-                  <p className="text-2xl font-bold text-green-600">
-                    {classStats.activeStudents}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    {classStats.totalStudents > 0
-                      ? Math.round(
-                          (classStats.activeStudents /
-                            classStats.totalStudents) *
-                            100
-                        )
-                      : 0}
-                    %
-                  </p>
-                </div>
-                <TrendingUp className="w-10 h-10 text-green-500" />
-              </div>
-            </Card>
-
-            <Card>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Điểm TB</p>
-                  <p className="text-2xl font-bold text-purple-600">
-                    {classStats.averageScore}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">/10 điểm</p>
-                </div>
-                <Award className="w-10 h-10 text-purple-500" />
-              </div>
-            </Card>
-
-            <Card>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Tỷ lệ đạt</p>
-                  <p className="text-2xl font-bold text-orange-600">
-                    {classStats.passRate}%
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">≥ 5 điểm</p>
-                </div>
-                <AlertCircle className="w-10 h-10 text-orange-500" />
-              </div>
-            </Card>
-          </div>
-
-          {/* Class Info */}
-          <Card>
-            <h3 className="text-lg font-semibold mb-4">Thông tin lớp học</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-gray-600">Tên lớp</p>
-                <p className="font-medium">
-                  {classStats.classInfo.name || classStats.classInfo.className}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Mã lớp</p>
-                <p className="font-medium">{classStats.classInfo.classCode}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Khóa học</p>
-                <p className="font-medium">
-                  {classStats.course?.name ||
-                    classStats.course?.courseName ||
-                    "N/A"}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Giáo viên</p>
-                <p className="font-medium">
-                  {classStats.teacher?.fullName || "Chưa phân công"}
-                </p>
-              </div>
-            </div>
-          </Card>
-
-          {/* Score Distribution */}
-          <Card>
-            <h3 className="text-lg font-semibold mb-4">Phân bố điểm</h3>
-            <div className="space-y-4">
-              <div className="flex items-center gap-4">
-                <div className="w-32">
-                  <Badge variant="success">Xuất sắc (9-10)</Badge>
-                </div>
-                <div className="flex-1">
-                  <div className="bg-gray-200 rounded-full h-8 overflow-hidden">
-                    <div
-                      className="bg-green-500 h-full flex items-center justify-center text-white text-sm font-medium"
-                      style={{
-                        width: `${
-                          classStats.totalStudents > 0
-                            ? (classStats.scoreRanges.excellent /
-                                classStats.totalStudents) *
-                              100
-                            : 0
-                        }%`,
-                        minWidth:
-                          classStats.scoreRanges.excellent > 0 ? "60px" : "0",
-                      }}
-                    >
-                      {classStats.scoreRanges.excellent} HV
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-4">
-                <div className="w-32">
-                  <Badge variant="primary">Giỏi (7-8)</Badge>
-                </div>
-                <div className="flex-1">
-                  <div className="bg-gray-200 rounded-full h-8 overflow-hidden">
-                    <div
-                      className="bg-blue-500 h-full flex items-center justify-center text-white text-sm font-medium"
-                      style={{
-                        width: `${
-                          classStats.totalStudents > 0
-                            ? (classStats.scoreRanges.good /
-                                classStats.totalStudents) *
-                              100
-                            : 0
-                        }%`,
-                        minWidth:
-                          classStats.scoreRanges.good > 0 ? "60px" : "0",
-                      }}
-                    >
-                      {classStats.scoreRanges.good} HV
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-4">
-                <div className="w-32">
-                  <Badge variant="warning">Khá (5-6)</Badge>
-                </div>
-                <div className="flex-1">
-                  <div className="bg-gray-200 rounded-full h-8 overflow-hidden">
-                    <div
-                      className="bg-yellow-500 h-full flex items-center justify-center text-white text-sm font-medium"
-                      style={{
-                        width: `${
-                          classStats.totalStudents > 0
-                            ? (classStats.scoreRanges.average /
-                                classStats.totalStudents) *
-                              100
-                            : 0
-                        }%`,
-                        minWidth:
-                          classStats.scoreRanges.average > 0 ? "60px" : "0",
-                      }}
-                    >
-                      {classStats.scoreRanges.average} HV
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-4">
-                <div className="w-32">
-                  <Badge variant="danger">Yếu (1-4)</Badge>
-                </div>
-                <div className="flex-1">
-                  <div className="bg-gray-200 rounded-full h-8 overflow-hidden">
-                    <div
-                      className="bg-red-500 h-full flex items-center justify-center text-white text-sm font-medium"
-                      style={{
-                        width: `${
-                          classStats.totalStudents > 0
-                            ? (classStats.scoreRanges.belowAverage /
-                                classStats.totalStudents) *
-                              100
-                            : 0
-                        }%`,
-                        minWidth:
-                          classStats.scoreRanges.belowAverage > 0
-                            ? "60px"
-                            : "0",
-                      }}
-                    >
-                      {classStats.scoreRanges.belowAverage} HV
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </Card>
-
-          {/* Actions */}
-          <Card>
-            <div className="flex gap-4">
-              <Button
-                variant="primary"
-                icon={<Download className="w-4 h-4" />}
-                onClick={exportToExcel}
-              >
-                Xuất báo cáo Excel
-              </Button>
-              <Button
-                variant="outline"
-                icon={<Printer className="w-4 h-4" />}
-                onClick={printReport}
-              >
-                In báo cáo
-              </Button>
-            </div>
-          </Card>
-        </div>
-      )}
-
-      {!selectedClass && (
-        <Card>
-          <div className="text-center py-12">
-            <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
-              Vui lòng chọn lớp học
-            </h3>
-            <p className="text-gray-500">
-              Chọn lớp học từ danh sách bên trên để xem báo cáo chi tiết
+    <div className="min-h-screen bg-gray-50/50 p-6 md:p-8 font-sans text-gray-800 print:bg-white print:p-0">
+      <div className="max-w-[1600px] mx-auto space-y-6 print:max-w-none">
+        
+        {/* --- HEADER (Hidden on Print) --- */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-5 rounded-xl border border-gray-200 shadow-sm print:hidden">
+          <div>
+            <h1 className="text-2xl font-bold text-[var(--color-primary)] flex items-center gap-3">
+               <div className="p-2 bg-[var(--color-primary)] rounded-lg shadow-sm">
+                  <BarChart2 className="w-6 h-6 text-white" />
+               </div>
+               Báo Cáo & Thống Kê
+            </h1>
+            <p className="text-gray-500 text-sm mt-1 ml-12">
+              Tổng hợp dữ liệu và kết quả học tập của lớp
             </p>
           </div>
+        </div>
+
+        {/* --- CLASS SELECTOR (Hidden on Print) --- */}
+        <Card className="border border-gray-200 shadow-sm print:hidden">
+           <div className="p-4 flex gap-4 items-center">
+              <div className="relative w-full md:w-1/3">
+                 <select
+                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[var(--color-secondary)] outline-none text-sm font-medium cursor-pointer"
+                    value={selectedClass}
+                    onChange={(e) => setSelectedClass(e.target.value)}
+                 >
+                    <option value="">-- Chọn lớp học để xem báo cáo --</option>
+                    {classes.map((cls) => (
+                       <option key={cls._id} value={cls._id}>
+                          {cls.name || cls.className} ({cls.classCode})
+                       </option>
+                    ))}
+                 </select>
+              </div>
+              {classStats && (
+                 <div className="flex gap-2 ml-auto">
+                    <Button variant="outline" className="border-gray-300 text-gray-700" onClick={printReport}>
+                       <Printer size={16} className="mr-2"/> In báo cáo
+                    </Button>
+                    <Button className="bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-light)]" onClick={exportToExcel}>
+                       <Download size={16} className="mr-2"/> Xuất Excel
+                    </Button>
+                 </div>
+              )}
+           </div>
         </Card>
-      )}
+
+        {/* --- REPORT CONTENT --- */}
+        {classStats ? (
+           <div className="space-y-6 print:space-y-8">
+              
+              {/* Report Header (Print Only) */}
+              <div className="hidden print:block text-center mb-8">
+                 <h1 className="text-3xl font-bold uppercase mb-2">Báo Cáo Tổng Kết Lớp Học</h1>
+                 <p className="text-gray-500">Trung Tâm Anh Ngữ English Hub</p>
+                 <p className="text-sm mt-2">Ngày xuất: {new Date().toLocaleDateString("vi-VN")}</p>
+              </div>
+
+              {/* Class Info Card */}
+              <Card className="border border-gray-200 shadow-sm bg-white print:shadow-none print:border-none">
+                 <div className="p-6">
+                    <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2 border-b pb-2">
+                       <School size={20} className="text-[var(--color-secondary)]" /> Thông tin chung
+                    </h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-sm">
+                       <div>
+                          <p className="text-gray-500 mb-1">Tên lớp</p>
+                          <p className="font-bold text-lg text-[var(--color-primary)]">{classStats.classInfo.name || classStats.classInfo.className}</p>
+                       </div>
+                       <div>
+                          <p className="text-gray-500 mb-1">Mã lớp</p>
+                          <p className="font-mono font-medium bg-gray-100 px-2 py-0.5 rounded w-fit">{classStats.classInfo.classCode}</p>
+                       </div>
+                       <div>
+                          <p className="text-gray-500 mb-1">Khóa học</p>
+                          <p className="font-medium">{classStats.course?.name || "N/A"}</p>
+                       </div>
+                       <div>
+                          <p className="text-gray-500 mb-1">Giáo viên</p>
+                          <p className="font-medium">{classStats.teacher?.fullName || "Chưa phân công"}</p>
+                       </div>
+                    </div>
+                 </div>
+              </Card>
+
+              {/* KPI Stats */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 print:grid-cols-4">
+                 <StatBox title="Sĩ số lớp" value={classStats.totalStudents} sub={`Sức chứa: ${classStats.capacity}`} icon={Users} color="blue" />
+                 <StatBox title="Đang theo học" value={classStats.activeStudents} sub={`${classStats.totalStudents > 0 ? Math.round((classStats.activeStudents/classStats.totalStudents)*100) : 0}% duy trì`} icon={CheckCircle} color="emerald" />
+                 <StatBox title="Điểm TB Lớp" value={classStats.averageScore} sub="/ 10.0" icon={TrendingUp} color="purple" />
+                 <StatBox title="Tỷ lệ đạt" value={`${classStats.passRate}%`} sub="≥ 5.0 điểm" icon={Award} color="orange" />
+              </div>
+
+              {/* Score Distribution Chart */}
+              <Card className="border border-gray-200 shadow-sm bg-white print:shadow-none print:border">
+                 <div className="p-6">
+                    <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
+                       <BarChart2 size={20} className="text-[var(--color-secondary)]" /> Phân bố kết quả
+                    </h3>
+                    
+                    <div className="space-y-5">
+                       <ScoreBar label="Xuất sắc (9-10)" count={classStats.scoreRanges.excellent} total={classStats.totalStudents} color="bg-emerald-500" />
+                       <ScoreBar label="Giỏi (7-8)" count={classStats.scoreRanges.good} total={classStats.totalStudents} color="bg-blue-500" />
+                       <ScoreBar label="Khá / TB (5-6)" count={classStats.scoreRanges.average} total={classStats.totalStudents} color="bg-amber-500" />
+                       <ScoreBar label="Yếu / Kém (< 5)" count={classStats.scoreRanges.belowAverage} total={classStats.totalStudents} color="bg-rose-500" />
+                    </div>
+                 </div>
+              </Card>
+
+              {/* Print Footer */}
+              <div className="hidden print:flex justify-between mt-12 pt-8 border-t border-gray-300">
+                 <div className="text-center w-1/3">
+                    <p className="font-bold mb-16">Người lập báo cáo</p>
+                    <p>(Ký và ghi rõ họ tên)</p>
+                 </div>
+                 <div className="text-center w-1/3">
+                    <p className="font-bold mb-16">Giám đốc trung tâm</p>
+                    <p>(Ký và đóng dấu)</p>
+                 </div>
+              </div>
+
+           </div>
+        ) : (
+           <div className="flex flex-col items-center justify-center py-24 bg-white rounded-xl border border-dashed border-gray-200 print:hidden">
+              <div className="p-4 bg-gray-50 rounded-full mb-3">
+                 <FileText size={40} className="text-gray-300" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-700">Chưa chọn lớp học</h3>
+              <p className="text-gray-500 mt-1 text-sm">Vui lòng chọn một lớp từ danh sách để xem báo cáo</p>
+           </div>
+        )}
+
+      </div>
     </div>
   );
+};
+
+// --- SUB COMPONENTS ---
+
+const StatBox = ({ title, value, sub, icon: Icon, color }) => {
+   const colors = {
+      blue: "bg-blue-50 text-blue-600 border-blue-100",
+      emerald: "bg-emerald-50 text-emerald-600 border-emerald-100",
+      purple: "bg-purple-50 text-purple-600 border-purple-100",
+      orange: "bg-orange-50 text-orange-600 border-orange-100",
+   };
+   
+   return (
+      <div className={`p-5 rounded-xl border ${colors[color] || colors.blue} flex items-center justify-between`}>
+         <div>
+            <p className="text-xs font-bold uppercase tracking-wider opacity-70 mb-1">{title}</p>
+            <p className="text-3xl font-extrabold">{value}</p>
+            <p className="text-[10px] font-medium opacity-80 mt-1">{sub}</p>
+         </div>
+         <div className="opacity-20 transform scale-150">
+            <Icon size={32} />
+         </div>
+      </div>
+   );
+};
+
+const ScoreBar = ({ label, count, total, color }) => {
+   const percent = total > 0 ? Math.round((count / total) * 100) : 0;
+   return (
+      <div className="flex items-center gap-4">
+         <div className="w-32 text-sm font-medium text-gray-600">{label}</div>
+         <div className="flex-1 h-3 bg-gray-100 rounded-full overflow-hidden">
+            <div className={`h-full ${color}`} style={{ width: `${percent}%` }}></div>
+         </div>
+         <div className="w-12 text-right text-sm font-bold text-gray-700">{count} HV</div>
+         <div className="w-12 text-right text-xs text-gray-400">({percent}%)</div>
+      </div>
+   );
 };
 
 export default ClassReportsPage;

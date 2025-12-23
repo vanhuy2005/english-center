@@ -1,443 +1,352 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
+import { getMySchedules } from "@services/scheduleApi";
+import { useAuth } from "@contexts/AuthContext"; // Giả sử path này đúng với project của bạn
+import { Loading, Card } from "@components/common";
 import {
-  Calendar,
+  Calendar as CalendarIcon,
   Clock,
   MapPin,
-  User,
-  Loader,
   ArrowLeft,
   AlertCircle,
-  BookOpen,
+  ChevronLeft,
+  ChevronRight,
+  Filter,
+  BookOpen
 } from "lucide-react";
-import { Card, Badge, Loading } from "@components/common";
-import { getMyClasses } from "@services/classApi";
-import { getMySchedules } from "@services/scheduleApi";
-import { useAuth } from "@contexts/AuthContext";
 import { toast } from "react-hot-toast";
-import { useNavigate } from "react-router-dom";
 
 const StudentTimetablePage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [enrolledClasses, setEnrolledClasses] = useState([]);
+  
+  // State quản lý thời gian và dữ liệu
   const [loading, setLoading] = useState(true);
-  const [selectedDay, setSelectedDay] = useState(new Date().getDay());
   const [error, setError] = useState(null);
-  const [viewMode, setViewMode] = useState("week"); // 'week' or 'month'
-  const [selectedDate, setSelectedDate] = useState(
-    new Date().toISOString().slice(0, 10)
-  );
-  const [periodSchedules, setPeriodSchedules] = useState([]);
+  const [viewMode, setViewMode] = useState("week"); // 'week' | 'month'
+  const [currentDate, setCurrentDate] = useState(new Date()); // Dùng Date object để dễ thao tác
+  const [schedules, setSchedules] = useState([]);
 
-  const daysOfWeek = [
-    "Chủ Nhật",
-    "Thứ Hai",
-    "Thứ Ba",
-    "Thứ Tư",
-    "Thứ Năm",
-    "Thứ Sáu",
-    "Thứ Bảy",
-  ];
+  // --- LOGIC FETCH DATA ---
+
+  // Tính toán range ngày dựa trên viewMode và currentDate
+  const dateRange = useMemo(() => {
+    const start = new Date(currentDate);
+    const end = new Date(currentDate);
+
+    if (viewMode === "week") {
+      // Lấy ngày thứ 2 của tuần hiện tại
+      const day = start.getDay();
+      const diff = start.getDate() - day + (day === 0 ? -6 : 1); 
+      start.setDate(diff);
+      start.setHours(0, 0, 0, 0);
+
+      // Lấy chủ nhật
+      end.setDate(start.getDate() + 6);
+      end.setHours(23, 59, 59, 999);
+    } else {
+      // Đầu tháng
+      start.setDate(1);
+      start.setHours(0, 0, 0, 0);
+      
+      // Cuối tháng
+      end.setMonth(end.getMonth() + 1);
+      end.setDate(0);
+      end.setHours(23, 59, 59, 999);
+    }
+
+    return { 
+      start: start.toISOString(), 
+      end: end.toISOString(),
+      startDateObj: start,
+      endDateObj: end
+    };
+  }, [currentDate, viewMode]);
 
   useEffect(() => {
-    loadStudentClasses();
-    loadSchedulesForPeriod();
-  }, []);
-
-  const loadStudentClasses = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      console.log("📥 Loading student classes...");
-
-      const data = await getMyClasses();
-      console.log("✓ Classes loaded:", data);
-
-      setEnrolledClasses(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.error("❌ Error loading student classes:", err);
-      setError("Lỗi tải danh sách lớp học");
-      setEnrolledClasses(getMockClasses());
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const computePeriodRange = (mode, dateStr) => {
-    // Parse date string safely as local date (expecting YYYY-MM-DD). This avoids
-    // timezone shifts when using new Date(dateStr) which can produce previous day
-    // in some timezones.
-    let date;
-    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-      const [y, m, d] = dateStr.split("-").map((v) => parseInt(v, 10));
-      date = new Date(y, m - 1, d);
-    } else {
-      date = new Date(dateStr);
-    }
-
-    if (mode === "week") {
-      // get Monday as start
-      const day = date.getDay();
-      const diffToMonday = (day + 6) % 7; // convert Sunday(0)->6, Mon(1)->0, etc.
-      const monday = new Date(
-        date.getFullYear(),
-        date.getMonth(),
-        date.getDate() - diffToMonday
-      );
-      const sunday = new Date(
-        monday.getFullYear(),
-        monday.getMonth(),
-        monday.getDate() + 6
-      );
-      return {
-        start: monday.toISOString().slice(0, 10),
-        end: sunday.toISOString().slice(0, 10),
-      };
-    }
-
-    // month
-    const start = new Date(date.getFullYear(), date.getMonth(), 1);
-    const end = new Date(date.getFullYear(), date.getMonth() + 1, 0);
-    return {
-      start: start.toISOString().slice(0, 10),
-      end: end.toISOString().slice(0, 10),
-    };
-  };
-
-  const loadSchedulesForPeriod = async (
-    mode = viewMode,
-    dateStr = selectedDate
-  ) => {
-    try {
-      const { start, end } = computePeriodRange(mode, dateStr);
-      const data = await getMySchedules(start, end);
-      setPeriodSchedules(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.error("Error loading schedules for period:", err);
-      setPeriodSchedules([]);
-    }
-  };
-
-  const getMockClasses = () => [
-    {
-      _id: "class_1",
-      name: "English A1 - Lớp 1",
-      code: "EN-A1-01",
-      course: {
-        _id: "course1",
-        name: "English A1",
-      },
-      instructor: {
-        _id: "instructor1",
-        fullName: "Cô Thanh",
-      },
-      schedule: [
-        {
-          dayOfWeek: "monday",
-          startTime: "08:00",
-          endTime: "10:00",
-          classroom: "Phòng A1",
-        },
-        {
-          dayOfWeek: "wednesday",
-          startTime: "14:00",
-          endTime: "16:00",
-          classroom: "Phòng A1",
-        },
-      ],
-      status: "active",
-      startDate: new Date(),
-      endDate: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000),
-      studentCount: 25,
-    },
-  ];
-
-  const getDayName = (dayOfWeek) => {
-    const days = {
-      monday: "Thứ Hai",
-      tuesday: "Thứ Ba",
-      wednesday: "Thứ Tư",
-      thursday: "Thứ Năm",
-      friday: "Thứ Sáu",
-      saturday: "Thứ Bảy",
-      sunday: "Chủ Nhật",
-    };
-    return days[dayOfWeek] || dayOfWeek;
-  };
-
-  const getSchedulesForDay = (dayOfWeek) => {
-    const schedules = [];
-
-    enrolledClasses.forEach((classItem) => {
-      if (classItem.schedule && Array.isArray(classItem.schedule)) {
-        const daySchedules = classItem.schedule.filter(
-          (s) => s.dayOfWeek === dayOfWeek
-        );
-        daySchedules.forEach((schedule) => {
-          schedules.push({
-            ...schedule,
-            className: classItem.name,
-            classCode: classItem.classCode,
-            classId: classItem._id,
-            teacher: classItem.teacher,
-            room: classItem.room,
-          });
-        });
+    const fetchSchedules = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        // Gọi API thực tế với range ngày đã tính
+        // API cần hỗ trợ query param ?startDate=...&endDate=...
+        const data = await getMySchedules(dateRange.start, dateRange.end);
+        
+        // Đảm bảo data là array
+        setSchedules(Array.isArray(data) ? data : []);
+      } catch (err) {
+        console.error("❌ Error loading schedules:", err);
+        setError("Không thể tải lịch học. Vui lòng thử lại sau.");
+        // Không fallback về mock data nữa
+      } finally {
+        setLoading(false);
       }
-    });
+    };
 
-    // Sort by start time
-    return schedules.sort((a, b) => a.startTime.localeCompare(b.startTime));
+    fetchSchedules();
+  }, [dateRange]);
+
+  // --- HANDLERS ---
+
+  const handlePrev = () => {
+    const newDate = new Date(currentDate);
+    if (viewMode === "week") newDate.setDate(newDate.getDate() - 7);
+    else newDate.setMonth(newDate.getMonth() - 1);
+    setCurrentDate(newDate);
   };
 
-  const todaySchedules = getSchedulesForDay(selectedDay);
+  const handleNext = () => {
+    const newDate = new Date(currentDate);
+    if (viewMode === "week") newDate.setDate(newDate.getDate() + 7);
+    else newDate.setMonth(newDate.getMonth() + 1);
+    setCurrentDate(newDate);
+  };
 
-  if (loading) return <Loading />;
+  const handleToday = () => {
+    setCurrentDate(new Date());
+  };
 
-  // If no enrolled classes
-  if (enrolledClasses.length === 0) {
-    return (
-      <div className="space-y-6">
-        {/* Header */}
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Thời Khóa Biểu</h1>
-          <p className="text-gray-600 mt-1">
-            Lịch học của {user?.profile?.fullName}
-          </p>
-        </div>
+  // --- HELPER RENDERING ---
 
-        {/* Empty State */}
-        <Card className="p-12 text-center">
-          <Calendar size={64} className="mx-auto text-gray-400 mb-6" />
-          <h2 className="text-2xl font-semibold text-gray-900 mb-2">
-            Chưa có lớp học nào
-          </h2>
-          <p className="text-gray-600 mb-6">
-            Bạn chưa đăng ký lớp học. Vui lòng liên hệ với bộ phận ghi danh để
-            đăng ký lớp.
-          </p>
-          <p className="text-sm text-gray-500">
-            Khi đăng ký lớp, lịch học sẽ tự động hiển thị ở đây.
-          </p>
-        </Card>
-      </div>
-    );
-  }
+  // Tạo danh sách các ngày cần hiển thị trong Grid
+  const calendarDays = useMemo(() => {
+    const days = [];
+    const start = new Date(dateRange.startDateObj);
+    
+    // Nếu là Month view, cần padding thêm các ngày của tháng trước để lấp đầy grid (nếu ngày 1 không phải T2)
+    if (viewMode === "month") {
+       const dayOfWeek = start.getDay(); // 0 is Sunday
+       const paddingDays = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+       start.setDate(start.getDate() - paddingDays);
+    }
+
+    // Tạo mảng ngày (42 ô cho month view để chắc chắn cover hết, 7 ô cho week view)
+    const totalDays = viewMode === "week" ? 7 : 42; 
+
+    for (let i = 0; i < totalDays; i++) {
+      const d = new Date(start);
+      d.setDate(start.getDate() + i);
+      days.push(d);
+    }
+    return days;
+  }, [dateRange, viewMode]);
+
+  // Lọc lịch học cho một ngày cụ thể
+  const getSchedulesForDate = (date) => {
+    const dateStr = date.toISOString().split('T')[0];
+    return schedules.filter(s => {
+      // Giả sử API trả về field 'date' hoặc 'startTime' chứa ngày
+      // Cần điều chỉnh tùy theo cấu trúc object trả về thực tế của DB bạn
+      const scheduleDate = s.date || s.startTime; 
+      return scheduleDate && scheduleDate.startsWith(dateStr);
+    }).sort((a, b) => (a.startTime || "").localeCompare(b.startTime || ""));
+  };
+
+  const isToday = (date) => {
+    const today = new Date();
+    return date.getDate() === today.getDate() &&
+      date.getMonth() === today.getMonth() &&
+      date.getFullYear() === today.getFullYear();
+  };
+
+  const isSameMonth = (date) => {
+    return date.getMonth() === currentDate.getMonth();
+  };
+
+  if (loading && schedules.length === 0) return <Loading />;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b">
-        <div className="max-w-4xl mx-auto px-4 py-6">
+    <div className="min-h-screen bg-gray-50/30 font-sans p-6 md:p-8">
+      {/* Header Section */}
+      <div className="max-w-7xl mx-auto mb-8">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <button
-              onClick={() => navigate("/student")}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              onClick={() => navigate(-1)}
+              className="p-2 bg-white rounded-lg shadow-sm border border-gray-100 hover:bg-gray-50 text-gray-500 hover:text-[var(--color-primary)] transition-colors"
             >
-              <ArrowLeft size={24} className="text-gray-600" />
+              <ArrowLeft size={20} />
             </button>
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
-                <Calendar size={32} className="text-blue-600" />
-                Lớp Học Của Tôi
+              <h1 className="text-2xl font-bold text-[var(--color-primary)] flex items-center gap-3">
+                <div className="p-2 bg-[var(--color-primary)] rounded-lg shadow-sm">
+                  <CalendarIcon size={20} className="text-white" />
+                </div>
+                Thời Khóa Biểu
               </h1>
-              <p className="text-gray-600 mt-1">
-                Xem danh sách lớp học và lịch biểu
+              <p className="text-gray-500 text-sm mt-1 ml-12">
+                Quản lý lịch học của <span className="font-bold text-[var(--color-secondary)]">{user?.fullName}</span>
               </p>
             </div>
-            <div className="ml-auto flex items-center gap-3">
-              <select
-                value={viewMode}
-                onChange={(e) => {
-                  setViewMode(e.target.value);
-                  loadSchedulesForPeriod(e.target.value, selectedDate);
-                }}
-                className="border rounded px-3 py-2"
-              >
-                <option value="week">Tuần</option>
-                <option value="month">Tháng</option>
-              </select>
+          </div>
 
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => {
-                  setSelectedDate(e.target.value);
-                  loadSchedulesForPeriod(viewMode, e.target.value);
-                }}
-                className="border rounded px-3 py-2"
-              />
+          {/* Controls */}
+          <div className="flex flex-wrap items-center gap-3 bg-white p-2 rounded-xl shadow-sm border border-gray-100">
+            <div className="flex items-center bg-gray-100 rounded-lg p-1">
               <button
-                onClick={() => loadSchedulesForPeriod()}
-                className="bg-blue-600 text-white px-3 py-2 rounded"
+                onClick={() => setViewMode("week")}
+                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
+                  viewMode === "week"
+                    ? "bg-white text-[var(--color-primary)] shadow-sm"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
               >
-                Tải
+                Tuần
+              </button>
+              <button
+                onClick={() => setViewMode("month")}
+                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
+                  viewMode === "month"
+                    ? "bg-white text-[var(--color-primary)] shadow-sm"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                Tháng
               </button>
             </div>
+
+            <div className="h-6 w-px bg-gray-200 mx-1"></div>
+
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={handlePrev}
+                className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-600"
+              >
+                <ChevronLeft size={20} />
+              </button>
+              <span className="text-sm font-bold text-[var(--color-primary)] min-w-[140px] text-center">
+                {viewMode === 'week' 
+                  ? `Tuần ${dateRange.startDateObj.getDate()}/${dateRange.startDateObj.getMonth()+1} - ${dateRange.endDateObj.getDate()}/${dateRange.endDateObj.getMonth()+1}`
+                  : `Tháng ${currentDate.getMonth() + 1}, ${currentDate.getFullYear()}`
+                }
+              </span>
+              <button 
+                onClick={handleNext}
+                className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-600"
+              >
+                <ChevronRight size={20} />
+              </button>
+            </div>
+
+            <button 
+              onClick={handleToday}
+              className="text-sm font-medium text-[var(--color-secondary)] hover:bg-[var(--color-secondary)]/10 px-3 py-1.5 rounded-lg transition-colors"
+            >
+              Hôm nay
+            </button>
           </div>
         </div>
       </div>
 
       {/* Error Alert */}
       {error && (
-        <div className="max-w-4xl mx-auto px-4 py-4">
-          <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-lg">
-            <AlertCircle className="text-red-600" size={20} />
-            <p className="text-sm text-red-800">{error}</p>
+        <div className="max-w-7xl mx-auto mb-6">
+          <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-100 rounded-lg">
+            <AlertCircle className="text-[var(--color-danger)]" size={20} />
+            <p className="text-sm text-[var(--color-danger)]">{error}</p>
           </div>
         </div>
       )}
 
-      {/* Classes List */}
-      <div className="max-w-6xl mx-auto px-4 py-8">
-        {/* Period overview removed — keeping timetable table below */}
+      {/* Calendar Grid */}
+      <div className="max-w-7xl mx-auto">
+        {/* Days Header */}
+        <div className="grid grid-cols-7 gap-4 mb-4">
+          {["Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7", "CN"].map((day, index) => (
+            <div key={index} className="text-center font-bold text-gray-400 text-sm uppercase tracking-wider">
+              {day}
+            </div>
+          ))}
+        </div>
 
-        {/* Timetable table: rooms vs days */}
-        <div className="overflow-auto bg-white border rounded">
-          {(() => {
-            const { start } = computePeriodRange(viewMode, selectedDate);
-            const startDate = new Date(start);
-            const days = [];
-            for (let i = 0; i < 7; i++) {
-              const d = new Date(startDate);
-              d.setDate(startDate.getDate() + i);
-              days.push(d);
+        {/* Calendar Body */}
+        <div className="grid grid-cols-7 gap-4 auto-rows-fr">
+          {calendarDays.map((date, index) => {
+            const daySchedules = getSchedulesForDate(date);
+            const isCurrentMonth = viewMode === 'week' || isSameMonth(date);
+            const isTodayDate = isToday(date);
+
+            // Ẩn ngày của tháng khác nếu đang ở chế độ xem Tháng để giao diện sạch hơn (hoặc làm mờ)
+            if (viewMode === 'month' && !isCurrentMonth && daySchedules.length === 0) {
+               return <div key={index} className="min-h-[120px] bg-transparent"></div>; 
             }
-
-            // collect rooms from schedules and enrolled classes
-            const roomSet = new Set();
-            periodSchedules.forEach((s) => {
-              const r =
-                s.room ||
-                s.classroom ||
-                s.roomName ||
-                (s.class && s.class.room);
-              if (r) roomSet.add(r);
-            });
-            enrolledClasses.forEach((c) => {
-              if (c.room) roomSet.add(c.room);
-            });
-            const rooms = Array.from(roomSet);
-            if (rooms.length === 0) {
-              return (
-                <div className="p-6 text-center text-gray-500">
-                  Không có thông tin phòng
-                </div>
-              );
-            }
-
-            const formatDateKey = (d) => d.toISOString().slice(0, 10);
-
-            const schedulesForCell = (room, d) => {
-              const key = formatDateKey(d);
-              return periodSchedules.filter((s) => {
-                const sRoom =
-                  s.room ||
-                  s.classroom ||
-                  s.roomName ||
-                  (s.class && s.class.room) ||
-                  "";
-                if (s.date) {
-                  const sDate = new Date(s.date);
-                  if (sDate.toISOString().slice(0, 10) !== key) return false;
-                } else if (s.dayOfWeek !== undefined && s.dayOfWeek !== null) {
-                  const targetWeekday = d.getDay();
-                  if (typeof s.dayOfWeek === "number") {
-                    if (
-                      s.dayOfWeek !== targetWeekday &&
-                      s.dayOfWeek % 7 !== targetWeekday
-                    )
-                      return false;
-                  } else if (typeof s.dayOfWeek === "string") {
-                    const map = {
-                      sunday: 0,
-                      monday: 1,
-                      tuesday: 2,
-                      wednesday: 3,
-                      thursday: 4,
-                      friday: 5,
-                      saturday: 6,
-                      "chủ nhật": 0,
-                      "thứ hai": 1,
-                      "thứ ba": 2,
-                      "thứ tư": 3,
-                      "thứ năm": 4,
-                      "thứ sáu": 5,
-                      "thứ bảy": 6,
-                    };
-                    const w = map[s.dayOfWeek.toLowerCase()] ?? null;
-                    if (w !== targetWeekday) return false;
-                  }
-                } else {
-                  return false;
-                }
-                // room match
-                if (room && sRoom) return sRoom === room;
-                if (!room && !sRoom) return true;
-                return false;
-              });
-            };
 
             return (
-              <table className="min-w-full table-auto border-collapse">
-                <thead>
-                  <tr>
-                    <th className="border p-2 bg-gray-100">Phòng</th>
-                    {days.map((d, i) => (
-                      <th
-                        key={i}
-                        className="border p-2 bg-blue-700 text-white text-sm"
+              <div
+                key={index}
+                className={`
+                  min-h-[150px] rounded-xl border p-2 transition-all duration-200
+                  ${isTodayDate 
+                    ? "bg-white border-[var(--color-secondary)] shadow-md ring-1 ring-[var(--color-secondary)]" 
+                    : isCurrentMonth 
+                      ? "bg-white border-gray-100 shadow-[var(--shadow-card)]" 
+                      : "bg-gray-50/50 border-dashed border-gray-200 opacity-60"
+                  }
+                `}
+              >
+                {/* Date Number */}
+                <div className="flex justify-between items-start mb-2">
+                  <span 
+                    className={`
+                      text-sm font-bold w-7 h-7 flex items-center justify-center rounded-full
+                      ${isTodayDate 
+                        ? "bg-[var(--color-secondary)] text-white" 
+                        : isCurrentMonth 
+                          ? "text-gray-700" 
+                          : "text-gray-400"
+                      }
+                    `}
+                  >
+                    {date.getDate()}
+                  </span>
+                  {daySchedules.length > 0 && (
+                    <span className="text-[10px] font-bold text-[var(--color-primary)] bg-blue-50 px-1.5 py-0.5 rounded-md">
+                      {daySchedules.length} lớp
+                    </span>
+                  )}
+                </div>
+
+                {/* Schedule Items */}
+                <div className="space-y-2">
+                  {daySchedules.length > 0 ? (
+                    daySchedules.map((schedule, idx) => (
+                      <div
+                        key={schedule._id || idx}
+                        className={`
+                          p-2 rounded-lg text-xs border-l-2 cursor-pointer hover:shadow-md transition-shadow
+                          bg-[var(--color-secondary)]/5 border-[var(--color-secondary)]
+                        `}
+                        onClick={() => navigate(`/student/courses/${schedule.course?._id || schedule.class?.course}`)}
                       >
-                        <div>
-                          {d.toLocaleDateString("vi-VN", { weekday: "short" })}
+                        <div className="font-bold text-[var(--color-primary)] truncate" title={schedule.course?.name || schedule.class?.name}>
+                          {schedule.course?.name || schedule.class?.name || "Lớp học"}
                         </div>
-                        <div className="text-xs">
-                          {d.toLocaleDateString("vi-VN")}
+                        <div className="flex items-center gap-1 text-gray-500 mt-1">
+                          <Clock size={10} />
+                          <span>{schedule.startTime?.slice(0, 5)} - {schedule.endTime?.slice(0, 5)}</span>
                         </div>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {rooms.map((room, ri) => (
-                    <tr key={ri} className="align-top">
-                      <td className="border p-2 bg-gray-100 font-medium">
-                        {room}
-                      </td>
-                      {days.map((d, ci) => (
-                        <td key={ci} className="border p-2 align-top min-h-28">
-                          <div className="space-y-2">
-                            {schedulesForCell(room, d).map((s, si) => (
-                              <div
-                                key={si}
-                                className="p-2 bg-blue-50 border border-blue-100 rounded text-center text-sm"
-                              >
-                                <div className="font-semibold text-blue-800">
-                                  {s.course?.name || s.topic || "Buổi học"}
-                                </div>
-                                <div className="text-xs text-gray-600">
-                                  {s.startTime || ""}
-                                  {s.startTime && s.endTime
-                                    ? ` - ${s.endTime}`
-                                    : ""}
-                                </div>
-                                <div className="text-xs text-gray-600">
-                                  {s.group ? `Nhóm: ${s.group}` : ""}
-                                </div>
-                                <div className="text-xs text-gray-600">
-                                  {s.teacher?.fullName || s.teacher || ""}
-                                </div>
-                              </div>
-                            ))}
+                        {(schedule.room || schedule.classroom) && (
+                           <div className="flex items-center gap-1 text-gray-500 mt-0.5">
+                            <MapPin size={10} />
+                            <span className="truncate">{schedule.room || schedule.classroom}</span>
                           </div>
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                        )}
+                      </div>
+                    ))
+                  ) : (
+                    // Empty visual for today if no class
+                    isTodayDate && (
+                      <div className="h-full flex flex-col items-center justify-center text-gray-300 mt-4">
+                        <BookOpen size={24} className="opacity-20" />
+                        <span className="text-[10px] mt-1">Trống</span>
+                      </div>
+                    )
+                  )}
+                </div>
+              </div>
             );
-          })()}
+          })}
         </div>
       </div>
     </div>

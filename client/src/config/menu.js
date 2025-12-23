@@ -39,12 +39,7 @@ export const directorMenu = [
         icon: "🏫",
         description: "Sĩ số và tình trạng lớp học",
       },
-      {
-        path: "/reports/teachers",
-        label: "Hiệu Suất Giảng Viên",
-        icon: "👨‍🏫",
-        description: "Đánh giá hiệu suất giảng dạy",
-      },
+
       {
         path: "/reports/retention",
         label: "Tỉ Lệ Nghỉ Và Bảo Lưu",
@@ -63,94 +58,10 @@ export const directorMenu = [
         description: "Tạo và quản lý tài khoản",
       },
       {
-        path: "/departments",
-        label: "Tổng Quan Bộ Phận",
-        icon: "🏢",
-        description: "Hoạt động ghi danh, học vụ, kế toán",
-      },
-      {
         path: "/notifications",
         label: "Thông Báo Hệ Thống",
         icon: "🔔",
         description: "Nhận thông báo quan trọng",
-      },
-    ],
-  },
-];
-
-export const teacherMenu = [
-  {
-    title: "TRANG CÁ NHÂN",
-    items: [
-      {
-        path: "/dashboard",
-        label: "Tổng Quan",
-        icon: "📊",
-        description: "Thống kê lớp học và tiến độ giảng dạy",
-      },
-      {
-        path: "/profile",
-        label: "Thông Tin Cá Nhân",
-        icon: "👤",
-        description: "Quản lý thông tin cá nhân",
-      },
-      {
-        path: "/notifications",
-        label: "Thông Báo",
-        icon: "🔔",
-        description: "Xem thông báo từ trung tâm",
-      },
-    ],
-  },
-  {
-    title: "TRA CỨU THÔNG TIN",
-    items: [
-      {
-        path: "/classes",
-        label: "Lớp Đang Dạy",
-        icon: "🏫",
-        description: "Danh sách lớp đang giảng dạy",
-      },
-      {
-        path: "/schedule",
-        label: "Lịch Giảng Dạy",
-        icon: "📅",
-        description: "Xem lịch dạy theo ngày/tuần/tháng",
-      },
-      {
-        path: "/students",
-        label: "Danh Sách Học Viên",
-        icon: "�",
-        description: "Xem học viên của các lớp",
-      },
-    ],
-  },
-  {
-    title: "CHỨC NĂNG TRỰC TUYẾN",
-    items: [
-      {
-        path: "/attendance",
-        label: "Điểm Danh",
-        icon: "✅",
-        description: "Điểm danh học viên",
-      },
-      {
-        path: "/grades",
-        label: "Nhập Điểm",
-        icon: "📝",
-        description: "Nhập và cập nhật điểm học viên",
-      },
-      {
-        path: "/evaluation",
-        label: "Đánh Giá Học Viên",
-        icon: "⭐",
-        description: "Ghi nhận nhận xét và đánh giá",
-      },
-      {
-        path: "/reports",
-        label: "Báo Cáo Cuối Khóa",
-        icon: "�",
-        description: "Gửi báo cáo và phản hồi",
       },
     ],
   },
@@ -449,8 +360,6 @@ export const getMenuByRole = (role) => {
   switch (role) {
     case "director":
       return directorMenu;
-    case "teacher":
-      return teacherMenu;
     case "student":
       return studentMenu;
     case "enrollment":
@@ -466,7 +375,6 @@ export const getMenuByRole = (role) => {
 
 export default {
   directorMenu,
-  teacherMenu,
   studentMenu,
   enrollmentStaffMenu,
   academicStaffMenu,

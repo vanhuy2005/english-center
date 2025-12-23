@@ -134,6 +134,14 @@ exports.createRequest = async (req, res) => {
       });
     }
 
+    // Validate reason length (minimum 10 characters)
+    if (reason.trim().length < 10) {
+      return res.status(400).json({
+        success: false,
+        message: "Lý do phải có ít nhất 10 ký tự",
+      });
+    }
+
     // Verify student exists
     const studentExists = await Student.findById(studentId);
     if (!studentExists) {
