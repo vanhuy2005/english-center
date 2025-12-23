@@ -298,8 +298,8 @@ Nếu gặp vấn đề trong quá trình cài đặt hoặc sử dụng:
 1. Xem [INSTALLATION.md](docs/INSTALLATION.md) và [DATABASE_SETUP.md](docs/DATABASE_SETUP.md)
 2. Kiểm tra [Issues](https://github.com/vanhuy2005/english-center/issues)
 3. Tạo issue mới nếu chưa có giải pháp
-4. Liên hệ email: nguyen.van.quang.huy.2105@gmail.com
+4. Liên hệ email: 4901104009@hcmue.student.edu.vn
 
 ---
 
-**Made with ❤️ by Nguyen Van Quang Huy**
+**Made with ❤️ by Group C.503**
