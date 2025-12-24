@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 require("dotenv").config();
 
-const connectDB = require("./src/config/database");
-const Staff = require("./src/shared/models/Staff.model");
+const connectDB = require("../src/config/database");
+const Staff = require("../src/shared/models/Staff.model");
 
 const DEFAULT = {
   email: process.env.SEED_DIRECTOR_EMAIL || "director@example.com",

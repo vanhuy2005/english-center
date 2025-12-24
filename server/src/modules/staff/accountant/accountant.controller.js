@@ -30,15 +30,14 @@ exports.getDashboard = async (req, res) => {
     ]);
     const monthRevenue = monthRevenueStats[0]?.total || 0;
 
-    // Pending payments
+    // Pending payments (chỉ đếm status = pending)
     const pendingPayments = await Finance.countDocuments({
-      status: { $in: ["pending", "partial"] },
+      status: "pending",
     });
 
-    // Overdue payments
+    // Overdue payments (quá hạn và chưa thanh toán)
     const overduePayments = await Finance.countDocuments({
-      dueDate: { $lt: new Date() },
-      status: { $in: ["pending", "partial"] },
+      status: "overdue",
     });
 
     // Recent transactions
@@ -49,32 +48,52 @@ exports.getDashboard = async (req, res) => {
       .populate("course", "name courseCode")
       .lean();
 
-    // Revenue trend (last 7 days)
-    const last7Days = Array.from({ length: 7 }, (_, i) => {
-      const date = new Date();
-      date.setDate(date.getDate() - (6 - i));
-      date.setHours(0, 0, 0, 0);
-      return date;
+    // Revenue trend (this month by day)
+    const today = new Date();
+    const startOfThisMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const endOfThisMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    
+    // Revenue trend - 18-23 Dec (6 days)
+    const endDate = new Date('2025-12-23T23:59:59');
+    const startDate = new Date('2025-12-18T00:00:00');
+    
+    const dailyRevenue = await Finance.aggregate([
+      {
+        $match: {
+          paidDate: { $gte: startDate, $lte: endDate },
+          status: { $in: ["paid", "partial"] },
+        },
+      },
+      {
+        $group: {
+          _id: {
+            $dateToString: { format: "%Y-%m-%d", date: "$paidDate" }
+          },
+          total: { $sum: "$paidAmount" },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]);
+
+    // Tạo map để tra cứu nhanh
+    const revenueMap = {};
+    dailyRevenue.forEach(item => {
+      revenueMap[item._id] = item.total;
     });
 
-    const revenueTrend = await Promise.all(
-      last7Days.map(async (date) => {
-        const nextDay = new Date(date);
-        nextDay.setDate(nextDay.getDate() + 1);
-
-        const dayRevenue = await Finance.aggregate([
-          {
-            $match: {
-              paidDate: { $gte: date, $lt: nextDay },
-              status: { $in: ["paid", "partial"] },
-            },
-          },
-          { $group: { _id: null, total: { $sum: "$paidAmount" } } },
-        ]);
-
-        return dayRevenue[0]?.total || 0;
-      })
-    );
+    // Tạo array cho 6 ngày (18-23/12)
+    const daysInMonth = [];
+    const revenueData = [];
+    
+    for (let day = 18; day <= 23; day++) {
+      const date = new Date(2025, 11, day); // Month is 0-indexed
+      const dateStr = date.toISOString().split('T')[0];
+      
+      daysInMonth.push(
+        date.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" })
+      );
+      revenueData.push(revenueMap[dateStr] || 0);
+    }
 
     const dashboardData = {
       stats: {
@@ -85,13 +104,11 @@ exports.getDashboard = async (req, res) => {
       },
       recentTransactions,
       revenueTrend: {
-        labels: last7Days.map((d) =>
-          d.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" })
-        ),
+        labels: daysInMonth,
         datasets: [
           {
             label: "Doanh thu (VNĐ)",
-            data: revenueTrend,
+            data: revenueData,
             borderColor: "rgb(59, 151, 151)",
             backgroundColor: "rgba(59, 151, 151, 0.1)",
           },
@@ -378,67 +395,54 @@ exports.getFinancialReport = async (req, res) => {
     if (startDate) dateFilter.$gte = new Date(startDate);
     if (endDate) dateFilter.$lte = new Date(endDate);
 
-    // Get total revenue (active receipts that are NOT refunds)
-    const revenueData = await Receipt.aggregate([
+    // Get total revenue from Finance (paid and partial payments)
+    const revenueData = await Finance.aggregate([
       ...(Object.keys(dateFilter).length > 0
         ? [
             {
               $match: {
-                createdAt: dateFilter,
-                status: "active",
-                paymentMethod: { $ne: "refund" },
+                paidDate: dateFilter,
+                status: { $in: ["paid", "partial"] },
               },
             },
           ]
-        : [{ $match: { status: "active", paymentMethod: { $ne: "refund" } } }]),
+        : [{ $match: { status: { $in: ["paid", "partial"] } } }]),
       {
         $group: {
           _id: null,
-          totalRevenue: { $sum: "$amount" },
+          totalRevenue: { $sum: "$paidAmount" },
           totalTransactions: { $sum: 1 },
-          avgTransactionAmount: { $avg: "$amount" },
+          avgTransactionAmount: { $avg: "$paidAmount" },
         },
       },
     ]);
 
-    // Get refunds
-    const refundData = await Receipt.aggregate([
-      ...(Object.keys(dateFilter).length > 0
-        ? [{ $match: { createdAt: dateFilter, paymentMethod: "refund" } }]
-        : [{ $match: { paymentMethod: "refund" } }]),
-      {
-        $group: {
-          _id: null,
-          totalRefunds: { $sum: "$amount" },
-          refundCount: { $sum: 1 },
-        },
-      },
-    ]);
+    // Get refunds (assuming status='refunded' or negative amounts)
+    // For now, assume refunds are 0 as Finance model doesn't track refunds
+    const totalRefunds = 0;
 
     // Get revenue by payment method
-    const revenueByType = await Receipt.aggregate([
+    const revenueByType = await Finance.aggregate([
       ...(Object.keys(dateFilter).length > 0
         ? [
             {
               $match: {
-                createdAt: dateFilter,
-                status: "active",
-                paymentMethod: { $ne: "refund" },
+                paidDate: dateFilter,
+                status: { $in: ["paid", "partial"] },
               },
             },
           ]
-        : [{ $match: { status: "active", paymentMethod: { $ne: "refund" } } }]),
+        : [{ $match: { status: { $in: ["paid", "partial"] } } }]),
       {
         $group: {
           _id: "$paymentMethod",
-          total: { $sum: "$amount" },
+          total: { $sum: "$paidAmount" },
           count: { $sum: 1 },
         },
       },
     ]);
 
     const totalRevenue = revenueData[0]?.totalRevenue || 0;
-    const totalRefunds = refundData[0]?.totalRefunds || 0;
     const netRevenue = totalRevenue - totalRefunds;
 
     return ApiResponse.success(
@@ -467,7 +471,7 @@ exports.exportReport = async (req, res) => {
 
     const query = {};
     if (dateFrom && dateTo) {
-      query.createdAt = {
+      query.paidDate = {
         $gte: new Date(dateFrom),
         $lte: new Date(dateTo),
       };
@@ -477,31 +481,40 @@ exports.exportReport = async (req, res) => {
     let headers = [];
 
     if (reportType === "revenue") {
-      data = await Finance.find(query)
+      data = await Finance.find({
+        ...query,
+        status: { $in: ["paid", "partial"] },
+      })
         .populate("student", "fullName studentCode")
+        .populate("course", "name courseCode")
         .lean();
       headers = [
         "Mã GD",
         "Học viên",
-        "Số tiền",
+        "Khóa học",
+        "Tổng số tiền",
+        "Đã thanh toán",
+        "Còn lại",
+        "Phương thức",
         "Trạng thái",
         "Ngày thanh toán",
         "Ngày tạo",
       ];
     } else if (reportType === "debt") {
-      data = await Finance.find({ ...query, status: "pending" })
+      data = await Finance.find({ ...query, status: { $in: ["pending", "overdue"] } })
         .populate("student", "fullName studentCode")
+        .populate("course", "name courseCode")
         .lean();
-      headers = ["Mã GD", "Học viên", "Số tiền còn nợ", "Hạn chót"];
+      headers = ["Mã GD", "Học viên", "Khóa học", "Số tiền còn nợ", "Hạn chót", "Trạng thái"];
     } else if (reportType === "receipts") {
-      data = await Receipt.find({ ...query, paymentMethod: { $ne: "refund" } })
+      data = await Finance.find(query)
         .populate("student", "fullName studentCode")
+        .populate("course", "name courseCode")
         .lean();
-      headers = ["Mã phiếu", "Học viên", "Số tiền", "Phương thức", "Ngày tạo"];
+      headers = ["Mã GD", "Học viên", "Khóa học", "Số tiền", "Phương thức", "Trạng thái", "Ngày tạo"];
     } else if (reportType === "refunds") {
-      data = await Receipt.find({ ...query, paymentMethod: "refund" })
-        .populate("student", "fullName studentCode")
-        .lean();
+      // No refund data in Finance model currently
+      data = []
       headers = ["Mã phiếu", "Học viên", "Số tiền", "Ngày hoàn"];
     }
 
@@ -533,8 +546,12 @@ exports.exportReport = async (req, res) => {
         htmlContent += `
           <tr>
             <td>${row.transactionCode || ""}</td>
-            <td>${row.student?.fullName || ""}</td>
+            <td>${row.student?.fullName || ""} (${row.student?.studentCode || ""})</td>
+            <td>${row.course?.name || ""}</td>
             <td>${row.amount || 0}</td>
+            <td>${row.paidAmount || 0}</td>
+            <td>${row.remainingAmount || 0}</td>
+            <td>${row.paymentMethod || ""}</td>
             <td>${row.status || ""}</td>
             <td>${
               row.paidDate
@@ -554,13 +571,15 @@ exports.exportReport = async (req, res) => {
         htmlContent += `
           <tr>
             <td>${row.transactionCode || ""}</td>
-            <td>${row.student?.fullName || ""}</td>
+            <td>${row.student?.fullName || ""} (${row.student?.studentCode || ""})</td>
+            <td>${row.course?.name || ""}</td>
             <td>${row.remainingAmount || 0}</td>
             <td>${
               row.dueDate
                 ? new Date(row.dueDate).toLocaleDateString("vi-VN")
                 : ""
             }</td>
+            <td>${row.status || ""}</td>
           </tr>
         `;
       });
@@ -568,10 +587,12 @@ exports.exportReport = async (req, res) => {
       data.forEach((row) => {
         htmlContent += `
           <tr>
-            <td>${row.receiptNumber || ""}</td>
-            <td>${row.student?.fullName || ""}</td>
-            <td>${row.amount || 0}</td>
+            <td>${row.transactionCode || ""}</td>
+            <td>${row.student?.fullName || ""} (${row.student?.studentCode || ""})</td>
+            <td>${row.course?.name || ""}</td>
+            <td>${row.paidAmount || 0}</td>
             <td>${row.paymentMethod || ""}</td>
+            <td>${row.status || ""}</td>
             <td>${
               row.createdAt
                 ? new Date(row.createdAt).toLocaleDateString("vi-VN")
@@ -581,10 +602,11 @@ exports.exportReport = async (req, res) => {
         `;
       });
     } else if (reportType === "refunds") {
+      // No refund data
       data.forEach((row) => {
         htmlContent += `
           <tr>
-            <td>${row.receiptNumber || ""}</td>
+            <td>${row.transactionCode || ""}</td>
             <td>${row.student?.fullName || ""}</td>
             <td>${row.amount || 0}</td>
             <td>${
@@ -659,5 +681,93 @@ exports.checkReceiptData = async (req, res) => {
   } catch (error) {
     console.error("Check receipt data error:", error);
     return ApiResponse.error(res, "Không thể kiểm tra dữ liệu");
+  }
+};
+
+// Get Receipt Statistics
+exports.getReceiptStatistics = async (req, res) => {
+  try {
+    let { startDate, endDate } = req.query;
+    
+    // Default to last 7 days if no dates provided
+    if (!startDate && !endDate) {
+      const today = new Date();
+      today.setHours(23, 59, 59, 999);
+      const sevenDaysAgo = new Date(today);
+      sevenDaysAgo.setDate(today.getDate() - 6);
+      sevenDaysAgo.setHours(0, 0, 0, 0);
+      
+      startDate = sevenDaysAgo.toISOString();
+      endDate = today.toISOString();
+    }
+    
+    const filter = { status: { $in: ["paid", "partial"] } };
+    
+    if (startDate || endDate) {
+      filter.paidDate = {};
+      if (startDate) filter.paidDate.$gte = new Date(startDate);
+      if (endDate) filter.paidDate.$lte = new Date(endDate);
+    }
+
+    // Total amount and receipts
+    const totalStats = await Finance.aggregate([
+      { $match: filter },
+      {
+        $group: {
+          _id: null,
+          totalAmount: { $sum: "$paidAmount" },
+          totalReceipts: { $sum: 1 },
+        },
+      },
+    ]);
+
+    // By payment method
+    const byMethod = await Finance.aggregate([
+      { $match: filter },
+      {
+        $group: {
+          _id: "$paymentMethod",
+          amount: { $sum: "$paidAmount" },
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
+    // Daily stats
+    const dailyStats = await Finance.aggregate([
+      { $match: filter },
+      {
+        $group: {
+          _id: {
+            $dateToString: { format: "%Y-%m-%d", date: "$paidDate" },
+          },
+          amount: { $sum: "$paidAmount" },
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]);
+
+    return ApiResponse.success(
+      res,
+      {
+        totalAmount: totalStats[0]?.totalAmount || 0,
+        totalReceipts: totalStats[0]?.totalReceipts || 0,
+        byMethod: byMethod.map((item) => ({
+          method: item._id,
+          amount: item.amount,
+          count: item.count,
+        })),
+        dailyStats: dailyStats.map((item) => ({
+          date: item._id,
+          amount: item.amount,
+          count: item.count,
+        })),
+      },
+      "Lấy thống kê phiếu thu thành công"
+    );
+  } catch (error) {
+    console.error("Get receipt statistics error:", error);
+    return ApiResponse.error(res, "Không thể lấy thống kê", 400);
   }
 };

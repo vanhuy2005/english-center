@@ -25,6 +25,9 @@ router.get(
   accountantController.getStudentPayments
 );
 
+// ==================== RECEIPTS ====================
+router.get("/receipts/statistics", accountantController.getReceiptStatistics);
+
 // ==================== REPORTS ====================
 router.get("/reports/financial", accountantController.getFinancialReport);
 router.post("/reports/export", accountantController.exportReport);

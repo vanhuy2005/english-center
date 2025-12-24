@@ -88,11 +88,9 @@ const RefundTuitionPage = () => {
         studentId: formData.studentId,
         classId: formData.classId,
         amount: Number(formData.amount),
-        type: 'refund',
-        paymentMethod: formData.refundMethod,
-        description: `Hoàn học phí - ${getReasonLabel(formData.reason)}`,
-        note: formData.note,
-        status: 'refunded'
+        paymentMethod: 'refund', // Mark as refund type
+        description: `Hoàn học phí - ${getReasonLabel(formData.reason)}${formData.note ? ` - ${formData.note}` : ''}`,
+        note: `Phương thức hoàn: ${formData.refundMethod}`,
       };
 
       console.log("📝 Sending refund receipt data:", receiptData);

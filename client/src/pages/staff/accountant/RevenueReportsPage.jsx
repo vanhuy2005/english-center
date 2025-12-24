@@ -60,6 +60,7 @@ const RevenueReportsPage = () => {
               {
                 label: "Doanh Thu",
                 data: (data.revenueByType || []).map((item) => item.total || 0),
+                counts: (data.revenueByType || []).map((item) => item.count || 0),
                 backgroundColor: ["#10b981", "#3b82f6", "#f59e0b", "#ef4444"],
                 borderRadius: 4,
               },
@@ -143,6 +144,29 @@ const RevenueReportsPage = () => {
     }).format(amount);
   };
 
+  const handleExportReport = async () => {
+    try {
+      const response = await api.post("/staff/accountant/reports/export", {
+        reportType: "revenue",
+        dateFrom: filters.dateFrom,
+        dateTo: filters.dateTo,
+      }, {
+        responseType: 'blob'
+      });
+
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `bao_cao_doanh_thu_${Date.now()}.xls`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (error) {
+      console.error("Export error:", error);
+      alert("Không thể xuất báo cáo. Vui lòng thử lại!");
+    }
+  };
+
   const StatCard = ({ title, value, subtext, icon: Icon, colorClass, bgClass }) => (
     <div className={`p-6 rounded-xl border border-gray-100 shadow-sm ${bgClass}`}>
       <div className="flex justify-between items-start">
@@ -177,7 +201,7 @@ const RevenueReportsPage = () => {
             <Button variant="outline" onClick={loadReport} className="flex items-center gap-2">
                 <RefreshCw size={16} /> Làm mới
             </Button>
-            <Button className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white">
+            <Button onClick={handleExportReport} className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white">
                 <Download size={16} /> Xuất Báo Cáo
             </Button>
         </div>
@@ -315,28 +339,25 @@ const RevenueReportsPage = () => {
               {reportData.revenueChart?.labels?.length > 0 ? (
                 reportData.revenueChart.labels.map((label, idx) => {
                   const total = reportData.revenueChart.datasets[0]?.data?.[idx] || 0;
-                  // Note: receiptCount is total, ideally we need count per type from backend
-                  // Assuming for now receiptCount applies generally or calculating avg based on available data
-                  // Ideally: backend sends array of { type, count, total }
-                  // Fallback to simple calculation for demo if detail count missing
-                  const count = 1; // Placeholder if specific count per type isn't in chart data
-                  const average = count > 0 ? total / count : 0; 
+                  const count = reportData.revenueChart.datasets[0]?.counts?.[idx] || "-"; 
+                  const average = count !== "-" && count > 0 ? total / count : 0; 
 
                   return (
                     <tr key={idx} className="hover:bg-gray-50 transition-colors">
                       <td className="px-6 py-4 font-medium text-gray-900 capitalize">
-                        {label === 'tuition' ? 'Học phí' : label === 'material' ? 'Tài liệu' : label}
+                        {label === 'cash' ? 'Tiền mặt' : 
+                         label === 'bank_transfer' ? 'Chuyển khoản' : 
+                         label === 'credit_card' ? 'Thẻ tín dụng' :
+                         label === 'momo' ? 'Ví MoMo' : label}
                       </td>
                       <td className="px-6 py-4 text-right text-gray-600">
-                        {/* Placeholder count display - enhance if backend provides specific counts */}
-                        - 
+                        {count}
                       </td>
                       <td className="px-6 py-4 text-right font-bold text-emerald-600">
                         {formatCurrency(total)}
                       </td>
                       <td className="px-6 py-4 text-right text-gray-600">
-                        {/* Placeholder avg */}
-                        -
+                        {count !== "-" && count > 0 ? formatCurrency(average) : "-"}
                       </td>
                     </tr>
                   );

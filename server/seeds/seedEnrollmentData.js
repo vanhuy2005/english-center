@@ -9,7 +9,8 @@ const Staff = require("../src/shared/models/Staff.model");
 
 const connectDB = async () => {
   try {
-    await mongoose.connect(process.env.MONGODB_URI);
+    const mongoUri = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/english_center_dev";
+    await mongoose.connect(mongoUri);
     console.log("✅ MongoDB connected");
   } catch (error) {
     console.error("❌ MongoDB connection error:", error);

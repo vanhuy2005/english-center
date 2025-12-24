@@ -37,7 +37,7 @@ const TuitionStatusPage = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      // Gọi API lấy danh sách học phí
+      // Gọi API lấy danh sách học phí từ Finance
       const response = await financeService.getAll({ limit: 100 });
       
       // Handle different response structures an toàn
@@ -49,9 +49,10 @@ const TuitionStatusPage = () => {
       // Transform API data sang format hiển thị
       const transformedData = financeData.map((item) => ({
         id: item._id,
-        studentId: item.student?.studentId || item.student?._id || "N/A",
+        studentId: item.student?._id || "N/A",
+        studentCode: item.student?.studentCode || "N/A",
         studentName: item.student?.fullName || "Unknown",
-        class: item.course?.courseCode || item.class?.name || "N/A",
+        class: item.course?.name || item.course?.courseCode || "N/A",
         totalAmount: item.amount || 0,
         paidAmount: item.paidAmount || 0,
         remainingAmount: item.remainingAmount || 0,
@@ -122,7 +123,7 @@ const TuitionStatusPage = () => {
   const filteredData = data.filter((item) => {
     const matchSearch =
       searchText === "" ||
-      item.studentId.toLowerCase().includes(searchText.toLowerCase()) ||
+      item.studentCode.toLowerCase().includes(searchText.toLowerCase()) ||
       item.studentName.toLowerCase().includes(searchText.toLowerCase());
     const matchStatus = statusFilter === "all" || item.status === statusFilter;
     return matchSearch && matchStatus;
@@ -263,7 +264,7 @@ const TuitionStatusPage = () => {
                 {filteredData.length > 0 ? (
                   filteredData.map((row) => (
                     <tr key={row.id} className="hover:bg-blue-50/30 transition-colors group">
-                      <td className="px-6 py-4 font-mono text-xs text-gray-600">{row.studentId}</td>
+                      <td className="px-6 py-4 font-mono text-xs text-gray-600">{row.studentCode}</td>
                       <td className="px-6 py-4 font-medium text-[var(--color-primary)]">{row.studentName}</td>
                       <td className="px-6 py-4 text-gray-600">{row.class}</td>
                       <td className="px-6 py-4 text-right font-medium">{formatCurrency(row.totalAmount)}</td>

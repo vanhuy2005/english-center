@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
 import {
   Table,
   Card,
@@ -20,18 +19,16 @@ import {
   FilterOutlined,
 } from "@ant-design/icons";
 import api from "@services/api";
+import { receiptService } from "@services/receiptService";
 import dayjs from "dayjs";
-import * as XLSX from "xlsx";
 
 const StudentPaymentHistoryPage = () => {
-  const { id: urlStudentId } = useParams(); // Get studentId from URL
   const [payments, setPayments] = useState([]);
   const [students, setStudents] = useState([]);
   const [classes, setClasses] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedStudent, setSelectedStudent] = useState(null);
   const [filters, setFilters] = useState({
-    studentId: urlStudentId || "",
+    studentId: "",
     classId: "",
     status: "",
     dateFrom: null,
@@ -54,22 +51,12 @@ const StudentPaymentHistoryPage = () => {
   const fetchInitialData = async () => {
     try {
       const [studentsRes, classesRes] = await Promise.all([
-        api.get("/staff/academic/students"),
-        api.get("/courses"),
+        api.get("/students?limit=1000"),
+        api.get("/classes?limit=1000"),
       ]);
 
-      const studentsData = studentsRes.data?.data || [];
-      const classesData = classesRes.data?.data || [];
-      
-      setStudents(studentsData);
-      setClasses(classesData);
-
-      // If URL has studentId, find and set the student
-      if (urlStudentId) {
-        const student = studentsData.find(s => s._id === urlStudentId);
-        setSelectedStudent(student);
-        setFilters(prev => ({ ...prev, studentId: urlStudentId }));
-      }
+      setStudents(studentsRes.data?.data || []);
+      setClasses(classesRes.data?.data || []);
     } catch (error) {
       console.error("Error fetching initial data:", error);
       message.error("Không thể tải dữ liệu!");
@@ -79,33 +66,27 @@ const StudentPaymentHistoryPage = () => {
   const fetchPayments = async () => {
     setLoading(true);
     try {
-      // Use Finance API
-      let url = "/staff/accountant/transactions";
-      const params = new URLSearchParams();
-      
-      if (filters.studentId) params.append("studentId", filters.studentId);
-      if (filters.classId) params.append("courseId", filters.classId);
-      if (filters.status) params.append("status", filters.status);
-      if (filters.dateFrom) params.append("startDate", filters.dateFrom.format("YYYY-MM-DD"));
-      if (filters.dateTo) params.append("endDate", filters.dateTo.format("YYYY-MM-DD"));
-      params.append("page", pagination.current);
-      params.append("limit", pagination.pageSize);
+      const params = {
+        page: pagination.current,
+        limit: pagination.pageSize,
+      };
 
-      const response = await api.get(`${url}?${params.toString()}`);
-      
-      if (response.data.success) {
-        const data = response.data.data?.receipts || [];
-        const total = response.data.data?.total || data.length;
-        
-        setPayments(data);
-        setPagination((prev) => ({ ...prev, total }));
-      } else {
-        setPayments([]);
-      }
+      if (filters.studentId) params.student = filters.studentId;
+      if (filters.classId) params.class = filters.classId;
+      if (filters.status) params.status = filters.status;
+      if (filters.dateFrom)
+        params.startDate = filters.dateFrom.format("YYYY-MM-DD");
+      if (filters.dateTo) params.endDate = filters.dateTo.format("YYYY-MM-DD");
+
+      const response = await receiptService.getReceipts(params);
+      const data = response.receipts || response.data || [];
+      const total = response.total || data.length;
+
+      setPayments(data);
+      setPagination((prev) => ({ ...prev, total }));
     } catch (error) {
       console.error("Error fetching payments:", error);
       message.error("Không thể tải lịch sử thanh toán!");
-      setPayments([]);
     } finally {
       setLoading(false);
     }
@@ -129,11 +110,8 @@ const StudentPaymentHistoryPage = () => {
 
   const getStatusTag = (status) => {
     const statusMap = {
-      paid: { color: "green", label: "Đã thanh toán" },
-      partial: { color: "blue", label: "Thanh toán một phần" },
-      pending: { color: "orange", label: "Chờ thanh toán" },
-      overdue: { color: "red", label: "Quá hạn" },
-      cancelled: { color: "default", label: "Đã hủy" },
+      active: { color: "green", label: "Hoạt động" },
+      voided: { color: "red", label: "Đã hủy" },
     };
     return (
       <Tag color={statusMap[status]?.color || "default"}>
@@ -144,9 +122,9 @@ const StudentPaymentHistoryPage = () => {
 
   const columns = [
     {
-      title: "Mã GD",
-      dataIndex: "transactionCode",
-      key: "transactionCode",
+      title: "Mã Phiếu",
+      dataIndex: "receiptNumber",
+      key: "receiptNumber",
       width: 120,
       render: (text) => text || "N/A",
     },
@@ -165,40 +143,16 @@ const StudentPaymentHistoryPage = () => {
       render: (text) => text || "N/A",
     },
     {
-      title: "Khóa Học",
-      dataIndex: ["course", "name"],
-      key: "courseName",
-      width: 150,
+      title: "Lớp Học",
+      dataIndex: ["class", "name"],
+      key: "className",
+      width: 120,
       render: (text) => text || "N/A",
     },
     {
-      title: "Tổng Tiền",
+      title: "Số Tiền",
       dataIndex: "amount",
       key: "amount",
-      width: 120,
-      align: "right",
-      render: (amount) =>
-        new Intl.NumberFormat("vi-VN", {
-          style: "currency",
-          currency: "VND",
-        }).format(amount || 0),
-    },
-    {
-      title: "Đã Thanh Toán",
-      dataIndex: "paidAmount",
-      key: "paidAmount",
-      width: 130,
-      align: "right",
-      render: (amount) =>
-        new Intl.NumberFormat("vi-VN", {
-          style: "currency",
-          currency: "VND",
-        }).format(amount || 0),
-    },
-    {
-      title: "Còn Lại",
-      dataIndex: "remainingAmount",
-      key: "remainingAmount",
       width: 120,
       align: "right",
       render: (amount) =>
@@ -232,13 +186,6 @@ const StudentPaymentHistoryPage = () => {
     },
     {
       title: "Ngày Thu",
-      dataIndex: "paidDate",
-      key: "paidDate",
-      width: 130,
-      render: (date) => (date ? dayjs(date).format("DD/MM/YYYY") : "Chưa thanh toán"),
-    },
-    {
-      title: "Ngày Tạo",
       dataIndex: "createdAt",
       key: "createdAt",
       width: 130,
@@ -246,55 +193,57 @@ const StudentPaymentHistoryPage = () => {
     },
     {
       title: "Ghi Chú",
-      dataIndex: "description",
-      key: "description",
-      width: 200,
+      dataIndex: "note",
+      key: "note",
+      width: 150,
       render: (text) => text || "-",
+      ellipsis: true,
     },
   ];
 
   const handleExport = () => {
     try {
-      // Chuẩn bị dữ liệu cho Excel
-      const data = payments.map((p) => ({
-        "Mã GD": p.transactionCode || "",
-        "Mã HV": p.student?.studentCode || "",
-        "Tên Học Viên": p.student?.fullName || "",
-        "Khóa Học": p.course?.name || "",
-        "Tổng Tiền": p.amount || 0,
-        "Đã Thanh Toán": p.paidAmount || 0,
-        "Còn Lại": p.remainingAmount || 0,
-        "Phương Thức": {
-          cash: 'Tiền mặt',
-          bank_transfer: 'Chuyển khoản',
-          credit_card: 'Thẻ tín dụng',
-          momo: 'Momo'
-        }[p.paymentMethod] || p.paymentMethod || "",
-        "Trạng Thái": {
-          paid: 'Đã thanh toán',
-          partial: 'Thanh toán một phần',
-          pending: 'Chờ thanh toán',
-          overdue: 'Quá hạn'
-        }[p.status] || p.status || "",
-        "Ngày Thu": p.paidDate ? dayjs(p.paidDate).format("DD/MM/YYYY") : "Chưa thanh toán",
-        "Ngày Tạo": p.createdAt ? dayjs(p.createdAt).format("DD/MM/YYYY") : "",
-        "Ghi Chú": p.description || ""
-      }));
+      const csv = [
+        [
+          "Mã Phiếu",
+          "Mã HV",
+          "Tên Học Viên",
+          "Lớp Học",
+          "Số Tiền",
+          "Phương Thức",
+          "Trạng Thái",
+          "Ngày Thu",
+        ],
+        ...payments.map((p) => [
+          p.receiptNumber || "",
+          p.student?.studentCode || "",
+          p.student?.fullName || "",
+          p.class?.name || "",
+          p.amount || 0,
+          p.paymentMethod || "",
+          p.status || "",
+          p.createdAt ? dayjs(p.createdAt).format("DD/MM/YYYY") : "",
+        ]),
+      ]
+        .map((r) => r.join(","))
+        .join("\n");
 
-      // Tạo workbook và worksheet
-      const worksheet = XLSX.utils.json_to_sheet(data);
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, "Lịch sử thanh toán");
-
-      // Xuất file Excel
-      XLSX.writeFile(
-        workbook,
-        `LichSuThanhToan_${selectedStudent?.studentCode || "All"}_${dayjs().format("YYYY-MM-DD")}.xlsx`
+      const element = document.createElement("a");
+      element.setAttribute(
+        "href",
+        "data:text/csv;charset=utf-8," + encodeURIComponent(csv)
       );
+      element.setAttribute(
+        "download",
+        `LichSuThanhToan_${dayjs().format("YYYY-MM-DD")}.csv`
+      );
+      element.style.display = "none";
+      document.body.appendChild(element);
+      element.click();
+      document.body.removeChild(element);
 
-      message.success("Xuất file Excel thành công!");
+      message.success("Xuất file thành công!");
     } catch (error) {
-      console.error("Export error:", error);
       message.error("Không thể xuất file!");
     }
   };
@@ -326,10 +275,8 @@ const StudentPaymentHistoryPage = () => {
               <tr>
                 <th>Mã HV</th>
                 <th>Tên Học Viên</th>
-                <th>Khóa Học</th>
-                <th>Tổng Tiền</th>
-                <th>Đã Thanh Toán</th>
-                <th>Còn Lại</th>
+                <th>Lớp Học</th>
+                <th>Số Tiền</th>
                 <th>Trạng Thái</th>
                 <th>Ngày Thanh Toán</th>
                 <th>Ngày Hạn</th>
@@ -342,24 +289,16 @@ const StudentPaymentHistoryPage = () => {
                 <tr>
                   <td>${p.student?.studentCode || ""}</td>
                   <td>${p.student?.fullName || ""}</td>
-                  <td>${p.course?.name || ""}</td>
+                  <td>${p.class?.name || ""}</td>
                   <td>${new Intl.NumberFormat("vi-VN", {
                     style: "currency",
                     currency: "VND",
                   }).format(p.amount || 0)}</td>
-                  <td>${new Intl.NumberFormat("vi-VN", {
-                    style: "currency",
-                    currency: "VND",
-                  }).format(p.paidAmount || 0)}</td>
-                  <td>${new Intl.NumberFormat("vi-VN", {
-                    style: "currency",
-                    currency: "VND",
-                  }).format(p.remainingAmount || 0)}</td>
                   <td>${p.status || ""}</td>
                   <td>${
                     p.paidDate
                       ? dayjs(p.paidDate).format("DD/MM/YYYY")
-                      : "Chưa thanh toán"
+                      : "Chưa thanh"
                   }</td>
                   <td>${
                     p.dueDate ? dayjs(p.dueDate).format("DD/MM/YYYY") : "N/A"
@@ -383,13 +322,9 @@ const StudentPaymentHistoryPage = () => {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-gray-800">
-          Lịch sử tPDFtoán học viên
+          Lịch sử thanh toán học viên
         </h1>
-        <p className="text-gray-500 mt-1">
-          {selectedStudent 
-            ? `Quản lý lịch sử thanh toán của ${selectedStudent.fullName} (${selectedStudent.studentCode})`
-            : "Quản lý lịch sử thanh toán học phí"}
-        </p>
+        <p className="text-gray-500 mt-1">Quản lý lịch sử thanh toán học phí</p>
       </div>
 
       {/* Filters */}
@@ -429,9 +364,9 @@ const StudentPaymentHistoryPage = () => {
                   .includes(input.toLowerCase())
               }
             >
-              {classes.map((course) => (
-                <Select.Option key={course._id} value={course._id}>
-                  {course.name} ({course.courseCode || ""})
+              {classes.map((cls) => (
+                <Select.Option key={cls._id} value={cls._id}>
+                  {cls.name || cls.className} ({cls.classCode})
                 </Select.Option>
               ))}
             </Select>

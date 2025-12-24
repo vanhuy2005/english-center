@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@contexts/AuthContext";
-import { receiptService } from "@services/receiptService";
+import api from "@services/api";
 import { Card, Loading, Badge } from "@components/common";
 import {
   DollarSign,
@@ -47,81 +47,53 @@ const AccountantDashboardPage = () => {
       setLoading(true);
       setError(null);
 
-      // 1. Get Recent Receipts
-      let recentReceipts = [];
-      try {
-        const recentResponse = await receiptService.getRecentReceipts();
-        recentReceipts = recentResponse.receipts || [];
-      } catch (recentError) {
-        console.warn("Failed to load recent receipts:", recentError);
-      }
-
-      // 2. Get All Receipts for Calculation
-      const response = await receiptService.getReceipts({
-        limit: 1000, 
-        sort: "-createdAt",
-      });
-      const receipts = response.data || [];
-
-      // 3. Calculate Stats
-      const totalRevenue = receipts.reduce((sum, r) => sum + (r.amount || 0), 0);
+      // Call backend dashboard API
+      const response = await api.get("/staff/accountant/dashboard");
       
-      const today = new Date();
-      const monthRevenue = receipts
-        .filter((r) => {
-          const receiptDate = new Date(r.createdAt);
-          return (
-            receiptDate.getMonth() === today.getMonth() &&
-            receiptDate.getFullYear() === today.getFullYear()
-          );
-        })
-        .reduce((sum, r) => sum + (r.amount || 0), 0);
-
-      const paidCount = receipts.filter(r => r.status === 'paid').length;
-      const pendingCount = receipts.filter(r => r.status === 'pending').length;
-      const overdueCount = receipts.filter(r => r.status === 'overdue').length;
-
-      // 4. Prepare Chart Data
-      setDashboardData({
-        stats: {
-          totalRevenue,
-          monthRevenue,
-          pendingPayments: pendingCount,
-          overduePayments: overdueCount,
-        },
-        recentTransactions: recentReceipts.map((r) => ({
-          _id: r._id,
-          transactionCode: r.receiptNumber || r._id.substring(0, 8).toUpperCase(),
-          student: r.student,
-          class: r.class,
-          amount: r.amount,
-          status: r.status || "pending",
-          createdAt: r.createdAt,
-          paymentMethod: r.paymentMethod,
-        })),
-        revenueTrend: {
-           labels: ["Tuần 1", "Tuần 2", "Tuần 3", "Tuần 4"],
-           datasets: [{
-              label: "Doanh thu (VND)",
-              data: [monthRevenue * 0.2, monthRevenue * 0.3, monthRevenue * 0.15, monthRevenue * 0.35], // Mock distribution
-              borderColor: "#3b9797", // Secondary Color
-              backgroundColor: "rgba(59, 151, 151, 0.1)",
-              tension: 0.4,
-              fill: true
-           }]
-        },
-        paymentStatus: {
-           labels: ["Đã thanh toán", "Chờ xử lý", "Quá hạn"],
-           datasets: [{
-              data: [paidCount, pendingCount, overdueCount],
-              backgroundColor: ["#10b981", "#f59e0b", "#ef4444"], // Emerald, Amber, Red
-              borderWidth: 0
-           }]
-        }
-      });
+      if (response.data && response.data.success) {
+        const data = response.data.data;
+        
+        // Map backend data to frontend format
+        setDashboardData({
+          stats: {
+            totalRevenue: data.stats.totalRevenue,
+            monthRevenue: data.stats.monthRevenue,
+            pendingPayments: data.stats.pendingPayments,
+            overduePayments: data.stats.overduePayments,
+          },
+          recentTransactions: data.recentTransactions.map((tx) => ({
+            _id: tx._id,
+            transactionCode: tx.transactionCode || tx._id.substring(0, 8).toUpperCase(),
+            student: tx.student,
+            class: tx.course,
+            amount: tx.amount || 0, // Tổng số tiền giao dịch
+            paidAmount: tx.paidAmount || 0, // Số tiền đã trả
+            status: tx.status,
+            createdAt: tx.createdAt,
+            paymentMethod: tx.paymentMethod || 'cash',
+          })),
+          revenueTrend: data.revenueTrend,
+          paymentStatus: data.paymentStatus,
+        });
+      } else {
+        throw new Error("Invalid response from API");
+      }
     } catch (error) {
       console.error("Failed to load dashboard data:", error);
-      setError("error");
+      setError("Không thể tải dữ liệu. Vui lòng thử lại sau.");
+      
+      // Set empty data on error
+      setDashboardData({
+        stats: {
+          totalRevenue: 0,
+          monthRevenue: 0,
+          pendingPayments: 0,
+          overduePayments: 0,
+        },
+        recentTransactions: [],
+        revenueTrend: { labels: [], datasets: [] },
+        paymentStatus: { labels: [], datasets: [] },
+      });
     } finally {
       setLoading(false);
     }
@@ -182,12 +154,33 @@ const AccountantDashboardPage = () => {
      switch(status) {
         case 'paid': return <Badge variant="success">Đã thanh toán</Badge>;
         case 'pending': return <Badge variant="warning">Chờ xử lý</Badge>;
+        case 'partial': return <Badge variant="info">Thanh toán một phần</Badge>;
         case 'overdue': return <Badge variant="danger">Quá hạn</Badge>;
         default: return <Badge variant="secondary">Nháp</Badge>;
      }
   };
 
   if (loading) return <div className="h-screen flex items-center justify-center bg-gray-50"><Loading size="large" /></div>;
+
+  if (error) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-gray-50">
+        <Card className="max-w-md">
+          <div className="text-center py-8">
+            <AlertCircle className="mx-auto text-red-500 mb-4" size={48} />
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Lỗi tải dữ liệu</h3>
+            <p className="text-gray-600 mb-4">{error}</p>
+            <button
+              onClick={() => loadDashboard()}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              Thử lại
+            </button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   const { stats, recentTransactions, revenueTrend, paymentStatus } = dashboardData;
 

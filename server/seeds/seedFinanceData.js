@@ -8,9 +8,9 @@ require('dotenv').config();
 
 // --- IMPORT MODELS (Adjust paths as necessary) ---
 // Assuming standard model names based on your project context
-const Student = require('./models/Student');
-const Course = require('./models/Course');
-const Class = require('./models/Class');
+const Student = require('../src/shared/models/Student.model');
+const Course = require('../src/shared/models/Course.model');
+const Class = require('../src/shared/models/Class.model');
 // Note: If you have a specific 'Tuition' or 'Finance' model, import that.
 // If tuition status is derived from Receipts, we'll seed Receipts.
 // If it's a field in Student, we'll update Students.
@@ -19,14 +19,15 @@ const Class = require('./models/Class');
 // **ADJUSTMENT:** Based on your frontend code using `financeService.getAll`, 
 // let's assume a 'Tuition' model or aggregation from 'Receipts'. 
 // I will seed 'Receipt' data heavily as it's a common pattern.
-const Receipt = require('./models/Receipt'); 
+const Receipt = require('../src/shared/models/Receipt.model'); 
 
 // --- CONFIGURATION ---
 const TARGET_RECORDS = 50; 
 
 const connectDB = async () => {
   try {
-    await mongoose.connect(process.env.MONGO_URI);
+    const mongoUri = process.env.MONGODB_URI || process.env.MONGO_URI || "mongodb://127.0.0.1:27017/english_center_dev";
+    await mongoose.connect(mongoUri);
     console.log('✅ Connected to MongoDB');
   } catch (error) {
     console.error('❌ Connection failed:', error);

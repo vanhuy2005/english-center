@@ -67,8 +67,8 @@ router.post("/login", async (req, res) => {
 
     const refreshToken = jwt.sign(
       { id: user._id, role, userType },
-      process.env.REFRESH_TOKEN_SECRET, // Changed from JWT_REFRESH_SECRET
-      { expiresIn: process.env.REFRESH_TOKEN_EXPIRES_IN || "30d" }
+      process.env.JWT_REFRESH_SECRET,
+      { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || "30d" }
     );
 
     // Save refresh token

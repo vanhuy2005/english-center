@@ -60,6 +60,8 @@ import ExportReportsPage from "@pages/staff/accountant/ExportReportsPage";
 import AccountantSchedulePage from "@pages/staff/accountant/AccountantSchedulePage";
 import AccountantNotificationsPage from "@pages/staff/accountant/AccountantNotificationsPage";
 import AccountantProfilePage from "@pages/staff/accountant/AccountantProfilePage";
+import StudentFinancePage from "@pages/staff/accountant/StudentFinancePage";
+import StudentPaymentHistoryPage from "@pages/staff/accountant/StudentPaymentHistoryPage";
 
 // Student Management
 import StudentListPage from "@pages/student/StudentListPage";
@@ -175,9 +177,10 @@ export const roleRoutes = {
     { path: "/accountant/reports", element: <RevenueReportsPage /> },
     { path: "/accountant/export", element: <ExportReportsPage /> },
     { path: "/accountant/schedule", element: <AccountantSchedulePage /> },
+    { path: "/accountant/students", element: <StudentFinancePage /> },
+    { path: "/accountant/students/:id/payments", element: <StudentPaymentHistoryPage /> },
     { path: "/notifications", element: <AccountantNotificationsPage /> },
     { path: "/profile", element: <AccountantProfilePage /> },
-    { path: "/accountant/students", element: <StudentListPage /> },
     { path: "/students/:id", element: <StudentDetailPage /> },
   ],
 };

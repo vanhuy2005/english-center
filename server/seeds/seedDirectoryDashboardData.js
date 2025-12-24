@@ -6,16 +6,17 @@ const mongoose = require('mongoose');
 require('dotenv').config();
 
 // Import Models (Điều chỉnh đường dẫn theo dự án của bạn)
-const Student = require('./models/Student');
-const Teacher = require('./models/Teacher'); // Hoặc User với role 'teacher'
-const Course = require('./models/Course');
-const Class = require('./models/Class');
-const Receipt = require('./models/Receipt');
-const ActivityLog = require('./models/ActivityLog'); // Nếu chưa có, có thể bỏ qua hoặc tạo model dummy
+const Student = require('../src/shared/models/Student.model');
+const Staff = require('../src/shared/models/Staff.model'); // Teacher is Staff with role teacher
+const Course = require('../src/shared/models/Course.model');
+const Class = require('../src/shared/models/Class.model');
+const Receipt = require('../src/shared/models/Receipt.model');
+// const ActivityLog = require('./models/ActivityLog'); // Nếu chưa có, có thể bỏ qua hoặc tạo model dummy
 
 const connectDB = async () => {
   try {
-    await mongoose.connect(process.env.MONGO_URI);
+    const mongoUri = process.env.MONGODB_URI || process.env.MONGO_URI || "mongodb://127.0.0.1:27017/english_center_dev";
+    await mongoose.connect(mongoUri);
     console.log('✅ Connected to MongoDB');
   } catch (error) {
     console.error('❌ DB Connection Error:', error);
