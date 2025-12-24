@@ -81,6 +81,7 @@ const courseRoutes = require("./modules/course/course.routes");
 const studentRoutes = require("./modules/student/student.routes");
 const teacherRoutes = require("./modules/teacher/teacher.routes");
 const directorController = require("./modules/director/director.controller");
+const receiptRoutes = require("../routes/receipts");
 
 // Register routes
 app.use("/api/auth", authRoutes);
@@ -90,6 +91,7 @@ app.use("/api/staff/accountant", accountantRoutes);
 app.use("/api/courses", courseRoutes);
 app.use("/api/students", studentRoutes);
 app.use("/api/teachers", teacherRoutes);
+app.use("/api/receipts", receiptRoutes);
 
 // Expose report endpoints at /reports/* matching client calls
 app.get("/reports/revenue-chart", directorController.getRevenueChart);

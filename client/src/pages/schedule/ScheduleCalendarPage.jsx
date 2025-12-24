@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Card, Button, Loading, Badge } from "@components/common";
 import { scheduleService } from "@services";
+import { getMyClasses } from "../../services/student";
 import toast from "react-hot-toast";
 import { useAuth, useLanguage } from "@hooks";
 
@@ -23,13 +24,55 @@ const ScheduleCalendarPage = () => {
   const fetchSchedules = async () => {
     try {
       setLoading(true);
-      // TODO: Implement proper API call based on role
-      // For teacher: scheduleService.getByTeacher(user.profileId, currentDate)
-      // For student: scheduleService.getByStudent(user.profileId, currentDate)
+      
+      if (role === 'student') {
+        const classes = await getMyClasses();
+        const generatedSchedules = [];
+        
+        // Calculate start of the week (Monday)
+        const startOfWeek = new Date(currentDate);
+        const day = startOfWeek.getDay() || 7; // 1=Mon, ..., 7=Sun
+        startOfWeek.setDate(startOfWeek.getDate() - day + 1);
+        startOfWeek.setHours(0, 0, 0, 0);
 
-      // Mock data for demonstration
-      const mockSchedules = generateMockSchedules();
-      setSchedules(mockSchedules);
+        // Generate schedules for the displayed week
+        for (let i = 0; i < 7; i++) {
+            const date = new Date(startOfWeek);
+            date.setDate(startOfWeek.getDate() + i);
+            
+            // Map JS getDay() (0=Sun, 1=Mon) to DB dayOfWeek (2=Mon, ..., 8=Sun)
+            const jsDay = date.getDay();
+            const dbDayOfWeek = jsDay === 0 ? 8 : jsDay + 1;
+
+            classes.forEach(cls => {
+                if (cls.schedule && Array.isArray(cls.schedule)) {
+                    cls.schedule.forEach(sch => {
+                        if (sch.dayOfWeek === dbDayOfWeek) {
+                            generatedSchedules.push({
+                                _id: `${cls._id}-${date.getTime()}`,
+                                date: date.toISOString(),
+                                dayOfWeek: date.toLocaleDateString("vi-VN", { weekday: "long" }),
+                                startTime: sch.startTime,
+                                endTime: sch.endTime,
+                                class: {
+                                    _id: cls._id,
+                                    className: cls.name,
+                                    classCode: cls.classCode
+                                },
+                                room: sch.room || cls.room,
+                                status: cls.status === 'ongoing' ? 'scheduled' : cls.status
+                            });
+                        }
+                    });
+                }
+            });
+        }
+        setSchedules(generatedSchedules);
+      } else {
+        // Mock data for other roles for now
+        const mockSchedules = generateMockSchedules();
+        setSchedules(mockSchedules);
+      }
     } catch (error) {
       console.error("Error fetching schedules:", error);
       toast.error("Không thể tải lịch học");

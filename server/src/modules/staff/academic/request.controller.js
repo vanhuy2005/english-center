@@ -119,7 +119,7 @@ exports.approveRequest = async (req, res) => {
 
       // Get course details for fee
       const course = await Course.findById(request.course);
-      if (course && course.fee) {
+      if (course && course.fee && course.fee.amount) {
         // Create finance record for tuition
         const dueDate = new Date();
         dueDate.setDate(dueDate.getDate() + 7); // Due in 7 days
@@ -128,9 +128,9 @@ exports.approveRequest = async (req, res) => {
           student: request.student,
           course: request.course,
           type: "tuition",
-          amount: course.fee,
+          amount: course.fee.amount,
           paidAmount: 0,
-          remainingAmount: course.fee,
+          remainingAmount: course.fee.amount,
           status: "pending",
           dueDate: dueDate,
           paymentMethod: "cash", // Default, can be changed when payment is made

@@ -88,3 +88,13 @@ export const getMyRequests = async () => {
     throw error;
   }
 };
+
+export const getMyClasses = async () => {
+  try {
+    const response = await api.get("/students/me/classes");
+    return response.data?.data || [];
+  } catch (error) {
+    console.error("Error fetching classes:", error);
+    throw error;
+  }
+};
