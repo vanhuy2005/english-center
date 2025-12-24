@@ -4,6 +4,18 @@ import Card from "../../components/common/Card";
 import Loading from "../../components/common/Loading";
 import Badge from "../../components/common/Badge";
 import { useNavigate } from "react-router-dom";
+import { 
+  FileText, 
+  Plus, 
+  Clock, 
+  CheckCircle, 
+  XCircle, 
+  Calendar, 
+  BookOpen, 
+  MessageSquare,
+  AlertCircle,
+  MoreHorizontal
+} from "lucide-react";
 
 const RequestListPage = () => {
   const navigate = useNavigate();
@@ -22,65 +34,50 @@ const RequestListPage = () => {
       setError(null);
       const response = await studentService.getMyRequests();
 
-      // `studentService.getMyRequests` may return either an array (data) or an axios response.
+      // Xử lý response an toàn cho mọi trường hợp
       if (Array.isArray(response)) {
         setRequests(response);
-      } else if (
-        response &&
-        response.data &&
-        Array.isArray(response.data.data)
-      ) {
+      } else if (response?.data?.data && Array.isArray(response.data.data)) {
         setRequests(response.data.data);
-      } else if (response && Array.isArray(response.data)) {
+      } else if (response?.data && Array.isArray(response.data)) {
         setRequests(response.data);
       } else {
         setRequests([]);
       }
     } catch (err) {
       console.error("Error fetching requests:", err);
-      setError(
-        err.response?.data?.message || "Không thể tải danh sách yêu cầu"
-      );
+      setError(err.response?.data?.message || "Không thể tải danh sách yêu cầu");
     } finally {
       setLoading(false);
     }
   };
 
-  const getStatusBadge = (status) => {
-    const statusMap = {
-      pending: { color: "warning", label: "Chờ xử lý", icon: "⏳" },
-      approved: { color: "success", label: "Đã duyệt", icon: "✓" },
-      rejected: { color: "danger", label: "Từ chối", icon: "✗" },
-      processing: { color: "info", label: "Đang xử lý", icon: "🔄" },
+  // --- CONFIG HELPER ---
+  const getStatusConfig = (status) => {
+    const map = {
+      pending: { color: "text-amber-600 bg-amber-50", label: "Chờ xử lý", icon: Clock },
+      approved: { color: "text-emerald-600 bg-emerald-50", label: "Đã duyệt", icon: CheckCircle },
+      rejected: { color: "text-rose-600 bg-rose-50", label: "Từ chối", icon: XCircle },
+      processing: { color: "text-blue-600 bg-blue-50", label: "Đang xử lý", icon: MoreHorizontal },
     };
-    const config = statusMap[status] || {
-      color: "default",
-      label: status,
-      icon: "?",
-    };
-    return (
-      <Badge color={config.color}>
-        {config.icon} {config.label}
-      </Badge>
-    );
+    return map[status] || { color: "text-gray-600 bg-gray-50", label: status, icon: AlertCircle };
   };
 
-  const getTypeBadge = (type) => {
-    const typeMap = {
-      leave: { label: "Xin nghỉ học", color: "info" },
-      makeup: { label: "Xin học bù", color: "success" },
-      transfer: { label: "Chuyển lớp", color: "warning" },
-      pause: { label: "Tạm dừng", color: "danger" },
-      other: { label: "Khác", color: "default" },
+  const getTypeLabel = (type) => {
+    const map = {
+      leave: "Xin nghỉ phép",
+      makeup: "Xin học bù",
+      transfer: "Chuyển lớp",
+      pause: "Bảo lưu",
+      consultation: "Tư vấn",
+      course_enrollment: "Đăng ký khóa học",
     };
-    const config = typeMap[type] || { label: type, color: "default" };
-    return <Badge color={config.color}>{config.label}</Badge>;
+    return map[type] || "Khác";
   };
 
-  const filteredRequests =
-    filter === "all" ? requests : requests.filter((r) => r.status === filter);
-
-  // Statistics
+  // --- FILTER & STATS ---
+  const filteredRequests = filter === "all" ? requests : requests.filter((r) => r.status === filter);
+  
   const stats = {
     total: requests.length,
     pending: requests.filter((r) => r.status === "pending").length,
@@ -90,208 +87,198 @@ const RequestListPage = () => {
 
   if (loading) return <Loading />;
 
-  if (error) {
-    return (
-      <div className="p-6">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-600">
-          {error}
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+    <div className="space-y-8 max-w-6xl mx-auto">
+      {/* 1. Header Section */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800 mb-2">
-            Yêu cầu của tôi
-          </h1>
-          <p className="text-gray-600">Quản lý các yêu cầu bạn đã gửi</p>
+          <h1 className="text-2xl font-bold text-gray-900">Yêu Cầu Của Tôi</h1>
+          <p className="text-gray-500 mt-1">Theo dõi trạng thái các đơn từ và hỗ trợ</p>
         </div>
         <button
-          onClick={() => navigate("/requests/new")}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+          onClick={() => navigate("/requests/create")} 
+          className="flex items-center justify-center gap-2 px-5 py-2.5 bg-[var(--color-primary)] hover:bg-blue-700 text-white font-medium rounded-lg shadow-sm transition-all active:scale-95"
         >
-          ➕ Gửi yêu cầu mới
+          <Plus size={18} />
+          <span>Tạo yêu cầu mới</span>
         </button>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <Card>
-          <div className="text-center">
-            <div className="text-3xl font-bold text-blue-600">
-              {stats.total}
-            </div>
-            <div className="text-sm text-gray-500 mt-1">Tổng yêu cầu</div>
-          </div>
-        </Card>
-        <Card>
-          <div className="text-center">
-            <div className="text-3xl font-bold text-yellow-600">
-              {stats.pending}
-            </div>
-            <div className="text-sm text-gray-500 mt-1">Chờ xử lý</div>
-          </div>
-        </Card>
-        <Card>
-          <div className="text-center">
-            <div className="text-3xl font-bold text-green-600">
-              {stats.approved}
-            </div>
-            <div className="text-sm text-gray-500 mt-1">Đã duyệt</div>
-          </div>
-        </Card>
-        <Card>
-          <div className="text-center">
-            <div className="text-3xl font-bold text-red-600">
-              {stats.rejected}
-            </div>
-            <div className="text-sm text-gray-500 mt-1">Từ chối</div>
-          </div>
-        </Card>
+      {/* 2. Stats Cards (Clean Style - No Border) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard 
+          label="Tổng yêu cầu" 
+          value={stats.total} 
+          icon={FileText} 
+          color="text-blue-600" 
+          bg="bg-blue-50" 
+        />
+        <StatCard 
+          label="Chờ xử lý" 
+          value={stats.pending} 
+          icon={Clock} 
+          color="text-amber-600" 
+          bg="bg-amber-50" 
+        />
+        <StatCard 
+          label="Đã duyệt" 
+          value={stats.approved} 
+          icon={CheckCircle} 
+          color="text-emerald-600" 
+          bg="bg-emerald-50" 
+        />
+        <StatCard 
+          label="Từ chối" 
+          value={stats.rejected} 
+          icon={XCircle} 
+          color="text-rose-600" 
+          bg="bg-rose-50" 
+        />
       </div>
 
-      {/* Filter */}
-      <Card className="mb-6">
-        <div className="flex items-center gap-4">
-          <label className="text-sm font-medium text-gray-700">
-            Lọc theo trạng thái:
-          </label>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setFilter("all")}
-              className={`px-4 py-2 rounded-lg text-sm transition ${
-                filter === "all"
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-              }`}
-            >
-              Tất cả
-            </button>
-            <button
-              onClick={() => setFilter("pending")}
-              className={`px-4 py-2 rounded-lg text-sm transition ${
-                filter === "pending"
-                  ? "bg-yellow-600 text-white"
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-              }`}
-            >
-              Chờ xử lý
-            </button>
-            <button
-              onClick={() => setFilter("approved")}
-              className={`px-4 py-2 rounded-lg text-sm transition ${
-                filter === "approved"
-                  ? "bg-green-600 text-white"
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-              }`}
-            >
-              Đã duyệt
-            </button>
-            <button
-              onClick={() => setFilter("rejected")}
-              className={`px-4 py-2 rounded-lg text-sm transition ${
-                filter === "rejected"
-                  ? "bg-red-600 text-white"
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-              }`}
-            >
-              Từ chối
-            </button>
-          </div>
-        </div>
-      </Card>
+      {/* 3. Filter Tabs (Pill Style) */}
+      <div className="flex flex-wrap gap-2 pb-2">
+        {["all", "pending", "approved", "rejected"].map((key) => (
+          <button
+            key={key}
+            onClick={() => setFilter(key)}
+            className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+              filter === key
+                ? "bg-gray-900 text-white shadow-md"
+                : "bg-white text-gray-600 hover:bg-gray-100 border border-gray-200"
+            }`}
+          >
+            {key === "all" ? "Tất cả" : getStatusConfig(key).label}
+          </button>
+        ))}
+      </div>
 
-      {/* Requests List */}
-      {filteredRequests.length === 0 ? (
-        <Card>
-          <div className="text-center py-12">
-            <div className="text-6xl mb-4">📋</div>
-            <p className="text-gray-600">
-              {filter === "all"
-                ? "Bạn chưa gửi yêu cầu nào"
-                : "Không có yêu cầu nào"}
-            </p>
-            <button
-              onClick={() => navigate("/requests/new")}
-              className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-            >
-              Gửi yêu cầu đầu tiên
-            </button>
+      {/* 4. Requests List */}
+      <div className="space-y-4">
+        {error && (
+          <div className="p-4 bg-red-50 text-red-600 rounded-lg flex items-center gap-2 border border-red-100">
+            <AlertCircle size={20} /> {error}
           </div>
-        </Card>
-      ) : (
-        <div className="space-y-4">
-          {filteredRequests.map((request) => (
-            <Card key={request._id} hover>
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    {getTypeBadge(request.type)}
-                    {getStatusBadge(request.status)}
-                    <span className="text-sm text-gray-500">
-                      {new Date(request.createdAt).toLocaleDateString("vi-VN")}
-                    </span>
+        )}
+
+        {filteredRequests.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 bg-white rounded-2xl border border-dashed border-gray-300">
+            <div className="p-4 bg-gray-50 rounded-full mb-4">
+              <FileText size={40} className="text-gray-300" />
+            </div>
+            <p className="text-gray-500 font-medium">Chưa có dữ liệu phù hợp</p>
+          </div>
+        ) : (
+          filteredRequests.map((request) => {
+            const statusConf = getStatusConfig(request.status);
+            const StatusIcon = statusConf.icon;
+
+            return (
+              <Card key={request._id} className="group hover:shadow-lg transition-all duration-300 border border-gray-100 overflow-hidden">
+                <div className="p-5">
+                  {/* Top Row: Type & Status */}
+                  <div className="flex flex-wrap justify-between items-start gap-3 mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2.5 bg-gray-100 rounded-lg text-gray-600">
+                        {request.type === 'consultation' ? <MessageSquare size={20}/> : 
+                         request.type === 'course_enrollment' ? <BookOpen size={20}/> : <FileText size={20}/>}
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-bold text-gray-900 leading-tight">
+                          {request.title || getTypeLabel(request.type)}
+                        </h3>
+                        <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                          {new Date(request.createdAt).toLocaleDateString("vi-VN", {
+                            hour: '2-digit', minute:'2-digit', day:'2-digit', month:'2-digit', year:'numeric'
+                          })}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 border ${statusConf.color.replace('text-', 'border-').replace('bg-', 'border-opacity-20 ')} ${statusConf.bg} ${statusConf.color}`}>
+                      <StatusIcon size={14} strokeWidth={2.5} />
+                      {statusConf.label}
+                    </div>
                   </div>
 
-                  <h3 className="text-lg font-semibold text-gray-800 mb-2">
-                    {request.title}
-                  </h3>
-
-                  <div className="space-y-1 text-sm text-gray-600 mb-3">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">Khóa học:</span>
-                      <span>{request.courseName}</span>
-                    </div>
-                    {request.requestDate && (
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">Ngày yêu cầu:</span>
-                        <span>
-                          {new Date(request.requestDate).toLocaleDateString(
-                            "vi-VN"
-                          )}
-                        </span>
+                  {/* Middle Row: Content Grid */}
+                  <div className="bg-gray-50/80 rounded-xl p-4 mb-4 grid md:grid-cols-2 gap-y-3 gap-x-6">
+                    {request.courseName && (
+                      <div className="flex items-start gap-2 text-sm">
+                        <BookOpen size={16} className="text-gray-400 mt-0.5 shrink-0" />
+                        <div>
+                          <span className="text-gray-500 block text-xs uppercase font-semibold">Khóa học</span>
+                          <span className="text-gray-800 font-medium">{request.courseName}</span>
+                        </div>
                       </div>
                     )}
-                  </div>
-
-                  <div className="text-sm text-gray-700 mb-3">
-                    <span className="font-medium">Lý do: </span>
-                    {request.reason}
-                  </div>
-
-                  {request.response && (
-                    <div
-                      className={`mt-3 p-3 rounded-lg ${
-                        request.status === "approved"
-                          ? "bg-green-50 border border-green-200"
-                          : "bg-red-50 border border-red-200"
-                      }`}
-                    >
-                      <div className="text-sm font-medium mb-1">
-                        Phản hồi từ {request.processorName}:
-                      </div>
-                      <div className="text-sm">{request.response}</div>
-                      {request.processedAt && (
-                        <div className="text-xs text-gray-500 mt-1">
-                          {new Date(request.processedAt).toLocaleString(
-                            "vi-VN"
-                          )}
+                    
+                    {request.requestDate && (
+                      <div className="flex items-start gap-2 text-sm">
+                        <Calendar size={16} className="text-gray-400 mt-0.5 shrink-0" />
+                        <div>
+                          <span className="text-gray-500 block text-xs uppercase font-semibold">Thời gian</span>
+                          <span className="text-gray-800 font-medium">
+                            {new Date(request.requestDate).toLocaleDateString("vi-VN")}
+                          </span>
                         </div>
-                      )}
+                      </div>
+                    )}
+
+                    <div className={`${request.courseName ? 'col-span-2' : 'col-span-2'} flex items-start gap-2 text-sm`}>
+                      <MessageSquare size={16} className="text-gray-400 mt-0.5 shrink-0" />
+                      <div>
+                        <span className="text-gray-500 block text-xs uppercase font-semibold">Nội dung / Lý do</span>
+                        <span className="text-gray-800">{request.reason}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Bottom Row: Response (Conditional) */}
+                  {request.response && (
+                    <div className={`text-sm rounded-xl p-4 flex gap-3 ${
+                      request.status === 'approved' ? 'bg-green-50 text-green-900' : 
+                      request.status === 'rejected' ? 'bg-red-50 text-red-900' : 'bg-blue-50 text-blue-900'
+                    }`}>
+                      <div className="mt-0.5 shrink-0">
+                        {request.status === 'approved' ? <CheckCircle size={18}/> : <MessageSquare size={18}/>}
+                      </div>
+                      <div className="flex-1">
+                        <div className="font-bold text-xs uppercase mb-1 opacity-80">
+                          Phản hồi từ {request.processorName || "Quản trị viên"}
+                        </div>
+                        <p className="leading-relaxed">{request.response}</p>
+                        {request.processedAt && (
+                          <div className="text-xs mt-2 opacity-60 font-medium">
+                            {new Date(request.processedAt).toLocaleString("vi-VN")}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
-              </div>
-            </Card>
-          ))}
-        </div>
-      )}
+              </Card>
+            );
+          })
+        )}
+      </div>
     </div>
   );
 };
+
+// --- Sub-component: Stat Card ---
+const StatCard = ({ label, value, icon: Icon, color, bg }) => (
+  <Card className="border border-gray-100 hover:border-gray-200 transition-colors">
+    <div className="p-4 flex items-center justify-between">
+      <div>
+        <p className="text-sm font-medium text-gray-500 mb-1">{label}</p>
+        <h4 className="text-2xl font-bold text-gray-900">{value}</h4>
+      </div>
+      <div className={`p-3 rounded-xl ${bg} ${color}`}>
+        <Icon size={24} />
+      </div>
+    </div>
+  </Card>
+);
 
 export default RequestListPage;

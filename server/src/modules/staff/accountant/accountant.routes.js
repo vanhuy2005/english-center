@@ -9,6 +9,10 @@ router.use(protect);
 // ==================== DASHBOARD ====================
 router.get("/dashboard", accountantController.getDashboard);
 
+// ==================== TUITION STATUS (MỚI) ====================
+// Đặt dòng này TRƯỚC các route có :id để tránh conflict
+router.get("/tuition", accountantController.getTuitionStatus);
+
 // ==================== TRANSACTIONS ====================
 router.get("/transactions", accountantController.getTransactions);
 router.get("/transactions/:id", accountantController.getTransactionById);

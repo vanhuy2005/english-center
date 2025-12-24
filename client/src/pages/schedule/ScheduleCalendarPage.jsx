@@ -24,11 +24,11 @@ const ScheduleCalendarPage = () => {
   const fetchSchedules = async () => {
     try {
       setLoading(true);
-      
-      if (role === 'student') {
+
+      if (role === "student") {
         const classes = await getMyClasses();
         const generatedSchedules = [];
-        
+
         // Calculate start of the week (Monday)
         const startOfWeek = new Date(currentDate);
         const day = startOfWeek.getDay() || 7; // 1=Mon, ..., 7=Sun
@@ -37,35 +37,37 @@ const ScheduleCalendarPage = () => {
 
         // Generate schedules for the displayed week
         for (let i = 0; i < 7; i++) {
-            const date = new Date(startOfWeek);
-            date.setDate(startOfWeek.getDate() + i);
-            
-            // Map JS getDay() (0=Sun, 1=Mon) to DB dayOfWeek (2=Mon, ..., 8=Sun)
-            const jsDay = date.getDay();
-            const dbDayOfWeek = jsDay === 0 ? 8 : jsDay + 1;
+          const date = new Date(startOfWeek);
+          date.setDate(startOfWeek.getDate() + i);
 
-            classes.forEach(cls => {
-                if (cls.schedule && Array.isArray(cls.schedule)) {
-                    cls.schedule.forEach(sch => {
-                        if (sch.dayOfWeek === dbDayOfWeek) {
-                            generatedSchedules.push({
-                                _id: `${cls._id}-${date.getTime()}`,
-                                date: date.toISOString(),
-                                dayOfWeek: date.toLocaleDateString("vi-VN", { weekday: "long" }),
-                                startTime: sch.startTime,
-                                endTime: sch.endTime,
-                                class: {
-                                    _id: cls._id,
-                                    className: cls.name,
-                                    classCode: cls.classCode
-                                },
-                                room: sch.room || cls.room,
-                                status: cls.status === 'ongoing' ? 'scheduled' : cls.status
-                            });
-                        }
-                    });
+          // Map JS getDay() (0=Sun, 1=Mon) to DB dayOfWeek (2=Mon, ..., 8=Sun)
+          const jsDay = date.getDay();
+          const dbDayOfWeek = jsDay === 0 ? 8 : jsDay + 1;
+
+          classes.forEach((cls) => {
+            if (cls.schedule && Array.isArray(cls.schedule)) {
+              cls.schedule.forEach((sch) => {
+                if (sch.dayOfWeek === dbDayOfWeek) {
+                  generatedSchedules.push({
+                    _id: `${cls._id}-${date.getTime()}`,
+                    date: date.toISOString(),
+                    dayOfWeek: date.toLocaleDateString("vi-VN", {
+                      weekday: "long",
+                    }),
+                    startTime: sch.startTime,
+                    endTime: sch.endTime,
+                    class: {
+                      _id: cls._id,
+                      className: cls.name,
+                      classCode: cls.classCode,
+                    },
+                    room: sch.room || cls.room,
+                    status: cls.status === "ongoing" ? "scheduled" : cls.status,
+                  });
                 }
-            });
+              });
+            }
+          });
         }
         setSchedules(generatedSchedules);
       } else {

@@ -22,8 +22,19 @@ const requestSchema = new mongoose.Schema(
         "resume",
         "withdrawal",
         "course_enrollment",
+        "consultation",
+        "reserve",
+        "other",
       ],
       required: [true, "Request type is required"],
+    },
+    title: {
+      type: String,
+      trim: true,
+    },
+    content: {
+      type: String,
+      trim: true,
     },
     course: {
       type: mongoose.Schema.Types.ObjectId,
@@ -44,9 +55,22 @@ const requestSchema = new mongoose.Schema(
     endDate: {
       type: Date,
     },
+    // Optional free-text reason or message. For 'consultation' it may be omitted and
+    // a separate 'additionalNote' field may be used.
     reason: {
       type: String,
-      required: [true, "Reason is required"],
+      trim: true,
+    },
+    // Consultation specific fields
+    contactPhone: {
+      type: String,
+      trim: true,
+    },
+    preferredDate: {
+      type: Date,
+    },
+    additionalNote: {
+      type: String,
       trim: true,
     },
     documents: [
@@ -133,6 +157,25 @@ requestSchema.pre("save", function (next) {
       }
       break;
   }
+
+  // Enforce 'reason' for request types that require it. 'consultation' and 'other' may omit reason
+  const typesRequiringReason = [
+    "leave",
+    "makeup",
+    "transfer",
+    "pause",
+    "resume",
+    "withdrawal",
+    "course_enrollment",
+    "reserve",
+  ];
+  if (
+    typesRequiringReason.includes(this.type) &&
+    (!this.reason || !this.reason.trim())
+  ) {
+    return next(new Error("Reason is required"));
+  }
+
   next();
 });
 // Auto-generate request code

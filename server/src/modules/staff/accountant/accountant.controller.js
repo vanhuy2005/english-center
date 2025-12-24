@@ -2,127 +2,153 @@ const Finance = require("../../../shared/models/Finance.model");
 const Student = require("../../../shared/models/Student.model");
 const Course = require("../../../shared/models/Course.model");
 const Receipt = require("../../../shared/models/Receipt.model");
+const Notification = require("../../../shared/models/Notification.model");
+const Staff = require("../../../shared/models/Staff.model");
 const ApiResponse = require("../../../shared/utils/ApiResponse");
 
 // Dashboard
 exports.getDashboard = async (req, res) => {
   try {
-    // Total revenue
+    // 1. TÍNH TỔNG DOANH THU THỰC TẾ (NET REVENUE)
+    // Logic: Cộng tổng paidAmount của tất cả các bản ghi Finance
     const revenueStats = await Finance.aggregate([
-      { $match: { status: { $in: ["paid", "partial"] } } },
+      { $match: { paidAmount: { $gt: 0 } } },
       { $group: { _id: null, total: { $sum: "$paidAmount" } } },
     ]);
     const totalRevenue = revenueStats[0]?.total || 0;
 
-    // This month revenue
-    const startOfMonth = new Date();
-    startOfMonth.setDate(1);
-    startOfMonth.setHours(0, 0, 0, 0);
+    // 2. TÍNH DOANH THU THÁNG NÀY (DÙNG RECEIPT để phân biệt refund)
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
-    const monthRevenueStats = await Finance.aggregate([
+    const ReceiptModel = require("../../../shared/models/Receipt.model");
+
+    const incomeMonth = await ReceiptModel.aggregate([
       {
         $match: {
-          status: { $in: ["paid", "partial"] },
-          paidDate: { $gte: startOfMonth },
+          createdAt: { $gte: startOfMonth, $lte: endOfMonth },
+          status: "active",
+          type: { $ne: "refund" },
         },
       },
-      { $group: { _id: null, total: { $sum: "$paidAmount" } } },
+      { $group: { _id: null, total: { $sum: "$amount" } } },
     ]);
-    const monthRevenue = monthRevenueStats[0]?.total || 0;
 
-    // Pending payments
+    const refundMonth = await ReceiptModel.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: startOfMonth, $lte: endOfMonth },
+          $or: [{ status: "refunded" }, { type: "refund" }],
+        },
+      },
+      { $group: { _id: null, total: { $sum: "$amount" } } },
+    ]);
+
+    const monthRevenue =
+      (incomeMonth[0]?.total || 0) - (refundMonth[0]?.total || 0);
+
+    // 3. CÁC CHỈ SỐ KHÁC
     const pendingPayments = await Finance.countDocuments({
       status: { $in: ["pending", "partial"] },
     });
-
-    // Overdue payments
     const overduePayments = await Finance.countDocuments({
       dueDate: { $lt: new Date() },
       status: { $in: ["pending", "partial"] },
     });
 
-    // Recent transactions
-    const recentTransactions = await Finance.find()
-      .limit(10)
+    // 4. GIAO DỊCH GẦN ĐÂY (Lấy từ Receipt để hiện cả Thu và Hoàn)
+    const recentTransactions = await ReceiptModel.find()
       .sort({ createdAt: -1 })
+      .limit(10)
       .populate("student", "studentCode fullName")
-      .populate("course", "name courseCode")
+      .populate("class", "name classCode")
       .lean();
 
-    // Revenue trend (last 7 days)
-    const last7Days = Array.from({ length: 7 }, (_, i) => {
-      const date = new Date();
-      date.setDate(date.getDate() - (6 - i));
-      date.setHours(0, 0, 0, 0);
-      return date;
-    });
+    // 4. BIỂU ĐỒ 1: XU HƯỚNG DOANH THU (7 NGÀY GẦN NHẤT)
+    const last7Days = [];
+    const revenueTrendData = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dayString = d.toLocaleDateString("vi-VN", {
+        day: "2-digit",
+        month: "2-digit",
+      });
+      last7Days.push(dayString);
 
-    const revenueTrend = await Promise.all(
-      last7Days.map(async (date) => {
-        const nextDay = new Date(date);
-        nextDay.setDate(nextDay.getDate() + 1);
+      const startOfDay = new Date(d);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(d);
+      endOfDay.setHours(23, 59, 59, 999);
 
-        const dayRevenue = await Finance.aggregate([
-          {
-            $match: {
-              paidDate: { $gte: date, $lt: nextDay },
-              status: { $in: ["paid", "partial"] },
-            },
+      const dayIncome = await ReceiptModel.aggregate([
+        {
+          $match: {
+            createdAt: { $gte: startOfDay, $lte: endOfDay },
+            status: "active",
+            type: { $ne: "refund" },
           },
-          { $group: { _id: null, total: { $sum: "$paidAmount" } } },
-        ]);
+        },
+        { $group: { _id: null, total: { $sum: "$amount" } } },
+      ]);
+      const dayRefund = await ReceiptModel.aggregate([
+        {
+          $match: {
+            createdAt: { $gte: startOfDay, $lte: endOfDay },
+            $or: [{ status: "refunded" }, { type: "refund" }],
+          },
+        },
+        { $group: { _id: null, total: { $sum: "$amount" } } },
+      ]);
 
-        return dayRevenue[0]?.total || 0;
-      })
-    );
+      const netDay = (dayIncome[0]?.total || 0) - (dayRefund[0]?.total || 0);
+      revenueTrendData.push(netDay);
+    }
+
+    // 5. BIỂU ĐỒ 2: TỶ LỆ THANH TOÁN (Pie Chart)
+    const paidCount = await Finance.countDocuments({ status: "paid" });
 
     const dashboardData = {
       stats: {
-        totalRevenue: Math.round(totalRevenue),
-        monthRevenue: Math.round(monthRevenue),
+        totalRevenue: totalRevenue,
+        monthRevenue: monthRevenue,
         pendingPayments,
         overduePayments,
       },
-      recentTransactions,
+      recentTransactions: recentTransactions.map((t) => ({
+        ...t,
+        transactionCode: t.receiptNumber || "N/A",
+        course: t.class,
+      })),
+      // --- Dữ liệu cho Line Chart ---
       revenueTrend: {
-        labels: last7Days.map((d) =>
-          d.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" })
-        ),
+        labels: last7Days,
         datasets: [
           {
             label: "Doanh thu (VNĐ)",
-            data: revenueTrend,
+            data: revenueTrendData,
             borderColor: "rgb(59, 151, 151)",
             backgroundColor: "rgba(59, 151, 151, 0.1)",
+            tension: 0.3,
+            fill: true,
           },
         ],
       },
+      // --- Dữ liệu cho Pie Chart ---
       paymentStatus: {
-        labels: [
-          "Đã thanh toán",
-          "Chưa thanh toán",
-          "Thanh toán một phần",
-          "Quá hạn",
-        ],
+        labels: ["Đã thanh toán", "Chưa thanh toán", "Quá hạn"],
         datasets: [
           {
-            data: [
-              await Finance.countDocuments({ status: "paid" }),
-              await Finance.countDocuments({ status: "pending" }),
-              await Finance.countDocuments({ status: "partial" }),
-              overduePayments,
-            ],
-            backgroundColor: [
-              "rgba(34, 197, 94, 0.8)",
-              "rgba(251, 191, 36, 0.8)",
-              "rgba(59, 130, 246, 0.8)",
-              "rgba(239, 68, 68, 0.8)",
-            ],
+            data: [paidCount, pendingPayments, overduePayments],
+            backgroundColor: ["#10b981", "#f59e0b", "#ef4444"],
+            borderWidth: 0,
           },
         ],
       },
     };
 
+    // Return
     return ApiResponse.success(
       res,
       dashboardData,
@@ -131,6 +157,40 @@ exports.getDashboard = async (req, res) => {
   } catch (error) {
     console.error("Get dashboard error:", error);
     return ApiResponse.error(res, "Không thể lấy dữ liệu dashboard");
+  }
+};
+
+// Helper: notify accountants/directors
+exports.notifyAccountants = async ({
+  title,
+  message,
+  relatedModel,
+  relatedId,
+}) => {
+  try {
+    // Find staff with staffType 'accountant' or 'director'
+    const accountants = await Staff.find({
+      staffType: { $in: ["accountant", "director"] },
+    }).select("_id");
+    if (!accountants || accountants.length === 0) return;
+
+    const notifications = accountants.map((acc) => ({
+      recipient: acc._id,
+      type: "system",
+      title,
+      message,
+      relatedModel,
+      relatedId,
+      isRead: false,
+      createdAt: new Date(),
+    }));
+
+    await Notification.insertMany(notifications);
+    console.log(
+      `🔔 Sent ${notifications.length} notifications to accountants/directors.`
+    );
+  } catch (err) {
+    console.error("Error notifying accountants:", err);
   }
 };
 
@@ -235,22 +295,158 @@ exports.getTransactionById = async (req, res) => {
   }
 };
 
-// Create transaction
+// Create transaction (tạo phiếu thu và đồng bộ Finance + Notification)
 exports.createTransaction = async (req, res) => {
+  const session = await Finance.startSession();
+  session.startTransaction();
   try {
-    const transaction = await Finance.create({
-      ...req.body,
+    const { student, course, amount, paymentMethod, type, notes } = req.body;
+
+    // A. Create Finance transaction (giao dịch tài chính)
+    // Resolve course: prefer provided course, fallback to class.course if class provided
+    let resolvedCourse = course;
+
+    if (!resolvedCourse && req.body.classId) {
+      // If a classId was sent, fetch class and derive course
+      try {
+        const cls = await require("../../../shared/models/Class.model")
+          .findById(req.body.classId)
+          .select("course");
+        if (cls && cls.course) resolvedCourse = cls.course;
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    const paidDateValue = req.body.date ? new Date(req.body.date) : new Date();
+
+    const newTransaction = new Finance({
+      student: student || req.body.studentId,
+      course: resolvedCourse,
+      amount,
+      paymentMethod,
+      type: type || "tuition",
+      status: "paid",
+      paidAmount: amount,
+      remainingAmount: 0,
+      paidDate: paidDateValue,
+      notes,
       createdBy: req.user._id,
     });
 
-    const populated = await Finance.findById(transaction._id)
+    await newTransaction.save({ session });
+
+    // C. Create Receipt and link to Finance
+    let createdReceipt = null;
+    try {
+      const ReceiptModel = require("../../../shared/models/Receipt.model");
+
+      const receiptPayload = {
+        student: student || req.body.studentId,
+        class: req.body.classId || null,
+        amount,
+        paymentMethod,
+        description: `Thu phí học viên`,
+        note: notes || "",
+        createdBy: req.user._id,
+        createdAt: req.body.date ? new Date(req.body.date) : undefined,
+      };
+
+      const receiptDoc = new ReceiptModel(receiptPayload);
+      createdReceipt = await receiptDoc.save({ session });
+
+      // Update finance record with receipt info
+      newTransaction.receipt = {
+        number: createdReceipt.receiptNumber,
+        url: createdReceipt.url || "",
+        issuedBy: req.user._id,
+        issuedAt: new Date(),
+      };
+
+      await newTransaction.save({ session });
+    } catch (receiptErr) {
+      console.warn("Could not create receipt:", receiptErr.message);
+      // don't fail if receipt creation fails, but log
+    }
+
+    // B. Create Notification for student
+    try {
+      await Notification.create(
+        [
+          {
+            recipient: student || req.body.studentId,
+            type: "payment_reminder",
+            title: "Xác nhận thanh toán học phí",
+            message: `Bạn đã thanh toán thành công số tiền ${new Intl.NumberFormat(
+              "vi-VN",
+              { style: "currency", currency: "VND" }
+            ).format(amount)}. Mã giao dịch: ${newTransaction.transactionCode}`,
+            relatedModel: "Finance",
+            relatedId: newTransaction._id,
+            isRead: false,
+          },
+        ],
+        { session }
+      );
+    } catch (notifErr) {
+      console.warn("Could not create notification:", notifErr.message);
+      // don't fail the whole transaction for a notification error
+    }
+    await session.commitTransaction();
+    session.endSession();
+
+    // Populate để trả về frontend hiển thị ngay
+    const populatedTrans = await Finance.findById(newTransaction._id)
       .populate("student", "studentCode fullName")
       .populate("course", "name courseCode");
 
-    return ApiResponse.success(res, populated, "Tạo giao dịch thành công", 201);
+    return ApiResponse.success(
+      res,
+      populatedTrans,
+      "Lập phiếu thu & gửi thông báo thành công",
+      201
+    );
   } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
     console.error("Create transaction error:", error);
-    return ApiResponse.error(res, error.message || "Không thể tạo giao dịch");
+    return ApiResponse.error(res, error.message || "Lỗi khi tạo giao dịch");
+  }
+};
+
+// Lấy tình hình học phí (list từ Finance)
+exports.getTuitionStatus = async (req, res) => {
+  try {
+    const { search, status } = req.query;
+    let query = {};
+
+    if (status && status !== "all") {
+      query.status = status;
+    }
+
+    const tuitionData = await Finance.find(query)
+      .populate("student", "studentCode fullName email phone")
+      .populate("course", "name courseCode")
+      .sort({ createdAt: -1 });
+
+    let finalData = tuitionData;
+    if (search) {
+      const lowerSearch = search.toLowerCase();
+      finalData = tuitionData.filter(
+        (item) =>
+          item.student?.fullName?.toLowerCase().includes(lowerSearch) ||
+          item.student?.studentCode?.toLowerCase().includes(lowerSearch)
+      );
+    }
+
+    return ApiResponse.success(
+      res,
+      finalData,
+      "Lấy tình hình học phí thành công"
+    );
+  } catch (error) {
+    console.error("Get tuition status error:", error);
+    return ApiResponse.error(res, "Không thể tải dữ liệu học phí");
   }
 };
 
@@ -378,19 +574,18 @@ exports.getFinancialReport = async (req, res) => {
     if (startDate) dateFilter.$gte = new Date(startDate);
     if (endDate) dateFilter.$lte = new Date(endDate);
 
-    // Get total revenue (active receipts that are NOT refunds)
+    // ==========================================
+    // 1. TÍNH DOANH THU (Chỉ lấy phiếu thu Active)
+    // ==========================================
+    const revenueMatch = {
+      status: "active", // Chỉ lấy phiếu đang active
+      // Đảm bảo không dính phiếu hoàn tiền nếu lỡ có phiếu hoàn mà status active (phòng hờ)
+      $and: [{ type: { $ne: "refund" } }, { paymentMethod: { $ne: "refund" } }],
+    };
+    if (Object.keys(dateFilter).length > 0) revenueMatch.createdAt = dateFilter;
+
     const revenueData = await Receipt.aggregate([
-      ...(Object.keys(dateFilter).length > 0
-        ? [
-            {
-              $match: {
-                createdAt: dateFilter,
-                status: "active",
-                paymentMethod: { $ne: "refund" },
-              },
-            },
-          ]
-        : [{ $match: { status: "active", paymentMethod: { $ne: "refund" } } }]),
+      { $match: revenueMatch },
       {
         $group: {
           _id: null,
@@ -401,11 +596,21 @@ exports.getFinancialReport = async (req, res) => {
       },
     ]);
 
-    // Get refunds
+    // ==========================================
+    // 2. TÍNH HOÀN TIỀN (SỬA LỖI TẠI ĐÂY)
+    // ==========================================
+    const refundMatch = {};
+    if (Object.keys(dateFilter).length > 0) refundMatch.createdAt = dateFilter;
+
+    // QUAN TRỌNG: Thêm điều kiện status: "refunded"
+    refundMatch.$or = [
+      { status: "refunded" }, // Ưu tiên bắt theo trạng thái này
+      { type: "refund" }, // Backup bắt theo loại
+      { paymentMethod: "refund" }, // Backup bắt theo phương thức
+    ];
+
     const refundData = await Receipt.aggregate([
-      ...(Object.keys(dateFilter).length > 0
-        ? [{ $match: { createdAt: dateFilter, paymentMethod: "refund" } }]
-        : [{ $match: { paymentMethod: "refund" } }]),
+      { $match: refundMatch },
       {
         $group: {
           _id: null,
@@ -415,31 +620,24 @@ exports.getFinancialReport = async (req, res) => {
       },
     ]);
 
-    // Get revenue by payment method
+    // ==========================================
+    // 3. TÍNH THEO LOẠI (DOANH THU)
+    // ==========================================
     const revenueByType = await Receipt.aggregate([
-      ...(Object.keys(dateFilter).length > 0
-        ? [
-            {
-              $match: {
-                createdAt: dateFilter,
-                status: "active",
-                paymentMethod: { $ne: "refund" },
-              },
-            },
-          ]
-        : [{ $match: { status: "active", paymentMethod: { $ne: "refund" } } }]),
+      { $match: revenueMatch }, // Dùng chung bộ lọc với Revenue
       {
         $group: {
-          _id: "$paymentMethod",
+          _id: { $ifNull: ["$type", "$paymentMethod"] }, // Gom nhóm theo type hoặc method
           total: { $sum: "$amount" },
           count: { $sum: 1 },
         },
       },
     ]);
 
+    // Tổng hợp số liệu
     const totalRevenue = revenueData[0]?.totalRevenue || 0;
     const totalRefunds = refundData[0]?.totalRefunds || 0;
-    const netRevenue = totalRevenue - totalRefunds;
+    const netRevenue = totalRevenue - totalRefunds; // Lợi nhuận ròng = Thu - Hoàn
 
     return ApiResponse.success(
       res,
@@ -450,6 +648,7 @@ exports.getFinancialReport = async (req, res) => {
           netRevenue,
           totalTransactions: revenueData[0]?.totalTransactions || 0,
           avgTransactionAmount: revenueData[0]?.avgTransactionAmount || 0,
+          refundCount: refundData[0]?.refundCount || 0, // Trả thêm số lượng phiếu hoàn
         },
         revenueByType,
       },
@@ -494,12 +693,28 @@ exports.exportReport = async (req, res) => {
         .lean();
       headers = ["Mã GD", "Học viên", "Số tiền còn nợ", "Hạn chót"];
     } else if (reportType === "receipts") {
-      data = await Receipt.find({ ...query, paymentMethod: { $ne: "refund" } })
+      // Exclude refunds by status/type/paymentMethod
+      data = await Receipt.find({
+        ...query,
+        $and: [
+          { type: { $ne: "refund" } },
+          { status: { $ne: "refunded" } },
+          { paymentMethod: { $ne: "refund" } },
+        ],
+      })
         .populate("student", "fullName studentCode")
         .lean();
       headers = ["Mã phiếu", "Học viên", "Số tiền", "Phương thức", "Ngày tạo"];
     } else if (reportType === "refunds") {
-      data = await Receipt.find({ ...query, paymentMethod: "refund" })
+      // Include refunds marked by status or type (or paymentMethod for legacy)
+      data = await Receipt.find({
+        ...query,
+        $or: [
+          { status: "refunded" },
+          { type: "refund" },
+          { paymentMethod: "refund" },
+        ],
+      })
         .populate("student", "fullName studentCode")
         .lean();
       headers = ["Mã phiếu", "Học viên", "Số tiền", "Ngày hoàn"];
@@ -623,19 +838,41 @@ exports.checkReceiptData = async (req, res) => {
   try {
     const totalReceipts = await Receipt.countDocuments();
     const activeReceipts = await Receipt.countDocuments({ status: "active" });
-    const refunds = await Receipt.countDocuments({ paymentMethod: "refund" });
+    const refunds = await Receipt.countDocuments({
+      $or: [
+        { status: "refunded" },
+        { type: "refund" },
+        { paymentMethod: "refund" },
+      ],
+    });
     const nonRefundReceipts = await Receipt.countDocuments({
       status: "active",
-      paymentMethod: { $ne: "refund" },
+      $and: [{ type: { $ne: "refund" } }, { paymentMethod: { $ne: "refund" } }],
     });
 
     const totalAmount = await Receipt.aggregate([
-      { $match: { status: "active", paymentMethod: { $ne: "refund" } } },
+      {
+        $match: {
+          status: "active",
+          $and: [
+            { type: { $ne: "refund" } },
+            { paymentMethod: { $ne: "refund" } },
+          ],
+        },
+      },
       { $group: { _id: null, total: { $sum: "$amount" } } },
     ]);
 
     const refundAmount = await Receipt.aggregate([
-      { $match: { paymentMethod: "refund" } },
+      {
+        $match: {
+          $or: [
+            { status: "refunded" },
+            { type: "refund" },
+            { paymentMethod: "refund" },
+          ],
+        },
+      },
       { $group: { _id: null, total: { $sum: "$amount" } } },
     ]);
 

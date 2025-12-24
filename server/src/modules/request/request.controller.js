@@ -111,6 +111,8 @@ exports.createRequest = async (req, res) => {
     const {
       student,
       type,
+      title,
+      content,
       course,
       class: classId,
       targetClass,
@@ -119,6 +121,9 @@ exports.createRequest = async (req, res) => {
       reason,
       documents,
       priority,
+      phone,
+      preferredDate,
+      note,
     } = req.body;
 
     // Prefer explicit student in body, otherwise use authenticated user
@@ -127,19 +132,33 @@ exports.createRequest = async (req, res) => {
     console.log("Request body:", req.body);
     console.log("Authenticated user:", req.user?._id || req.user?.id || null);
 
-    if (!studentId || !type || !reason) {
+    if (!studentId || !type) {
       return res.status(400).json({
         success: false,
         message: "Vui lòng cung cấp đầy đủ thông tin bắt buộc",
       });
     }
 
-    // Validate reason length (minimum 10 characters)
-    if (reason.trim().length < 10) {
-      return res.status(400).json({
-        success: false,
-        message: "Lý do phải có ít nhất 10 ký tự",
-      });
+    // Allow consultation and other types to omit 'reason'; otherwise require reason >= 10 chars
+    const finalReason = reason || content || note || undefined;
+    const typesRequiringReason = [
+      "leave",
+      "makeup",
+      "transfer",
+      "pause",
+      "resume",
+      "withdrawal",
+      "course_enrollment",
+      "reserve",
+    ];
+
+    if (typesRequiringReason.includes(type)) {
+      if (!finalReason || (finalReason && finalReason.trim().length < 10)) {
+        return res.status(400).json({
+          success: false,
+          message: "Lý do phải có ít nhất 10 ký tự",
+        });
+      }
     }
 
     // Verify student exists
@@ -187,15 +206,78 @@ exports.createRequest = async (req, res) => {
     const request = await Request.create({
       student: studentId,
       type,
+      title: title || undefined,
+      content: content || undefined,
       course: course || undefined,
-      class: classId,
+      class: classId || undefined,
       targetClass,
       startDate,
       endDate,
-      reason,
+      reason: finalReason,
       documents,
       priority: priority || "normal",
+      contactPhone: phone,
+      preferredDate: preferredDate ? new Date(preferredDate) : undefined,
+      additionalNote: note,
     });
+
+    // Notification trigger (send to staff roles based on request type)
+    try {
+      const Staff = require("../../shared/models/Staff.model");
+      const Notification = require("../../shared/models/Notification.model");
+
+      let targetRoles = [];
+      let notiTitle = "Yêu cầu mới";
+      let notiMessage = `${req.user?.fullName || "Học viên"} vừa gửi yêu cầu.`;
+
+      if (type === "consultation") {
+        targetRoles = ["enrollment", "academic", "director"];
+        notiTitle = "Yêu cầu tư vấn mới";
+        notiMessage = `${
+          req.user?.fullName || "Học viên"
+        } đã gửi yêu cầu tư vấn. SĐT: ${phone || "N/A"}`;
+      } else if (type === "course_enrollment") {
+        targetRoles = ["enrollment", "academic", "accountant", "director"];
+        notiTitle = "Đăng ký khóa học mới";
+        notiMessage = `${
+          req.user?.fullName || "Học viên"
+        } vừa đăng ký khóa học. Vui lòng kiểm tra và thu phí.`;
+      } else {
+        targetRoles = ["academic", "director"];
+        notiTitle = "Yêu cầu học vụ mới";
+        notiMessage = `${req.user?.fullName || "Học viên"} gửi yêu cầu: ${
+          title || finalReason || "(không có mô tả)"
+        }`;
+      }
+
+      const staffUsers = await Staff.find({
+        staffType: { $in: targetRoles },
+        status: "active",
+      }).select("_id");
+
+      if (staffUsers && staffUsers.length > 0) {
+        const notifications = staffUsers.map((s) => ({
+          recipient: s._id,
+          sender: req.user?._id || req.user?.id || null,
+          type: "request_response",
+          title: notiTitle,
+          message: notiMessage,
+          relatedModel: "Request",
+          relatedId: request._id,
+          isRead: false,
+          createdAt: new Date(),
+        }));
+
+        await Notification.insertMany(notifications);
+        console.log(
+          `🔔 Đã gửi thông báo đến ${
+            notifications.length
+          } nhân viên (Roles: ${targetRoles.join(", ")})`
+        );
+      }
+    } catch (errNoti) {
+      console.error("Lỗi gửi thông báo (không chặn luồng chính):", errNoti);
+    }
 
     const populatedRequest = await Request.findById(request._id)
       .populate("student", "studentCode fullName")

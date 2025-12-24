@@ -306,6 +306,24 @@ function App() {
             </ProtectedRoute>
           }
         />
+
+        {/* Backwards-compatible student-scoped routes (some links use /student/requests) */}
+        <Route
+          path="/student/requests"
+          element={
+            <ProtectedRoute allowedRoles={["student"]}>
+              <RequestListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/student/requests/new"
+          element={
+            <ProtectedRoute allowedRoles={["student"]}>
+              <RequestFormPage />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/enroll"
           element={

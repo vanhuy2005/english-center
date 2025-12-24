@@ -63,17 +63,21 @@ const PaymentReceiptsPage = () => {
       cell: (row) => (
         <div>
           <div className="font-medium text-gray-900">
-            {row.student?.fullName}
+            {row.student?.fullName || row.studentName || "Không xác định"}
           </div>
-          <div className="text-sm text-gray-500">{row.student?.email}</div>
+          <div className="text-sm text-gray-500">
+            {row.student?.studentCode || row.student?.email || ""}
+          </div>
         </div>
       ),
     },
     {
-      header: "Lớp",
+      header: "Lớp/Khóa",
       accessor: "class",
       cell: (row) => (
-        <span className="text-gray-900">{row.class?.name || "N/A"}</span>
+        <span className="text-gray-900">
+          {row.course?.name || row.class?.name || row.courseName || "N/A"}
+        </span>
       ),
     },
     {

@@ -4,6 +4,9 @@ const Receipt = require("../src/shared/models/Receipt.model");
 const Staff = require("../src/shared/models/Staff.model");
 const Student = require("../src/shared/models/Student.model");
 const Class = require("../src/shared/models/Class.model");
+const mongoose = require("mongoose");
+const Finance = require("../src/shared/models/Finance.model");
+const Notification = require("../src/shared/models/Notification.model");
 const { auth, checkRole } = require("../middleware/auth");
 
 // ⚠️ IMPORTANT: Statistics route MUST come before /:id route
@@ -15,20 +18,36 @@ router.get(
   async (req, res) => {
     try {
       const { startDate, endDate } = req.query;
-      const query = { status: "active" };
 
+      // Query cơ sở cho ngày tháng
+      const dateQuery = {};
       if (startDate || endDate) {
-        query.createdAt = {};
-        if (startDate) query.createdAt.$gte = new Date(startDate);
-        if (endDate) query.createdAt.$lte = new Date(endDate);
+        dateQuery.createdAt = {};
+        if (startDate) dateQuery.createdAt.$gte = new Date(startDate);
+        if (endDate) dateQuery.createdAt.$lte = new Date(endDate);
       }
 
-      const receipts = await Receipt.find(query);
-      const totalAmount = receipts.reduce((sum, r) => sum + r.amount, 0);
-      const totalReceipts = receipts.length;
+      // 1. Lấy tổng thu (Chỉ Active)
+      const revenueReceipts = await Receipt.find({
+        ...dateQuery,
+        status: "active",
+      });
+      const totalRevenue = revenueReceipts.reduce(
+        (sum, r) => sum + r.amount,
+        0
+      );
+      const totalReceipts = revenueReceipts.length;
 
+      // 2. Lấy tổng chi/hoàn tiền (Status = refunded)
+      const refundReceipts = await Receipt.find({
+        ...dateQuery,
+        $or: [{ status: "refunded" }, { type: "refund" }],
+      });
+      const totalRefunds = refundReceipts.reduce((sum, r) => sum + r.amount, 0);
+
+      // 3. Thống kê theo phương thức (Chỉ tính trên phiếu thu Active)
       const byMethod = await Receipt.aggregate([
-        { $match: query },
+        { $match: { ...dateQuery, status: "active" } },
         {
           $group: {
             _id: "$paymentMethod",
@@ -38,16 +57,22 @@ router.get(
         },
       ]);
 
-      // Daily statistics
+      // 4. Thống kê theo ngày (Doanh thu thuần)
+      // Logic: Group theo ngày, sum amount nếu active, trừ amount nếu refunded
       const dailyStats = await Receipt.aggregate([
-        { $match: query },
+        { $match: dateQuery }, // Lấy tất cả trong khoảng ngày
         {
           $group: {
-            _id: {
-              $dateToString: { format: "%Y-%m-%d", date: "$createdAt" },
+            _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+            // Nếu active thì cộng, refunded thì trừ (hoặc bỏ qua tùy nghiệp vụ)
+            total: {
+              $sum: {
+                $cond: [{ $eq: ["$status", "active"] }, "$amount", 0],
+              },
             },
-            total: { $sum: "$amount" },
-            count: { $sum: 1 },
+            count: {
+              $sum: { $cond: [{ $eq: ["$status", "active"] }, 1, 0] },
+            },
           },
         },
         { $sort: { _id: 1 } },
@@ -56,7 +81,9 @@ router.get(
       res.json({
         success: true,
         message: "Lấy thống kê thành công",
-        totalAmount,
+        totalAmount: totalRevenue, // Tổng thu
+        totalRefunds: totalRefunds, // Tổng hoàn (Mới thêm)
+        netAmount: totalRevenue - totalRefunds, // Thực thu (Mới thêm)
         totalReceipts,
         byMethod,
         dailyStats: dailyStats.map((stat) => ({
@@ -383,13 +410,18 @@ router.get(
   }
 );
 
-// Create new receipt
+// === REWRITE: CREATE NEW RECEIPT (THU & HOÀN) with class->course mapping ===
 router.post(
   "/",
   auth,
   checkRole(["accountant", "director"]),
   async (req, res) => {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
     try {
+      console.log("📥 CREATE RECEIPT REQUEST:", req.body);
+
       const {
         studentId,
         amount,
@@ -397,115 +429,199 @@ router.post(
         description,
         note,
         classId,
+        type = "tuition",
         date,
       } = req.body;
 
-      console.log("📝 Creating receipt with data:", {
-        studentId,
-        amount,
-        paymentMethod,
-        classId,
-      });
+      // 1. Xác định trạng thái Receipt
+      const receiptStatus = type === "refund" ? "refunded" : "active";
 
-      // Validate required fields
-      if (!studentId || !amount || !paymentMethod) {
-        console.warn("⚠️ Missing required fields:", {
-          studentId: !!studentId,
-          amount: !!amount,
-          paymentMethod: !!paymentMethod,
-        });
-        return res.status(400).json({
-          success: false,
-          message: "Thiếu thông tin bắt buộc: studentId, amount, paymentMethod",
-        });
-      }
-
-      // Validate user is authenticated
-      if (!req.user || !req.user._id) {
-        console.warn("⚠️ User not authenticated");
-        return res.status(401).json({
-          success: false,
-          message: "Người dùng chưa được xác thực",
-        });
-      }
-
-      console.log("✅ Creating receipt object for student:", studentId);
-
-      const receipt = new Receipt({
+      // 2. Tạo Receipt (Biên lai lưu classId để truy vết)
+      const newReceipt = new Receipt({
         student: studentId,
-        amount: parseInt(amount) || amount, // Ensure it's a number
-        paymentMethod: paymentMethod.toLowerCase(), // Normalize to lowercase
-        description,
+        class: classId || null,
+        amount: parseInt(amount),
+        paymentMethod,
+        description:
+          description ||
+          (type === "refund" ? "Hoàn trả học phí" : "Thu học phí"),
         note,
-        class: classId,
+        type: type,
+        status: receiptStatus,
         createdBy: req.user._id,
+        createdAt: date ? new Date(date) : new Date(),
       });
 
-      console.log("💾 Saving receipt...");
-      await receipt.save();
-      console.log("✅ Receipt saved:", receipt._id);
+      await newReceipt.save({ session });
+      console.log("✅ Saved Receipt:", {
+        id: newReceipt._id,
+        type: newReceipt.type,
+        status: newReceipt.status,
+      });
 
-      // Convert to plain object to avoid populate issues
-      const receiptObj = receipt.toObject ? receipt.toObject() : { ...receipt };
-
-      // Manually populate references
-      try {
-        if (receiptObj.student) {
-          const student = await Student.findById(receiptObj.student);
-          if (student) {
-            receiptObj.student = {
-              _id: student._id,
-              studentCode: student.studentCode,
-              fullName: student.fullName,
-            };
-          }
+      // 3. XỬ LÝ TÌM KIẾM FINANCE (Map classId -> courseId nếu cần)
+      let courseId = null;
+      if (classId) {
+        try {
+          const classInfo = await Class.findById(classId).select("course");
+          if (classInfo) courseId = classInfo.course;
+        } catch (e) {
+          console.warn(
+            "⚠️ Error fetching class info for classId:",
+            classId,
+            e.message
+          );
         }
-
-        if (receiptObj.createdBy) {
-          const staff = await Staff.findById(receiptObj.createdBy);
-          if (staff) {
-            receiptObj.createdBy = {
-              _id: staff._id,
-              fullName: staff.fullName,
-            };
-          }
-        }
-
-        if (receiptObj.class) {
-          const cls = await Class.findById(receiptObj.class);
-          if (cls) {
-            receiptObj.class = {
-              _id: cls._id,
-              name: cls.name,
-            };
-          }
-        }
-      } catch (populateError) {
-        console.warn("⚠️ Error in manual population:", populateError.message);
-        // Continue without full population
       }
 
-      console.log("📤 Sending response with receipt:", receiptObj);
+      // Use safe ObjectId for queries
+      const studentObjId = new mongoose.Types.ObjectId(studentId);
 
-      res.status(201).json({
+      // Strategy for finding finance:
+      // 1) Student + Course + status in pending/partial (best candidate)
+      // 2) Student + Course (any status) newest
+      // 3) Student + status in pending/partial (any course)
+      let financeRecord = null;
+
+      if (courseId) {
+        financeRecord = await Finance.findOne({
+          student: studentObjId,
+          course: courseId,
+          status: { $in: ["pending", "partial"] },
+        }).session(session);
+      }
+
+      if (!financeRecord && courseId) {
+        financeRecord = await Finance.findOne({
+          student: studentObjId,
+          course: courseId,
+        })
+          .sort({ createdAt: -1 })
+          .session(session);
+      }
+
+      if (!financeRecord) {
+        financeRecord = await Finance.findOne({
+          student: studentObjId,
+          status: { $in: ["pending", "partial"] },
+        })
+          .sort({ createdAt: -1 })
+          .session(session);
+      }
+
+      if (financeRecord) {
+        console.log(
+          `✅ Found Finance Record: ${financeRecord._id} | Status: ${financeRecord.status}`
+        );
+
+        if (type === "refund") {
+          const refundAmount = parseInt(amount);
+          financeRecord.paidAmount = Math.max(
+            0,
+            (financeRecord.paidAmount || 0) - refundAmount
+          );
+          financeRecord.status = "refunded";
+          financeRecord.notes =
+            (financeRecord.notes || "") +
+            `\n[${new Date().toLocaleDateString()}] Đã hoàn: ${new Intl.NumberFormat(
+              "vi-VN"
+            ).format(refundAmount)}đ`;
+        } else {
+          const payAmount = parseInt(amount);
+          financeRecord.paidAmount =
+            (financeRecord.paidAmount || 0) + payAmount;
+
+          // update latest payment method
+          financeRecord.paymentMethod = paymentMethod;
+
+          if (financeRecord.paidAmount >= financeRecord.amount) {
+            financeRecord.status = "paid";
+            financeRecord.paidDate = new Date();
+          } else {
+            financeRecord.status = "partial";
+          }
+        }
+
+        financeRecord.remainingAmount = Math.max(
+          0,
+          (financeRecord.amount || 0) - (financeRecord.paidAmount || 0)
+        );
+        await financeRecord.save({ session });
+      } else {
+        console.warn(
+          "⚠️ Không tìm thấy công nợ. Tự động tạo mới hồ sơ tài chính..."
+        );
+
+        const newFinance = new Finance({
+          student: studentObjId,
+          course: courseId || null,
+          type: type,
+          amount: parseInt(amount),
+          paidAmount: parseInt(amount),
+          remainingAmount: 0,
+          paymentMethod: paymentMethod,
+          status: type === "refund" ? "refunded" : "paid",
+          paidDate: new Date(),
+          createdBy: req.user._id,
+          receipt: {
+            number: newReceipt.receiptNumber,
+            url: "",
+            issuedBy: req.user._id,
+            issuedAt: new Date(),
+          },
+        });
+
+        await newFinance.save({ session });
+      }
+
+      // 4. Tạo Thông báo
+      const notiTitle =
+        type === "refund" ? "Thông báo hoàn tiền" : "Xác nhận thanh toán";
+      const notiMsg =
+        type === "refund"
+          ? `Bạn đã được hoàn trả ${new Intl.NumberFormat("vi-VN").format(
+              amount
+            )}đ.`
+          : `Đã thanh toán thành công ${new Intl.NumberFormat("vi-VN").format(
+              amount
+            )}đ.`;
+
+      await Notification.create(
+        [
+          {
+            recipient: studentId,
+            type: type === "refund" ? "system" : "payment_reminder",
+            title: notiTitle,
+            message: notiMsg,
+            relatedModel: "Receipt",
+            relatedId: newReceipt._id,
+            isRead: false,
+          },
+        ],
+        { session }
+      );
+
+      await session.commitTransaction();
+      session.endSession();
+
+      // Populate để trả về frontend
+      const populatedReceipt = await Receipt.findById(newReceipt._id)
+        .populate("student", "fullName studentCode")
+        .populate("class", "name");
+
+      return res.status(201).json({
         success: true,
-        message: "Tạo phiếu thu thành công",
-        data: receiptObj,
+        message:
+          type === "refund"
+            ? "Hoàn tiền thành công"
+            : "Tạo phiếu thu thành công",
+        data: populatedReceipt,
       });
     } catch (error) {
-      console.error("❌ Error creating receipt:", error);
-      console.error("Error stack:", error.stack);
-      console.error("Error details:", {
-        message: error.message,
-        name: error.name,
-        errors: error.errors,
-      });
-      res.status(500).json({
-        success: false,
-        message: "Lỗi khi tạo phiếu thu",
-        error: error.message,
-        details: error.errors || error.validationErrors,
-      });
+      await session.abortTransaction();
+      session.endSession();
+      console.error("❌ Create Transaction Error:", error);
+      return res.status(500).json({ success: false, message: error.message });
     }
   }
 );
