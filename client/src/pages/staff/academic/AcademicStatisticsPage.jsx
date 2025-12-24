@@ -15,37 +15,34 @@ import { LineChart, BarChart, DoughnutChart } from "../../../components/charts";
 import api from "../../../services/api";
 import { toast } from "react-hot-toast";
 
-// --- HELPERS: Tính toán dữ liệu ---
 
-// 1. Phân loại điểm số
 const calculateGradeDistribution = (students) => {
-  const distribution = [0, 0, 0, 0, 0]; // [Xuất sắc, Giỏi, Khá, TB, Yếu]
+  const distribution = [0, 0, 0, 0, 0];
 
   students.forEach((s) => {
     const score = Number(s.average || 0);
-    if (score >= 9) distribution[0]++; // Xuất sắc
-    else if (score >= 8) distribution[1]++; // Giỏi
-    else if (score >= 6.5) distribution[2]++; // Khá
-    else if (score >= 5) distribution[3]++; // Trung bình
-    else distribution[4]++; // Yếu
+    if (score >= 9) distribution[0]++;
+    else if (score >= 8) distribution[1]++; 
+    else if (score >= 6.5) distribution[2]++; 
+    else if (score >= 5) distribution[3]++; 
+    else distribution[4]++; 
   });
 
   return distribution;
 };
 
-// 2. Tính xu hướng tuyển sinh (6 tháng gần nhất)
 const calculateEnrollmentTrend = (students) => {
   const last6Months = [];
   const counts = [0, 0, 0, 0, 0, 0];
   const today = new Date();
 
-  // Tạo labels cho 6 tháng
+ 
   for (let i = 5; i >= 0; i--) {
     const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
     last6Months.push(`Tháng ${d.getMonth() + 1}`);
   }
 
-  // Đếm số lượng
+  
   students.forEach((s) => {
     if (!s.createdAt) return;
     const date = new Date(s.createdAt);
@@ -54,7 +51,7 @@ const calculateEnrollmentTrend = (students) => {
       (today.getMonth() - date.getMonth());
 
     if (monthDiff >= 0 && monthDiff < 6) {
-      // monthDiff = 0 là tháng hiện tại (index 5), monthDiff = 5 là 6 tháng trước (index 0)
+      
       counts[5 - monthDiff]++;
     }
   });
@@ -86,20 +83,20 @@ const AcademicStatisticsPage = () => {
     try {
       setLoading(true);
 
-      // Gọi song song các API danh sách để lấy dữ liệu thô
+     
       const [studentsRes, classesRes, statsRes] = await Promise.allSettled([
         api.get("/staff/academic/students", { params: { limit: 1000 } }), // Lấy hết để tính toán
         api.get("/classes", { params: { limit: 1000 } }),
         api.get("/staff/academic/statistics"), // Lấy thêm thống kê server-side (nếu có Attendance Trend)
       ]);
 
-      // 1. Xử lý dữ liệu Học viên
+      
       const studentsList =
         studentsRes.status === "fulfilled"
           ? studentsRes.value.data?.data || []
           : [];
 
-      // Tính toán chỉ số học viên
+    
       const totalStudents = studentsList.length;
       const totalScore = studentsList.reduce(
         (sum, s) => sum + (Number(s.average) || 0),
@@ -110,12 +107,12 @@ const AcademicStatisticsPage = () => {
         0
       );
 
-      const avgGrade =
+      let avgGrade =
         totalStudents > 0 ? (totalScore / totalStudents).toFixed(1) : 0;
-      const avgAttendance =
+      let avgAttendance =
         totalStudents > 0 ? (totalAttendance / totalStudents).toFixed(1) : 0;
 
-      // 2. Xử lý dữ liệu Lớp học
+   
       const classesList =
         classesRes.status === "fulfilled"
           ? classesRes.value.data?.data || []
@@ -125,11 +122,11 @@ const AcademicStatisticsPage = () => {
         (c) => c.status === "ongoing"
       ).length;
 
-      // 3. Xử lý dữ liệu Biểu đồ
+    
       const gradeDist = calculateGradeDistribution(studentsList);
       const enrollmentTrend = calculateEnrollmentTrend(studentsList);
 
-      // Attendance Trend: Ưu tiên lấy từ API thống kê nếu có
+     
       const serverStats =
         statsRes.status === "fulfilled" ? statsRes.value.data?.data || {} : {};
 
@@ -137,7 +134,7 @@ const AcademicStatisticsPage = () => {
       let attendanceData = Array(7).fill(avgAttendance);
 
       if (serverStats.attendanceTrend) {
-        // Handle if API returns full chart object (labels + datasets)
+        
         if (serverStats.attendanceTrend.labels) {
           attendanceLabels = serverStats.attendanceTrend.labels;
         }
@@ -147,12 +144,17 @@ const AcademicStatisticsPage = () => {
         ) {
           attendanceData = serverStats.attendanceTrend.datasets[0].data;
         } else if (Array.isArray(serverStats.attendanceTrend)) {
-          // Handle if API returns just data array (fallback)
+        
           attendanceData = serverStats.attendanceTrend;
         }
       }
 
-      // Cập nhật State
+      if (serverStats.stats) {
+        avgGrade = serverStats.stats.averageGrade ?? avgGrade;
+        avgAttendance = serverStats.stats.attendanceRate ?? avgAttendance;
+      }
+
+  
       setStats({
         totalClasses,
         totalStudents,
@@ -177,7 +179,7 @@ const AcademicStatisticsPage = () => {
     }
   };
 
-  // --- CHART CONFIGURATIONS ---
+  
 
   const attendanceChartConfig = {
     labels: chartData.attendance.labels,
@@ -185,7 +187,7 @@ const AcademicStatisticsPage = () => {
       {
         label: "Tỷ lệ chuyên cần (%)",
         data: chartData.attendance.data,
-        borderColor: "#10b981", // Emerald
+        borderColor: "#10b981", 
         backgroundColor: "rgba(16, 185, 129, 0.1)",
         tension: 0.3,
         fill: true,
@@ -209,11 +211,11 @@ const AcademicStatisticsPage = () => {
         label: "Số lượng học viên",
         data: chartData.grades,
         backgroundColor: [
-          "#10b981", // Emerald
-          "#3b82f6", // Blue
-          "#f59e0b", // Amber
-          "#8b5cf6", // Purple
-          "#ef4444", // Red
+          "#10b981", 
+          "#3b82f6",
+          "#f59e0b", 
+          "#8b5cf6", 
+          "#ef4444", 
         ],
         borderWidth: 0,
         hoverOffset: 4,
@@ -234,7 +236,7 @@ const AcademicStatisticsPage = () => {
     ],
   };
 
-  // --- COMPONENT: Stat Card ---
+  
   const StatCard = ({ title, value, icon: Icon, color, subText, trend }) => {
     const styles = {
       blue: "bg-blue-50 text-blue-600 border-blue-100",
@@ -295,7 +297,7 @@ const AcademicStatisticsPage = () => {
   return (
     <div className="min-h-screen bg-gray-50/50 p-6 md:p-8 font-sans text-gray-800">
       <div className="max-w-[1600px] mx-auto space-y-6">
-        {/* --- HEADER --- */}
+   
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
           <div>
             <h1 className="text-2xl font-bold text-[var(--color-primary)] flex items-center gap-3">
@@ -321,7 +323,7 @@ const AcademicStatisticsPage = () => {
           </div>
         </div>
 
-        {/* --- STATS GRID --- */}
+       
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <StatCard
             title="Tổng Lớp Học"
@@ -353,7 +355,6 @@ const AcademicStatisticsPage = () => {
           />
         </div>
 
-        {/* --- CHARTS ROW 1 --- */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Attendance Trend (Line Chart) */}
           <div className="lg:col-span-8">
@@ -376,7 +377,7 @@ const AcademicStatisticsPage = () => {
             </Card>
           </div>
 
-          {/* Grade Distribution (Doughnut Chart) */}
+         
           <div className="lg:col-span-4">
             <Card className="border border-gray-200 shadow-sm h-full">
               <div className="p-5 border-b border-gray-100">
@@ -400,7 +401,7 @@ const AcademicStatisticsPage = () => {
                       },
                     }}
                   />
-                  {/* Center Text */}
+                 
                   <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pb-8">
                     <span className="text-3xl font-extrabold text-gray-800">
                       {stats.averageGrade}
@@ -414,7 +415,7 @@ const AcademicStatisticsPage = () => {
             </Card>
           </div>
 
-          {/* Enrollment Trend (Bar Chart) */}
+          
           <div className="lg:col-span-12">
             <Card className="border border-gray-200 shadow-sm">
               <div className="p-5 border-b border-gray-100">

@@ -188,6 +188,7 @@ exports.createClass = async (req, res) => {
     if (!finalName) missing.push("name");
     if (!course) missing.push("course");
     if (!startDate) missing.push("startDate");
+    if (!endDate) missing.push("endDate");
 
     if (missing.length) {
       console.warn("Create class validation failed - missing:", missing);
@@ -195,6 +196,22 @@ exports.createClass = async (req, res) => {
         success: false,
         message: "Vui lòng cung cấp đầy đủ thông tin bắt buộc",
         missing,
+      });
+    }
+
+    // Validate date ordering
+    const sd = new Date(startDate);
+    const ed = new Date(endDate);
+    if (isNaN(sd.getTime()) || isNaN(ed.getTime())) {
+      return res.status(400).json({
+        success: false,
+        message: "Ngày bắt đầu hoặc kết thúc không hợp lệ",
+      });
+    }
+    if (ed <= sd) {
+      return res.status(400).json({
+        success: false,
+        message: "Ngày kết thúc phải lớn hơn ngày bắt đầu",
       });
     }
 
@@ -221,18 +238,25 @@ exports.createClass = async (req, res) => {
       }
     }
 
+    // Normalize schedule: the client may send a free-text string (legacy UI).
+    // The Class model expects an array of schedule items; if the incoming
+    // `schedule` is not an array, we default to an empty array to avoid
+    // triggering subdocument validation errors.
+    const normalizedSchedule = Array.isArray(schedule) ? schedule : [];
+
     // Create class
     const newClass = await Class.create({
       name: finalName,
       classCode: classCode || undefined,
       course,
       teacher,
-      schedule,
+      schedule: normalizedSchedule,
       startDate,
       endDate,
       capacity: { max: maxStudents || 30 },
       room,
-      tuitionFee: tuitionFee || courseExists.fee.amount,
+      tuitionFee:
+        tuitionFee || (courseExists.fee && courseExists.fee.amount) || 0,
       status: status || "upcoming",
       createdBy: req.user._id,
     });
@@ -249,6 +273,29 @@ exports.createClass = async (req, res) => {
     });
   } catch (error) {
     console.error("Error creating class:", error);
+
+    // Mongoose validation errors -> return 400 with details
+    if (error && error.name === "ValidationError") {
+      const errors = Object.keys(error.errors || {}).map((k) => ({
+        field: k,
+        message: error.errors[k].message,
+      }));
+      return res.status(400).json({
+        success: false,
+        message: "Validation error when creating class",
+        errors,
+      });
+    }
+
+    // Duplicate key (unique) error
+    if (error && error.code === 11000) {
+      return res.status(409).json({
+        success: false,
+        message: "Duplicate value error",
+        error: error.keyValue || error.message,
+      });
+    }
+
     res.status(500).json({
       success: false,
       message: "Lỗi khi tạo lớp học",

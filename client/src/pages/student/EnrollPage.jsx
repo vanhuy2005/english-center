@@ -13,7 +13,7 @@ import {
   AlertCircle,
   BookOpen,
   Calendar,
-  MessageSquare
+  MessageSquare,
 } from "lucide-react";
 
 const EnrollPage = () => {
@@ -23,19 +23,19 @@ const EnrollPage = () => {
   const [courses, setCourses] = useState([]);
   const [enrolling, setEnrolling] = useState(false);
   const [selectedCourse, setSelectedCourse] = useState(null);
-  
+
   // Modal states
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showConsultModal, setShowConsultModal] = useState(false);
   const [consultSubmitting, setConsultSubmitting] = useState(false);
-  
+
   const [consultForm, setConsultForm] = useState({
     fullName: user?.fullName || "",
     phone: user?.phone || "",
     preferredDate: "",
     message: "",
   });
-  
+
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -75,7 +75,7 @@ const EnrollPage = () => {
         setCourses(normalizeCoursesData(courseData));
       } else {
         setError("Không tìm thấy khóa học nào khả dụng.");
-        setCourses([]); 
+        setCourses([]);
       }
     } catch (error) {
       console.error("Error loading courses:", error);
@@ -97,7 +97,7 @@ const EnrollPage = () => {
           ? course.duration
           : { hours: course.duration || 60, weeks: course.sessions || 12 },
       maxStudents: course.maxStudents || 30,
-      tuition: course.tuition || 0,
+      tuition: course.tuition ?? (course.fee && course.fee.amount) ?? 0,
       startDate: course.startDate || new Date().toISOString(),
     }));
   };
@@ -116,7 +116,9 @@ const EnrollPage = () => {
       const studentId = user?._id || user?.id || user?.studentId;
 
       if (!studentId) {
-        alert("Lỗi: Không tìm thấy thông tin học viên. Vui lòng đăng nhập lại.");
+        alert(
+          "Lỗi: Không tìm thấy thông tin học viên. Vui lòng đăng nhập lại."
+        );
         return;
       }
 
@@ -127,7 +129,9 @@ const EnrollPage = () => {
         });
 
         if (response.data.success) {
-          alert("Đăng ký khóa học thành công! Yêu cầu đã gửi để học vụ xếp lớp.");
+          alert(
+            "Đăng ký khóa học thành công! Yêu cầu đã gửi để học vụ xếp lớp."
+          );
           setShowConfirmModal(false);
           setSelectedCourse(null);
           loadCourses();
@@ -142,7 +146,7 @@ const EnrollPage = () => {
         } else if (apiError.response?.status === 409) {
           errorMsg = "Bạn đã đăng ký khóa học này rồi.";
         } else {
-           errorMsg = apiError.response?.data?.message || apiError.message;
+          errorMsg = apiError.response?.data?.message || apiError.message;
         }
         alert(errorMsg);
       }
@@ -185,19 +189,27 @@ const EnrollPage = () => {
   // Helper styles
   const getLevelBadgeStyle = (level) => {
     switch (level) {
-      case 'beginner': return "bg-[var(--color-secondary)]/10 text-[var(--color-secondary)]";
-      case 'intermediate': return "bg-amber-50 text-amber-700";
-      case 'advanced': return "bg-purple-50 text-purple-700";
-      default: return "bg-gray-100 text-gray-600";
+      case "beginner":
+        return "bg-[var(--color-secondary)]/10 text-[var(--color-secondary)]";
+      case "intermediate":
+        return "bg-amber-50 text-amber-700";
+      case "advanced":
+        return "bg-purple-50 text-purple-700";
+      default:
+        return "bg-gray-100 text-gray-600";
     }
   };
 
   const getLevelLabel = (level) => {
     switch (level) {
-      case 'beginner': return "Sơ cấp";
-      case 'intermediate': return "Trung cấp";
-      case 'advanced': return "Nâng cao";
-      default: return "Cơ bản";
+      case "beginner":
+        return "Sơ cấp";
+      case "intermediate":
+        return "Trung cấp";
+      case "advanced":
+        return "Nâng cao";
+      default:
+        return "Cơ bản";
     }
   };
 
@@ -206,7 +218,6 @@ const EnrollPage = () => {
   return (
     <div className="min-h-screen bg-gray-50/30 font-sans p-6 md:p-8">
       <div className="w-full mx-auto space-y-8">
-        
         {/* Header */}
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
@@ -248,91 +259,108 @@ const EnrollPage = () => {
               >
                 {/* Card Header */}
                 <div className="p-6 pb-4 border-b border-gray-50 relative">
-                   <div className="absolute top-0 left-0 w-1 h-full bg-[var(--color-primary)] opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                   
-                   <div className="flex justify-between items-start mb-3">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider ${getLevelBadgeStyle(course.level)}`}>
-                        {getLevelLabel(course.level)}
-                      </span>
-                      <span className="text-xs text-gray-400 flex items-center gap-1 bg-gray-50 px-2 py-1 rounded">
-                         <Calendar size={12} />
-                         {new Date(course.startDate).toLocaleDateString("vi-VN")}
-                      </span>
-                   </div>
-                   
-                   <h3 className="text-lg font-bold text-[var(--color-primary)] mb-2 line-clamp-2 h-[3.5rem] group-hover:text-[var(--color-secondary)] transition-colors">
-                     {course.name}
-                   </h3>
-                   <p className="text-sm text-gray-500 line-clamp-2 min-h-[2.5rem]">
-                     {course.description}
-                   </p>
+                  <div className="absolute top-0 left-0 w-1 h-full bg-[var(--color-primary)] opacity-0 group-hover:opacity-100 transition-opacity"></div>
+
+                  <div className="flex justify-between items-start mb-3">
+                    <span
+                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider ${getLevelBadgeStyle(
+                        course.level
+                      )}`}
+                    >
+                      {getLevelLabel(course.level)}
+                    </span>
+                    <span className="text-xs text-gray-400 flex items-center gap-1 bg-gray-50 px-2 py-1 rounded">
+                      <Calendar size={12} />
+                      {new Date(course.startDate).toLocaleDateString("vi-VN")}
+                    </span>
+                  </div>
+
+                  <h3 className="text-lg font-bold text-[var(--color-primary)] mb-2 line-clamp-2 h-[3.5rem] group-hover:text-[var(--color-secondary)] transition-colors">
+                    {course.name}
+                  </h3>
+                  <p className="text-sm text-gray-500 line-clamp-2 min-h-[2.5rem]">
+                    {course.description}
+                  </p>
                 </div>
 
                 {/* Card Body */}
                 <div className="p-6 py-4 flex-1">
-                   <div className="space-y-3">
-                      <div className="flex items-center justify-between text-sm">
-                         <div className="flex items-center gap-2 text-gray-600">
-                            <Clock size={16} className="text-[var(--color-secondary)]" />
-                            <span>Thời lượng</span>
-                         </div>
-                         <span className="font-medium text-gray-900">{course.duration?.hours}h ({course.duration?.weeks} tuần)</span>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2 text-gray-600">
+                        <Clock
+                          size={16}
+                          className="text-[var(--color-secondary)]"
+                        />
+                        <span>Thời lượng</span>
                       </div>
-                      
-                      <div className="flex items-center justify-between text-sm">
-                         <div className="flex items-center gap-2 text-gray-600">
-                            <Users size={16} className="text-[var(--color-secondary)]" />
-                            <span>Sĩ số</span>
-                         </div>
-                         <span className="font-medium text-gray-900">Max {course.maxStudents} HV</span>
-                      </div>
+                      <span className="font-medium text-gray-900">
+                        {course.duration?.hours}h ({course.duration?.weeks}{" "}
+                        tuần)
+                      </span>
+                    </div>
 
-                      <div className="pt-3 mt-3 border-t border-gray-50 flex items-center justify-between">
-                         <span className="text-sm text-gray-500">Học phí</span>
-                         <span className="text-lg font-bold text-[var(--color-danger)]">
-                            {course.tuition?.toLocaleString("vi-VN")} ₫
-                         </span>
+                    <div className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2 text-gray-600">
+                        <Users
+                          size={16}
+                          className="text-[var(--color-secondary)]"
+                        />
+                        <span>Sĩ số</span>
                       </div>
-                   </div>
+                      <span className="font-medium text-gray-900">
+                        Max {course.maxStudents} HV
+                      </span>
+                    </div>
+
+                    <div className="pt-3 mt-3 border-t border-gray-50 flex items-center justify-between">
+                      <span className="text-sm text-gray-500">Học phí</span>
+                      <span className="text-lg font-bold text-[var(--color-danger)]">
+                        {course.tuition?.toLocaleString("vi-VN")} ₫
+                      </span>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Card Footer (Actions) */}
                 <div className="p-6 pt-0 mt-auto flex gap-3">
-                   <button
-                      onClick={() => handleEnrollClick(course)}
-                      className="flex-1 py-2.5 bg-[var(--color-primary)] hover:bg-[var(--color-primary-light)] text-white text-sm font-bold rounded-lg transition-colors shadow-sm"
-                   >
-                      Đăng ký
-                   </button>
-                   <button
-                      onClick={() => {
-                        setSelectedCourse(course);
-                        setShowConsultModal(true);
-                        setConsultForm(f => ({
-                          ...f,
-                          fullName: user?.fullName || "",
-                          phone: user?.phone || "",
-                          message: `Tôi muốn tư vấn về khóa học ${course.name}`,
-                        }));
-                      }}
-                      className="px-3 py-2.5 border border-gray-200 hover:bg-gray-50 text-gray-600 rounded-lg transition-colors"
-                      title="Tư vấn thêm"
-                   >
-                      <MessageSquare size={18} />
-                   </button>
+                  <button
+                    onClick={() => handleEnrollClick(course)}
+                    className="flex-1 py-2.5 bg-[var(--color-primary)] hover:bg-[var(--color-primary-light)] text-white text-sm font-bold rounded-lg transition-colors shadow-sm"
+                  >
+                    Đăng ký
+                  </button>
+                  <button
+                    onClick={() => {
+                      setSelectedCourse(course);
+                      setShowConsultModal(true);
+                      setConsultForm((f) => ({
+                        ...f,
+                        fullName: user?.fullName || "",
+                        phone: user?.phone || "",
+                        message: `Tôi muốn tư vấn về khóa học ${course.name}`,
+                      }));
+                    }}
+                    className="px-3 py-2.5 border border-gray-200 hover:bg-gray-50 text-gray-600 rounded-lg transition-colors"
+                    title="Tư vấn thêm"
+                  >
+                    <MessageSquare size={18} />
+                  </button>
                 </div>
               </div>
             ))}
           </div>
         ) : (
-          !loading && !error && (
+          !loading &&
+          !error && (
             <div className="flex flex-col items-center justify-center py-20 bg-white rounded-xl border border-dashed border-gray-200">
-               <BookOpen size={48} className="text-gray-300 mb-4" />
-               <p className="text-gray-500 font-medium">Hiện tại chưa có khóa học nào mở đăng ký</p>
+              <BookOpen size={48} className="text-gray-300 mb-4" />
+              <p className="text-gray-500 font-medium">
+                Hiện tại chưa có khóa học nào mở đăng ký
+              </p>
             </div>
           )
         )}
-
       </div>
 
       {/* --- MODALS --- */}
@@ -342,41 +370,61 @@ const EnrollPage = () => {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-               <h3 className="text-lg font-bold text-[var(--color-primary)]">Xác nhận đăng ký</h3>
-               <button onClick={() => setShowConfirmModal(false)} className="text-gray-400 hover:text-gray-600">
-                  <X size={20} />
-               </button>
+              <h3 className="text-lg font-bold text-[var(--color-primary)]">
+                Xác nhận đăng ký
+              </h3>
+              <button
+                onClick={() => setShowConfirmModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X size={20} />
+              </button>
             </div>
-            
+
             <div className="p-6 space-y-4">
-               <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
-                  <h4 className="font-bold text-[var(--color-primary)] mb-1">{selectedCourse.name}</h4>
-                  <p className="text-sm text-gray-600">Học phí: <span className="font-bold text-[var(--color-danger)]">{selectedCourse.tuition?.toLocaleString()} ₫</span></p>
-               </div>
-               
-               <div className="space-y-2 text-sm text-gray-600">
-                  <p><span className="font-medium">Học viên:</span> {user?.fullName}</p>
-                  <p><span className="font-medium">Email:</span> {user?.email}</p>
-                  <p className="italic text-xs mt-2">* Bằng cách xác nhận, yêu cầu đăng ký của bạn sẽ được gửi đến bộ phận giáo vụ để xếp lớp.</p>
-               </div>
+              <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
+                <h4 className="font-bold text-[var(--color-primary)] mb-1">
+                  {selectedCourse.name}
+                </h4>
+                <p className="text-sm text-gray-600">
+                  Học phí:{" "}
+                  <span className="font-bold text-[var(--color-danger)]">
+                    {selectedCourse.tuition?.toLocaleString()} ₫
+                  </span>
+                </p>
+              </div>
+
+              <div className="space-y-2 text-sm text-gray-600">
+                <p>
+                  <span className="font-medium">Học viên:</span>{" "}
+                  {user?.fullName}
+                </p>
+                <p>
+                  <span className="font-medium">Email:</span> {user?.email}
+                </p>
+                <p className="italic text-xs mt-2">
+                  * Bằng cách xác nhận, yêu cầu đăng ký của bạn sẽ được gửi đến
+                  bộ phận giáo vụ để xếp lớp.
+                </p>
+              </div>
             </div>
 
             <div className="p-6 pt-0 flex gap-3">
-               <button 
-                  onClick={() => setShowConfirmModal(false)}
-                  className="flex-1 py-2.5 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50"
-                  disabled={enrolling}
-               >
-                  Hủy bỏ
-               </button>
-               <button 
-                  onClick={handleEnrollConfirm}
-                  className="flex-1 py-2.5 bg-[var(--color-primary)] text-white font-bold rounded-lg hover:bg-[var(--color-primary-light)] flex justify-center items-center gap-2"
-                  disabled={enrolling}
-               >
-                  {enrolling && <Loading size="sm" color="white" />}
-                  {enrolling ? "Đang xử lý..." : "Xác nhận"}
-               </button>
+              <button
+                onClick={() => setShowConfirmModal(false)}
+                className="flex-1 py-2.5 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50"
+                disabled={enrolling}
+              >
+                Hủy bỏ
+              </button>
+              <button
+                onClick={handleEnrollConfirm}
+                className="flex-1 py-2.5 bg-[var(--color-primary)] text-white font-bold rounded-lg hover:bg-[var(--color-primary-light)] flex justify-center items-center gap-2"
+                disabled={enrolling}
+              >
+                {enrolling && <Loading size="sm" color="white" />}
+                {enrolling ? "Đang xử lý..." : "Xác nhận"}
+              </button>
             </div>
           </div>
         </div>
@@ -387,74 +435,100 @@ const EnrollPage = () => {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-               <h3 className="text-lg font-bold text-[var(--color-primary)]">Đăng ký tư vấn</h3>
-               <button onClick={() => setShowConsultModal(false)} className="text-gray-400 hover:text-gray-600">
-                  <X size={20} />
-               </button>
+              <h3 className="text-lg font-bold text-[var(--color-primary)]">
+                Đăng ký tư vấn
+              </h3>
+              <button
+                onClick={() => setShowConsultModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X size={20} />
+              </button>
             </div>
 
             <div className="p-6 space-y-4">
-               <div className="grid grid-cols-2 gap-4">
-                  <div>
-                     <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Họ tên</label>
-                     <input 
-                        value={consultForm.fullName}
-                        onChange={(e) => setConsultForm({...consultForm, fullName: e.target.value})}
-                        className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-[var(--color-secondary)] focus:border-[var(--color-secondary)] outline-none"
-                     />
-                  </div>
-                  <div>
-                     <label className="text-xs font-bold text-gray-500 uppercase block mb-1">SĐT</label>
-                     <input 
-                        value={consultForm.phone}
-                        onChange={(e) => setConsultForm({...consultForm, phone: e.target.value})}
-                        className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-[var(--color-secondary)] focus:border-[var(--color-secondary)] outline-none"
-                     />
-                  </div>
-               </div>
-               
-               <div>
-                  <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Ngày mong muốn (Không bắt buộc)</label>
-                  <input 
-                     type="date"
-                     value={consultForm.preferredDate}
-                     onChange={(e) => setConsultForm({...consultForm, preferredDate: e.target.value})}
-                     className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-[var(--color-secondary)] focus:border-[var(--color-secondary)] outline-none"
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase block mb-1">
+                    Họ tên
+                  </label>
+                  <input
+                    value={consultForm.fullName}
+                    onChange={(e) =>
+                      setConsultForm({
+                        ...consultForm,
+                        fullName: e.target.value,
+                      })
+                    }
+                    className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-[var(--color-secondary)] focus:border-[var(--color-secondary)] outline-none"
                   />
-               </div>
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase block mb-1">
+                    SĐT
+                  </label>
+                  <input
+                    value={consultForm.phone}
+                    onChange={(e) =>
+                      setConsultForm({ ...consultForm, phone: e.target.value })
+                    }
+                    className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-[var(--color-secondary)] focus:border-[var(--color-secondary)] outline-none"
+                  />
+                </div>
+              </div>
 
-               <div>
-                  <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Nội dung tư vấn</label>
-                  <textarea 
-                     rows={3}
-                     value={consultForm.message}
-                     onChange={(e) => setConsultForm({...consultForm, message: e.target.value})}
-                     className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-[var(--color-secondary)] focus:border-[var(--color-secondary)] outline-none"
-                     placeholder="Ví dụ: Tôi muốn hỏi về lịch học buổi tối..."
-                  />
-               </div>
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase block mb-1">
+                  Ngày mong muốn (Không bắt buộc)
+                </label>
+                <input
+                  type="date"
+                  value={consultForm.preferredDate}
+                  onChange={(e) =>
+                    setConsultForm({
+                      ...consultForm,
+                      preferredDate: e.target.value,
+                    })
+                  }
+                  className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-[var(--color-secondary)] focus:border-[var(--color-secondary)] outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase block mb-1">
+                  Nội dung tư vấn
+                </label>
+                <textarea
+                  rows={3}
+                  value={consultForm.message}
+                  onChange={(e) =>
+                    setConsultForm({ ...consultForm, message: e.target.value })
+                  }
+                  className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-[var(--color-secondary)] focus:border-[var(--color-secondary)] outline-none"
+                  placeholder="Ví dụ: Tôi muốn hỏi về lịch học buổi tối..."
+                />
+              </div>
             </div>
 
             <div className="p-6 pt-0 flex gap-3">
-               <button 
-                  onClick={() => setShowConsultModal(false)}
-                  className="flex-1 py-2.5 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50"
-                  disabled={consultSubmitting}
-               >
-                  Đóng
-               </button>
-               <button 
-                  onClick={handleConsultSubmit}
-                  className="flex-1 py-2.5 bg-[var(--color-secondary)] text-white font-bold rounded-lg hover:bg-[var(--color-secondary-dark)] flex justify-center items-center gap-2"
-                  disabled={consultSubmitting}
-               >
-                  {consultSubmitting ? "Đang gửi..." : "Gửi yêu cầu"}
-               </button>
+              <button
+                onClick={() => setShowConsultModal(false)}
+                className="flex-1 py-2.5 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50"
+                disabled={consultSubmitting}
+              >
+                Đóng
+              </button>
+              <button
+                onClick={handleConsultSubmit}
+                className="flex-1 py-2.5 bg-[var(--color-secondary)] text-white font-bold rounded-lg hover:bg-[var(--color-secondary-dark)] flex justify-center items-center gap-2"
+                disabled={consultSubmitting}
+              >
+                {consultSubmitting ? "Đang gửi..." : "Gửi yêu cầu"}
+              </button>
             </div>
           </div>
         </div>
       )}
-
     </div>
   );
 };

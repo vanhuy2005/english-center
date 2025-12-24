@@ -5,9 +5,7 @@ import { classService, courseService } from "@services";
 import toast from "react-hot-toast";
 import { useAuth, useLanguage } from "@hooks";
 
-/**
- * ClassListPage - List all classes with filters
- */
+
 const ClassListPage = () => {
   const navigate = useNavigate();
   const { role } = useAuth();

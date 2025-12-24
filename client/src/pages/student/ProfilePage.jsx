@@ -2,24 +2,19 @@ import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@hooks";
 import { userService } from "../../services";
 import apiClient from "../../services/api";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@components/common";
+import { Card, CardContent, CardHeader, CardTitle } from "@components/common";
 import { Button } from "@components/common";
-import { 
-  User, 
-  Mail, 
-  Phone, 
-  MapPin, 
-  Calendar, 
-  Camera, 
-  Save, 
+import {
+  User,
+  Mail,
+  Phone,
+  MapPin,
+  Calendar,
+  Camera,
+  Save,
   X,
   Edit2,
-  ShieldCheck
+  ShieldCheck,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -29,7 +24,7 @@ const ProfilePage = () => {
   const [editing, setEditing] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef(null);
-  
+
   const [profile, setProfile] = useState({
     fullName: "",
     email: "",
@@ -75,7 +70,8 @@ const ProfilePage = () => {
       setEditing(false);
       setOriginalProfile(profile);
     } catch (error) {
-      const errorMsg = error.response?.data?.message || error.message || "Cập nhật thất bại!";
+      const errorMsg =
+        error.response?.data?.message || error.message || "Cập nhật thất bại!";
       toast.error(errorMsg);
     } finally {
       setLoading(false);
@@ -111,7 +107,8 @@ const ProfilePage = () => {
         toast.error(response.data.message || "Tải ảnh thất bại!");
       }
     } catch (error) {
-      const errorMsg = error.response?.data?.message || error.message || "Không biết lỗi";
+      const errorMsg =
+        error.response?.data?.message || error.message || "Không biết lỗi";
       toast.error("Tải ảnh thất bại: " + errorMsg);
     } finally {
       setUploading(false);
@@ -120,18 +117,27 @@ const ProfilePage = () => {
 
   // --- UI COMPONENTS ---
 
-  const InputField = ({ icon: Icon, label, value, field, type = "text", isTextArea = false }) => (
+  const InputField = ({
+    icon: Icon,
+    label,
+    value,
+    field,
+    type = "text",
+    isTextArea = false,
+  }) => (
     <div className="group">
       <label className="flex items-center gap-2 text-sm font-semibold text-[var(--color-primary)] mb-2">
         <Icon className="w-4 h-4 text-[var(--color-secondary)]" />
         {label}
       </label>
-      
+
       {editing ? (
         isTextArea ? (
           <textarea
             value={value}
-            onChange={(e) => setProfile({ ...profile, [field]: e.target.value })}
+            onChange={(e) =>
+              setProfile({ ...profile, [field]: e.target.value })
+            }
             className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-[var(--color-secondary)] focus:border-transparent transition-all outline-none bg-white text-gray-700"
             rows={3}
           />
@@ -139,7 +145,9 @@ const ProfilePage = () => {
           <input
             type={type}
             value={value}
-            onChange={(e) => setProfile({ ...profile, [field]: e.target.value })}
+            onChange={(e) =>
+              setProfile({ ...profile, [field]: e.target.value })
+            }
             className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-[var(--color-secondary)] focus:border-transparent transition-all outline-none bg-white text-gray-700"
           />
         )
@@ -153,21 +161,20 @@ const ProfilePage = () => {
 
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto min-h-screen bg-gray-50/30">
-      
       {/* Header Section */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="text-2xl font-bold text-[var(--color-primary)] flex items-center gap-3">
-             <div className="p-2 bg-[var(--color-primary)] rounded-lg shadow-sm">
-                <ShieldCheck className="w-6 h-6 text-white" />
-             </div>
-             Hồ Sơ Cá Nhân
+            <div className="p-2 bg-[var(--color-primary)] rounded-lg shadow-sm">
+              <ShieldCheck className="w-6 h-6 text-white" />
+            </div>
+            Hồ Sơ Cá Nhân
           </h1>
           <p className="text-gray-500 text-sm mt-1 ml-12">
             Quản lý thông tin và bảo mật tài khoản
           </p>
         </div>
-        
+
         {!editing && (
           <Button
             onClick={() => setEditing(true)}
@@ -180,106 +187,120 @@ const ProfilePage = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        
         {/* Left Column: Avatar & Short Info */}
         <div className="space-y-6">
           <Card className="border-none shadow-[var(--shadow-card)] overflow-hidden">
-             {/* Decorative Background */}
-             <div className="h-24 bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-accent)]"></div>
-             
-             <CardContent className="flex flex-col items-center -mt-12 pb-8">
-                <div className="relative group">
-                  {/* Avatar Circle */}
-                  <div className="w-32 h-32 rounded-full border-4 border-white shadow-md bg-gray-100 flex items-center justify-center overflow-hidden">
-                    {user?.avatar ? (
-                      <img
-                        src={`http://localhost:5000${user.avatar}`}
-                        alt="Avatar"
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <User className="w-16 h-16 text-[var(--color-secondary)]" />
-                    )}
-                  </div>
+            {/* Decorative Background */}
+            <div className="h-24 bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-accent)]"></div>
 
-                  {/* Upload Button Overlay */}
-                  <div 
-                    onClick={() => !uploading && fileInputRef.current?.click()}
-                    className={`absolute bottom-1 right-1 p-2 rounded-full bg-[var(--color-secondary)] text-white shadow-lg cursor-pointer hover:bg-[var(--color-secondary-dark)] transition-colors border-2 border-white ${uploading ? 'opacity-50 cursor-wait' : ''}`}
-                    title="Đổi ảnh đại diện"
-                  >
-                    <Camera className="w-4 h-4" />
-                  </div>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleAvatarUpload}
-                    className="hidden"
-                  />
+            <CardContent className="flex flex-col items-center -mt-12 pb-8">
+              <div className="relative group">
+                {/* Avatar Circle */}
+                <div className="w-32 h-32 rounded-full border-4 border-white shadow-md bg-gray-100 flex items-center justify-center overflow-hidden">
+                  {user?.avatar ? (
+                    <img
+                      src={`http://localhost:5000${user.avatar}`}
+                      alt="Avatar"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <User className="w-16 h-16 text-[var(--color-secondary)]" />
+                  )}
                 </div>
 
-                <div className="text-center mt-4">
-                  <h2 className="text-xl font-bold text-[var(--color-primary)]">
-                    {user?.fullName || "Người dùng"}
-                  </h2>
-                  <p className="text-sm font-medium text-[var(--color-secondary)] bg-[var(--color-secondary)]/10 px-3 py-1 rounded-full mt-2 inline-block">
-                    {user?.role === "student" ? "Học viên" : user?.role === "admin" ? "Quản trị viên" : "Giáo viên"}
-                  </p>
-                  <p className="text-sm text-gray-500 mt-2">
-                    Mã: {user?.studentCode || user?.staffCode || user?.phone || "N/A"}
-                  </p>
+                {/* Upload Button Overlay */}
+                <div
+                  onClick={() => !uploading && fileInputRef.current?.click()}
+                  className={`absolute bottom-1 right-1 p-2 rounded-full bg-[var(--color-secondary)] text-white shadow-lg cursor-pointer hover:bg-[var(--color-secondary-dark)] transition-colors border-2 border-white ${
+                    uploading ? "opacity-50 cursor-wait" : ""
+                  }`}
+                  title="Đổi ảnh đại diện"
+                >
+                  <Camera className="w-4 h-4" />
                 </div>
-             </CardContent>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleAvatarUpload}
+                  className="hidden"
+                />
+              </div>
+
+              <div className="text-center mt-4">
+                <h2 className="text-xl font-bold text-[var(--color-primary)]">
+                  {user?.fullName || "Người dùng"}
+                </h2>
+                <p className="text-sm font-medium text-[var(--color-secondary)] bg-[var(--color-secondary)]/10 px-3 py-1 rounded-full mt-2 inline-block">
+                  {(() => {
+                    const r = user?.role;
+                    if (!r) return "Người dùng";
+                    if (r === "student") return "Học viên";
+                    if (r === "admin") return "Quản trị viên";
+                    if (r === "academic") return "Học vụ";
+                    if (r === "teacher") return "Giáo viên";
+                    if (r === "accountant") return "Kế toán";
+                    if (r === "enrollment") return "Tuyển sinh";
+                    return r;
+                  })()}
+                </p>
+                <p className="text-sm text-gray-500 mt-2">
+                  Mã:{" "}
+                  {user?.studentCode || user?.staffCode || user?.phone || "N/A"}
+                </p>
+              </div>
+            </CardContent>
           </Card>
         </div>
 
         {/* Right Column: Detailed Form */}
         <Card className="lg:col-span-2 border-none shadow-[var(--shadow-card)] h-fit">
           <CardHeader className="border-b border-gray-100 pb-4 mb-4">
-            <CardTitle className="text-lg font-bold text-[var(--color-primary)]">Thông tin chi tiết</CardTitle>
+            <CardTitle className="text-lg font-bold text-[var(--color-primary)]">
+              Thông tin chi tiết
+            </CardTitle>
           </CardHeader>
-          
+
           <CardContent className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <InputField 
-                icon={User} 
-                label="Họ và tên" 
-                field="fullName" 
-                value={profile.fullName} 
+              <InputField
+                icon={User}
+                label="Họ và tên"
+                field="fullName"
+                value={profile.fullName}
               />
-              
-              <InputField 
-                icon={Calendar} 
-                label="Ngày sinh" 
-                field="dateOfBirth" 
-                value={profile.dateOfBirth} 
+
+              <InputField
+                icon={Calendar}
+                label="Ngày sinh"
+                field="dateOfBirth"
+                value={profile.dateOfBirth}
                 type="date"
               />
-              
-              <InputField 
-                icon={Mail} 
-                label="Email" 
-                field="email" 
-                value={profile.email} 
+
+              <InputField
+                icon={Mail}
+                label="Email"
+                field="email"
+                value={profile.email}
                 type="email"
               />
-              
-              <InputField 
-                icon={Phone} 
-                label="Số điện thoại" 
-                field="phone" 
-                value={profile.phone} 
+
+              <InputField
+                icon={Phone}
+                label="Số điện thoại"
+                field="phone"
+                value={profile.phone}
                 type="tel"
               />
             </div>
 
             <div className="w-full">
-              <InputField 
-                icon={MapPin} 
-                label="Địa chỉ thường trú" 
-                field="address" 
-                value={profile.address} 
+              <InputField
+                icon={MapPin}
+                label="Địa chỉ thường trú"
+                field="address"
+                value={profile.address}
                 isTextArea={true}
               />
             </div>
@@ -299,9 +320,9 @@ const ProfilePage = () => {
                   <X className="w-4 h-4 mr-2" />
                   Hủy bỏ
                 </Button>
-                
-                <Button 
-                  onClick={handleSave} 
+
+                <Button
+                  onClick={handleSave}
                   disabled={loading}
                   className="bg-[var(--color-primary)] hover:bg-[var(--color-primary-light)] text-white min-w-[140px]"
                 >

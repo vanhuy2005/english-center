@@ -11,9 +11,10 @@ exports.getDashboard = async (req, res) => {
     const totalClasses = await Class.countDocuments({
       status: { $in: ["ongoing", "upcoming"] },
     });
-    const totalStudents = await Student.countDocuments({
-      academicStatus: "active",
-    });
+    // Show total students (count all). Previously this counted only
+    // students with academicStatus === "active", which caused the
+    // dashboard to show fewer students than exist in the DB.
+    const totalStudents = await Student.countDocuments();
 
     const pendingRequestsCount = await Request.countDocuments({
       status: "pending",
@@ -124,9 +125,8 @@ exports.getStatistics = async (req, res) => {
       status: { $in: ["ongoing", "upcoming"] },
     });
 
-    const totalStudents = await Student.countDocuments({
-      academicStatus: "active",
-    });
+    // Use total students for overall statistics as well.
+    const totalStudents = await Student.countDocuments();
 
     // Overall Attendance Rate
     const attendanceStats = await Attendance.aggregate([

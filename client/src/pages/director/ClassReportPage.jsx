@@ -14,7 +14,6 @@ import {
   MoreHorizontal
 } from "lucide-react";
 
-// Import dữ liệu giả lập từ file vừa tạo
 import { 
   classStats, 
   classStatusData, 
@@ -23,14 +22,11 @@ import {
   breakdownStats
 } from './mockClassData';
 
-/**
- * Class Report Page - Thống kê lớp học (Polished UI)
- */
+
 const ClassReportPage = () => {
   const { t } = useLanguage();
   const [loading, setLoading] = useState(true);
-  
-  // State quản lý dữ liệu
+
   const [stats, setStats] = useState(classStats);
   const [classData, setClassData] = useState([]);
   const [capacityData, setCapacityData] = useState([]);
@@ -45,11 +41,10 @@ const ClassReportPage = () => {
     try {
       setLoading(true);
       
-      // Giả lập độ trễ mạng (0.8s) để tạo hiệu ứng loading mượt mà
+  
       await new Promise(resolve => setTimeout(resolve, 800));
 
-      // Gán dữ liệu trực tiếp từ Mock Data
-      // (Không gọi API để tránh lỗi service function missing)
+
       setStats(classStats);
       setClassData(classStatusData);
       setCapacityData(classCapacityData);
@@ -71,11 +66,11 @@ const ClassReportPage = () => {
     );
   }
 
-  // Helper render Progress Bar cho cột Sĩ số
+ 
   const renderCapacityBar = (current, max) => {
     const percent = Math.round((current / max) * 100) || 0;
     
-    // Logic màu sắc: >90% đỏ, >70% vàng, còn lại xanh
+   
     let colorClass = "bg-emerald-500";
     if (percent >= 90) colorClass = "bg-rose-500";
     else if (percent >= 70) colorClass = "bg-amber-500";
@@ -96,7 +91,7 @@ const ClassReportPage = () => {
     );
   };
 
-  // Cấu hình cột cho bảng
+  
   const tableColumns = [
     { key: "classCode", label: "Mã Lớp", width: "110px", className: "text-sm font-mono text-gray-600" },
     { key: "className", label: "Tên Lớp", className: "font-semibold text-gray-900" },
@@ -109,7 +104,7 @@ const ClassReportPage = () => {
   return (
     <div className="p-6 space-y-8 bg-gray-50/50 min-h-screen font-sans">
       
-      {/* 1. Header Section */}
+     
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight">
@@ -131,7 +126,7 @@ const ClassReportPage = () => {
         </div>
       </div>
 
-      {/* 2. Statistics Cards Grid */}
+    
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
         <StatCard
           title="Tổng Lớp Học"
@@ -166,9 +161,9 @@ const ClassReportPage = () => {
         />
       </div>
 
-      {/* 3. Charts Section */}
+      
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Pie Chart: Status */}
+    
         <Card title="Trạng Thái Lớp Học" className="shadow-sm border-gray-200">
           <div className="mt-4">
              <PieChart
@@ -181,7 +176,7 @@ const ClassReportPage = () => {
           </div>
         </Card>
 
-        {/* Bar Chart: Capacity */}
+     
         <Card title="Phân Tích Tỷ Lệ Lấp Đầy" className="shadow-sm border-gray-200">
           <div className="mt-4">
             <BarChart
@@ -201,7 +196,7 @@ const ClassReportPage = () => {
         </Card>
       </div>
 
-      {/* 4. Main Class List Table */}
+   
       <Card title="Danh Sách Lớp Học Tiêu Biểu" className="shadow-sm border-gray-200">
         <div className="mt-2">
             <Table
@@ -242,7 +237,7 @@ const ClassReportPage = () => {
         </div>
       </Card>
 
-      {/* 5. Breakdown Info Cards */}
+      
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card title="Phân Bổ Theo Trình Độ" className="shadow-sm border-gray-200" icon={<BookOpen className="w-5 h-5 text-gray-400"/>}>
           <div className="space-y-4 mt-2">
@@ -272,11 +267,6 @@ const ClassReportPage = () => {
   );
 };
 
-// --- Sub Components ---
-
-/**
- * Stat Card Component - Tái sử dụng style Soft UI
- */
 const StatCard = ({ title, value, icon, variant = "blue", subtitle }) => {
   const variants = {
     blue: "bg-blue-50 text-blue-600 border-blue-100",
@@ -304,9 +294,6 @@ const StatCard = ({ title, value, icon, variant = "blue", subtitle }) => {
   );
 };
 
-/**
- * Status Item Component - Dùng cho các Card Breakdown cuối trang
- */
 const StatusItem = ({ label, count, color }) => {
     // Kiểm tra xem color là mã hex hay class tailwind
     const isTailwindClass = color.startsWith('bg-');

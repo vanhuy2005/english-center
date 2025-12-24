@@ -5,9 +5,7 @@ import { classService, studentService } from "@services";
 import toast from "react-hot-toast";
 import { useAuth, useLanguage } from "@hooks";
 
-/**
- * ClassDetailPage - View class details with students, schedule, and actions
- */
+
 const ClassDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -31,7 +29,7 @@ const ClassDetailPage = () => {
       setLoading(true);
       const classRes = await classService.getById(id);
       setClassData(classRes.data);
-      // Lấy students từ classData.students (đã populate từ API)
+ 
       const studentsList = (classRes.data?.students || [])
         .map((item) => item.student)
         .filter(Boolean);
@@ -67,7 +65,6 @@ const ClassDetailPage = () => {
       console.log("res.data type:", typeof res.data);
       console.log("res.data?.data:", res.data?.data);
 
-      // Xử lý response - có thể là res.data hoặc res.data.data tùy vào API structure
       const allStudents = Array.isArray(res.data)
         ? res.data
         : Array.isArray(res.data?.data)
