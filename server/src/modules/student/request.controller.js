@@ -97,6 +97,53 @@ exports.enrollCourse = async (req, res) => {
       priority: "normal",
     });
 
+    // Create notification for academic staff about new enrollment request
+    const Staff = require("../../shared/models/Staff.model");
+    const academicStaff = await Staff.find({
+      staffType: "academic",
+      status: "active",
+    }).select("_id");
+
+    const academicNotifications = academicStaff.map((staff) => ({
+      recipient: staff._id,
+      type: "request_response",
+      title: `Yêu cầu đăng ký khóa học mới`,
+      message: `${student.fullName} (${student.studentCode}) đã gửi yêu cầu đăng ký khóa học ${course.name}. Vui lòng xử lý.`,
+      link: "/staff/academic/requests",
+      relatedModel: "Request",
+      relatedId: enrollmentRequest._id,
+      priority: "high",
+    }));
+
+    // Create notification for accountant staff about new finance record
+    const accountantStaff = await Staff.find({
+      staffType: "accountant",
+      status: "active",
+    }).select("_id");
+
+    const accountantNotifications = accountantStaff.map((staff) => ({
+      recipient: staff._id,
+      type: "payment_reminder",
+      title: `Khoản thu mới: Học phí`,
+      message: `${student.fullName} (${
+        student.studentCode
+      }) đã đăng ký khóa học ${
+        course.name
+      }. Số tiền: ${feeAmount.toLocaleString("vi-VN")}đ.`,
+      link: "/staff/accountant/finance",
+      relatedModel: "Finance",
+      relatedId: financeRecord._id,
+      priority: "normal",
+    }));
+
+    if (academicNotifications.length > 0) {
+      await Notification.insertMany(academicNotifications);
+    }
+
+    if (accountantNotifications.length > 0) {
+      await Notification.insertMany(accountantNotifications);
+    }
+
     // Respond with the created request and finance info
     successResponse(
       res,

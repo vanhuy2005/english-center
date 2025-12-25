@@ -168,13 +168,15 @@ gradeSchema.pre("save", function (next) {
     // Calculate letter grade
     this.letterGrade = this.calculateLetterGrade(this.totalScore);
 
-    // Determine status
-    this.status = this.totalScore >= 5.0 ? "completed" : "failed";
+    // Don't automatically change status - let staff/teacher control this
+    // Status should only be set manually or when explicitly published
   } else {
-    // If no scores, reset total
+    // If no scores, keep as in_progress (don't reset if already set)
     this.totalScore = undefined;
     this.letterGrade = undefined;
-    this.status = "in_progress";
+    if (!this.status || this.status === undefined) {
+      this.status = "in_progress";
+    }
   }
 
   // Set graded date if not already set and scores are entered

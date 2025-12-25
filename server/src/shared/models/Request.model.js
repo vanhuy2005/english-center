@@ -49,6 +49,11 @@ const requestSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Class",
     },
+    assignedToClass: {
+      // For course_enrollment: the class student was assigned to after approval
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Class",
+    },
     startDate: {
       type: Date,
     },

@@ -531,10 +531,12 @@ exports.getMyGrades = async (req, res) => {
     const studentId = req.user._id;
 
     const grades = await Grade.find({ student: studentId, isPublished: true })
-      .populate("class", "className classCode")
+      .populate("class", "name classCode")
       .populate("course", "name courseCode level")
       .populate("gradedBy", "fullName")
       .sort({ createdAt: -1 });
+
+    console.log(`📊 Found ${grades.length} grades for student ${studentId}`);
 
     res.status(200).json({
       success: true,

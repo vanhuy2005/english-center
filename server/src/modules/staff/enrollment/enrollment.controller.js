@@ -529,26 +529,35 @@ exports.getEnrollmentRequests = async (req, res) => {
   try {
     const { status = "pending", type, page = 1, limit = 20 } = req.query;
 
-    const query = { status };
-    if (type) {
-      if (type.includes(",")) {
-        query.type = { $in: type.split(",") };
-      } else {
-        query.type = type;
-      }
+    const query = {};
+
+    // For approved status, only get course_enrollment requests that haven't been assigned to a class yet
+    if (status === "approved") {
+      query.status = "approved";
+      query.type = "course_enrollment";
+      query.assignedToClass = { $exists: false }; // Not assigned to class yet
     } else {
-      // Include all types by default - don't filter by type if not specified
-      query.type = {
-        $in: [
-          "transfer",
-          "pause",
-          "resume",
-          "leave",
-          "makeup",
-          "withdrawal",
-          "course_enrollment",
-        ],
-      };
+      query.status = status;
+      if (type) {
+        if (type.includes(",")) {
+          query.type = { $in: type.split(",") };
+        } else {
+          query.type = type;
+        }
+      } else {
+        // Include all types by default - don't filter by type if not specified
+        query.type = {
+          $in: [
+            "transfer",
+            "pause",
+            "resume",
+            "leave",
+            "makeup",
+            "withdrawal",
+            "course_enrollment",
+          ],
+        };
+      }
     }
 
     console.log("Enrollment requests query:", query);
@@ -594,10 +603,10 @@ exports.getEnrollmentRequests = async (req, res) => {
  */
 exports.processRequest = async (req, res) => {
   try {
-    const { action, note } = req.body; // action: 'approve' or 'reject'
+    const { action, note, classId } = req.body;
     const requestId = req.params.id;
 
-    console.log("Processing request:", { requestId, action, note });
+    console.log("Processing request:", { requestId, action, note, classId });
 
     if (!["approve", "reject"].includes(action)) {
       return errorResponse(res, "Hành động không hợp lệ", 400);
@@ -608,16 +617,42 @@ exports.processRequest = async (req, res) => {
       return errorResponse(res, "Không tìm thấy yêu cầu", 404);
     }
 
-    if (request.status !== "pending") {
-      return errorResponse(res, "Yêu cầu đã được xử lý", 400);
+    // Allow processing if:
+    // 1. Status is pending (normal flow)
+    // 2. Status is approved AND we're assigning to a class (enrollment staff assigning class after academic approved)
+    if (request.status === "rejected" || request.status === "cancelled") {
+      return errorResponse(
+        res,
+        "Không thể xử lý yêu cầu đã bị từ chối hoặc hủy",
+        400
+      );
     }
 
-    // Update request status
-    request.status = action === "approve" ? "approved" : "rejected";
-    request.processedBy = req.user._id;
-    if (note) request.responseNote = note;
+    if (request.status === "approved" && action === "reject") {
+      return errorResponse(
+        res,
+        "Không thể từ chối yêu cầu đã được phê duyệt",
+        400
+      );
+    }
 
-    // If approved, update student and class accordingly
+    // Check if trying to approve an already approved request without classId
+    if (request.status === "approved" && action === "approve" && !classId) {
+      return errorResponse(
+        res,
+        "Yêu cầu đã được phê duyệt. Vui lòng chọn lớp để xếp học viên.",
+        400
+      );
+    }
+
+    // Update request status (only if still pending)
+    if (request.status === "pending") {
+      request.status = action === "approve" ? "approved" : "rejected";
+      request.processedBy = req.user._id;
+      if (note) request.responseNote = note;
+    }
+
+    // If approved (or already approved), update student and class accordingly
     if (action === "approve") {
       const student = await Student.findById(request.student);
       if (!student) {
@@ -627,8 +662,6 @@ exports.processRequest = async (req, res) => {
       // If the request is a course enrollment and staff provided a classId,
       // enroll the student into that class immediately.
       if (request.type === "course_enrollment") {
-        const { classId } = req.body;
-
         if (classId) {
           const classData = await Class.findById(classId).populate("course");
           if (!classData) {
@@ -664,6 +697,30 @@ exports.processRequest = async (req, res) => {
             status: "active",
           });
           await classData.save();
+
+          // Mark request as assigned to this class
+          request.assignedToClass = classId;
+
+          // Create grade record for the student in this class
+          const Grade = require("../../../shared/models/Grade.model");
+          const existingGrade = await Grade.findOne({
+            student: student._id,
+            class: classData._id,
+          });
+
+          if (!existingGrade) {
+            await Grade.create({
+              student: student._id,
+              class: classData._id,
+              course: classData.course?._id || null,
+              status: "in_progress",
+              isPublished: true,
+              publishedDate: new Date(),
+            });
+            console.log(
+              `✅ Created grade record for student ${student.studentCode} in class ${classData.name}`
+            );
+          }
 
           // Update student profile
           if (!student.enrolledCourses) student.enrolledCourses = [];
