@@ -5,6 +5,8 @@ const Grade = require("../../shared/models/Grade.model");
 const Attendance = require("../../shared/models/Attendance.model");
 const Finance = require("../../shared/models/Finance.model");
 const Request = require("../../shared/models/Request.model");
+const Notification = require("../../shared/models/Notification.model");
+const Staff = require("../../shared/models/Staff.model");
 const {
   successResponse,
   errorResponse,
@@ -199,6 +201,29 @@ exports.createStudent = async (req, res) => {
     });
 
     successResponse(res, student, "Tạo học viên thành công", 201);
+
+    // Optional: notify accountants/directors about new student registration
+    try {
+      const accountants = await Staff.find({ staffType: "accountant" }).select(
+        "_id"
+      );
+      if (accountants.length > 0) {
+        const notis = accountants.map((acc) => ({
+          recipient: acc._id,
+          type: "system",
+          title: "Học viên mới đăng ký",
+          message: `Học viên ${student.fullName} đã được tạo trong hệ thống. Vui lòng kiểm tra thông tin và công nợ nếu cần.`,
+          relatedModel: "Student",
+          relatedId: student._id,
+          isRead: false,
+          createdAt: new Date(),
+        }));
+        await Notification.insertMany(notis);
+        console.log("🔔 Đã gửi thông báo về học viên mới cho kế toán.");
+      }
+    } catch (err) {
+      console.error("Lỗi gửi noti khi tạo học viên:", err);
+    }
   } catch (error) {
     console.error("Create Student Error:", error);
     errorResponse(res, error.message, 500);
@@ -346,6 +371,35 @@ exports.enrollCourse = async (req, res) => {
 
     await student.populate("enrolledCourses", "name courseCode level fee");
     successResponse(res, student, "Ghi danh thành công");
+
+    // --- TRIGGER NOTIFICATION FOR ACCOUNTANT ---
+    try {
+      const accountants = await Staff.find({ staffType: "accountant" }).select(
+        "_id"
+      );
+      if (accountants.length > 0) {
+        const notis = accountants.map((acc) => ({
+          recipient: acc._id,
+          type: "system",
+          title: "Đăng ký khóa học mới",
+          message: `Học viên ${student.fullName} vừa đăng ký khóa học ${
+            course?.name || ""
+          }. Vui lòng kiểm tra công nợ.`,
+          relatedModel: "Student",
+          relatedId: student._id,
+          isRead: false,
+          createdAt: new Date(),
+        }));
+
+        await Notification.insertMany(notis);
+        console.log("🔔 Đã gửi thông báo cho kế toán.");
+      }
+    } catch (notiError) {
+      console.error(
+        "Lỗi gửi thông báo kế toán (không ảnh hưởng luồng chính):",
+        notiError
+      );
+    }
   } catch (error) {
     console.error("Enroll Course Error:", error);
     errorResponse(res, error.message, 500);
@@ -364,68 +418,88 @@ exports.enrollCourse = async (req, res) => {
 exports.getMyCourses = async (req, res) => {
   try {
     const studentId = req.user._id;
-    console.log("📚 Fetching courses for student:", studentId);
 
-    // Find all classes where student is enrolled (by Class.students)
-    const classesByClassDoc = await Class.find({
+    // 1. Find classes where student is active
+    const enrolledClasses = await Class.find({
       "students.student": studentId,
+      "students.status": "active",
     })
-      .populate("course", "name code level duration")
-      .populate("teacher", "fullName email")
+      .populate("course", "name code duration")
+      .populate("teacher", "fullName")
       .lean();
 
-    // Also check Student.enrolledCourses (legacy or different storage)
-    const student = await Student.findById(studentId).lean();
-    let classesByStudentDoc = [];
-    if (
-      student &&
-      Array.isArray(student.enrolledCourses) &&
-      student.enrolledCourses.length
-    ) {
-      const ids = student.enrolledCourses.map((c) => c.toString());
-      classesByStudentDoc = await Class.find({ _id: { $in: ids } })
-        .populate("course", "name code level duration")
-        .populate("teacher", "fullName email")
-        .lean();
+    if (!enrolledClasses || enrolledClasses.length === 0) {
+      return successResponse(res, [], "Chưa đăng ký khóa học nào");
     }
 
-    // Merge and dedupe by _id
-    const combined = [];
-    const seen = new Set();
+    const coursesWithStats = await Promise.all(
+      enrolledClasses.map(async (cls) => {
+        // 1. TÍNH TIẾN ĐỘ (PROGRESS) - Kẹp giá trị từ 0-100
+        const now = new Date();
+        const startDate = cls.startDate ? new Date(cls.startDate) : null;
+        const endDate = cls.endDate ? new Date(cls.endDate) : null;
 
-    (classesByClassDoc || []).forEach((c) => {
-      if (!seen.has(String(c._id))) {
-        seen.add(String(c._id));
-        combined.push(c);
-      }
-    });
-    (classesByStudentDoc || []).forEach((c) => {
-      if (!seen.has(String(c._id))) {
-        seen.add(String(c._id));
-        combined.push(c);
-      }
-    });
+        let progress = 0;
+        if (startDate && endDate) {
+          if (now < startDate) progress = 0;
+          else if (now > endDate) progress = 100;
+          else {
+            const totalDuration = endDate - startDate;
+            const elapsed = now - startDate;
+            progress = Math.round((elapsed / totalDuration) * 100);
+          }
+        }
+        // Ensure progress is between 0 and 100
+        progress = Math.min(100, Math.max(0, Number.isFinite(progress) ? progress : 0));
 
-    console.log(
-      "✅ Found (by class doc):",
-      classesByClassDoc.length,
-      "by student doc:",
-      classesByStudentDoc.length,
-      "combined:",
-      combined.length
+        // 2. TÍNH CHUYÊN CẦN (ATTENDANCE)
+        const presentCount = await Attendance.countDocuments({
+          class: cls._id,
+          student: studentId,
+          status: "present", // Hoặc trạng thái được coi là có mặt
+        });
+        const totalCheckins = await Attendance.countDocuments({
+          class: cls._id,
+          student: studentId,
+        });
+
+        // Display logic: If there are no attendance records, default to 100% (to avoid showing alarming 0%)
+        // Frontend can interpret 100 as 'no data' styling if desired, or you can change to null to explicitly denote missing data.
+        const attendanceRate = totalCheckins > 0 ? Math.round((presentCount / totalCheckins) * 100) : 100;
+
+        // 3. ĐIỂM SỐ (GRADE)
+        const grade = await Grade.findOne({ student: studentId, class: cls._id }).lean();
+
+        // Determine status: Prefer student's enrollment status, fallback to class status
+        // Map 'ongoing' class status to 'active' for frontend compatibility if needed
+        const enrollment = cls.students.find(s => s.student.toString() === studentId.toString());
+        let status = enrollment?.status || cls.status;
+        if (status === "ongoing") status = "active";
+
+        return {
+          classId: cls._id,
+          className: cls.name,
+          courseName: cls.course?.name || "Khóa học",
+          courseCode: cls.course?.code,
+          teacherName: cls.teacher?.fullName || "Giảng viên",
+          startDate: cls.startDate,
+          endDate: cls.endDate,
+          schedule: cls.schedule || [], // Mảng lịch học
+
+          progress,
+          attendanceRate,
+          averageGrade: grade?.totalScore || 0,
+          letterGrade: grade?.letterGrade || "N/A", // Frontend may render N/A as muted
+
+          status: status,
+        };
+      })
     );
 
-    res.json({
-      success: true,
-      data: combined || [],
-    });
+    return successResponse(res, coursesWithStats, "Lấy danh sách khóa học thành công");
   } catch (error) {
-    console.error("❌ Error fetching student courses:", error);
-    res.status(500).json({
-      success: false,
-      message: "Không thể tải danh sách khóa học",
-      data: [],
-    });
+    console.error("Get My Courses Error:", error);
+    return errorResponse(res, error.message, 500);
   }
 };
 
@@ -541,13 +615,22 @@ exports.createRequest = async (req, res) => {
   try {
     const {
       type,
+      title,
+      content,
+      course: courseId,
+      courseId: courseIdAlias,
       class: classId,
+      classId: classIdAlias,
       targetClass,
+      date,
       startDate,
       endDate,
       reason,
       documents,
       priority,
+      phone,
+      preferredDate,
+      note,
     } = req.body;
 
     const studentId = req.user && (req.user._id || req.user.id);
@@ -555,17 +638,41 @@ exports.createRequest = async (req, res) => {
     console.log("[student.createRequest] payload:", req.body);
     console.log("[student.createRequest] auth user:", studentId);
 
-    if (!studentId || !type || !reason) {
-      return errorResponse(res, "Vui lòng cung cấp thông tin bắt buộc", 400);
+    // Normalize identifiers (accept course or courseId, class or classId)
+    const finalCourseId = courseId || courseIdAlias || null;
+    const finalClassId = classId || classIdAlias || null;
+
+    if (!studentId || !type) {
+      return errorResponse(res, "Loại yêu cầu là bắt buộc", 400);
     }
 
-    // Optional: validate class/targetClass existence
-    if (classId) {
-      if (!mongoose.Types.ObjectId.isValid(classId)) {
+    // If this type requires reason and none provided, reject early
+    const needReason = [
+      "leave",
+      "makeup",
+      "transfer",
+      "pause",
+      "resume",
+      "withdrawal",
+      "course_enrollment",
+      "reserve",
+    ];
+    const finalReason = reason || content || note || undefined;
+    if (needReason.includes(type) && (!finalReason || !finalReason.trim())) {
+      return errorResponse(
+        res,
+        "Vui lòng cung cấp lý do hoặc nội dung yêu cầu",
+        400
+      );
+    }
+
+    // Validate IDs if provided
+    if (finalClassId) {
+      if (!mongoose.Types.ObjectId.isValid(finalClassId)) {
         return errorResponse(res, "Mã lớp không hợp lệ", 400);
       }
       const ClassModel = require("../../shared/models/Class.model");
-      const c = await ClassModel.findById(classId);
+      const c = await ClassModel.findById(finalClassId);
       if (!c) return errorResponse(res, "Lớp học không tồn tại", 404);
     }
 
@@ -578,24 +685,93 @@ exports.createRequest = async (req, res) => {
       if (!tc) return errorResponse(res, "Lớp đích không tồn tại", 404);
     }
 
+    // For course enrollment, ensure course provided
+    if (type === "course_enrollment" && !finalCourseId) {
+      return errorResponse(
+        res,
+        "Mã khóa học là bắt buộc khi đăng ký khóa học",
+        400
+      );
+    }
+
     const RequestModel = require("../../shared/models/Request.model");
 
     const newReq = await RequestModel.create({
       student: studentId,
       type,
-      class: classId,
+      title: title || getTitleByType(type),
+      content: content || undefined,
+      reason: finalReason,
+      course: finalCourseId || undefined,
+      class: finalClassId || undefined,
       targetClass,
-      startDate,
-      endDate,
-      reason,
+      startDate: date
+        ? new Date(date)
+        : startDate
+        ? new Date(startDate)
+        : undefined,
+      endDate: endDate ? new Date(endDate) : undefined,
       documents,
       priority: priority || "normal",
+      // consultation-specific fields
+      contactPhone: phone,
+      preferredDate: preferredDate ? new Date(preferredDate) : undefined,
+      additionalNote: note,
     });
 
     const populated = await RequestModel.findById(newReq._id)
       .populate("student", "studentCode fullName")
       .populate("class", "className classCode")
       .populate("targetClass", "className classCode");
+
+    // Notification logic for various request types
+    try {
+      const Staff = require("../../shared/models/Staff.model");
+      const Notification = require("../../shared/models/Notification.model");
+
+      let targetRoles = [];
+      let notiTitle = "Yêu cầu mới";
+      let notiMessage = `${populated.student?.fullName || "Học viên"} vừa gửi yêu cầu.`;
+
+      if (type === "consultation") {
+        targetRoles = ["enrollment", "academic", "director"];
+        notiTitle = "Yêu cầu tư vấn mới";
+        notiMessage = `${populated.student?.fullName || "Học viên"} đã gửi yêu cầu tư vấn. SĐT: ${phone || "N/A"}`;
+      } else if (type === "course_enrollment") {
+        targetRoles = ["enrollment", "academic", "accountant", "director"];
+        notiTitle = "Đăng ký khóa học mới";
+        notiMessage = `${populated.student?.fullName || "Học viên"} vừa đăng ký khóa học. Vui lòng kiểm tra và thu phí.`;
+      } else {
+        targetRoles = ["academic", "director"];
+        notiTitle = "Yêu cầu học vụ mới";
+        notiMessage = `${populated.student?.fullName || "Học viên"} gửi yêu cầu: ${populated.title || populated.reason || "(không có mô tả)"}`;
+      }
+
+      const staffUsers = await Staff.find({
+        staffType: { $in: targetRoles },
+        status: "active",
+      }).select("_id");
+
+      if (staffUsers && staffUsers.length > 0) {
+        const notifications = staffUsers.map((s) => ({
+          recipient: s._id,
+          sender: studentId,
+          type: "request_response",
+          title: notiTitle,
+          message: notiMessage,
+          link: "/staff/enrollment/requests",
+          relatedModel: "Request",
+          relatedId: newReq._id,
+          isRead: false,
+          createdAt: new Date(),
+        }));
+
+        await Notification.insertMany(notifications);
+        console.log(`🔔 Đã gửi thông báo đến ${notifications.length} nhân viên (Roles: ${targetRoles.join(", ")})`);
+      }
+    } catch (notifErr) {
+      console.error("Lỗi gửi thông báo (không chặn luồng chính):", notifErr);
+    }
 
     successResponse(res, populated, "Tạo yêu cầu thành công", 201);
   } catch (error) {
@@ -609,6 +785,19 @@ exports.createRequest = async (req, res) => {
     errorResponse(res, error.message, 500);
   }
 };
+
+// Helper function to generate a default title
+function getTitleByType(type) {
+  const map = {
+    consultation: "Đăng ký tư vấn",
+    leave: "Xin nghỉ phép",
+    makeup: "Đăng ký học bù",
+    transfer: "Xin chuyển lớp",
+    reserve: "Xin bảo lưu",
+    course_enrollment: "Đăng ký khóa học",
+  };
+  return map[type] || "Yêu cầu khác";
+}
 
 exports.uploadAvatar = async (req, res) => {
   try {

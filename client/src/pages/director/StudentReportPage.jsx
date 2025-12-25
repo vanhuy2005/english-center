@@ -67,9 +67,7 @@ import {
   Calendar,
 } from "lucide-react";
 
-/**
- * Student Report Page - Thống kê học viên
- */
+
 const StudentReportPage = () => {
   const { t } = useLanguage();
   const [loading, setLoading] = useState(true);
@@ -194,7 +192,6 @@ const StudentReportPage = () => {
     );
   }
 
-  // Helper để render Rank đẹp hơn
   const renderRankBadge = (index) => {
     const rank = index + 1;
     let badgeStyle = "bg-gray-100 text-gray-600 border-gray-200"; // Mặc định
@@ -238,7 +235,7 @@ const StudentReportPage = () => {
 
   return (
     <div className="p-6 space-y-8 bg-gray-50/50 min-h-screen font-sans">
-      {/* Header Section */}
+    
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight">
@@ -248,8 +245,6 @@ const StudentReportPage = () => {
             Tổng quan số liệu, xu hướng ghi danh và xếp hạng thành tích.
           </p>
         </div>
-
-        {/* Actions Placeholder (Optional UI Polish) */}
         <div className="flex items-center gap-2">
           <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 shadow-sm transition-all">
             <Calendar className="w-4 h-4" />
@@ -261,7 +256,7 @@ const StudentReportPage = () => {
         </div>
       </div>
 
-      {/* Statistics Cards Grid */}
+     
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard
           title="Tổng Học Viên"
@@ -290,9 +285,8 @@ const StudentReportPage = () => {
         />
       </div>
 
-      {/* Charts Section */}
+    
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Enrollment Trend */}
         <Card
           className="lg:col-span-2 shadow-sm border-gray-200"
           title="Xu Hướng Ghi Danh"
@@ -310,7 +304,7 @@ const StudentReportPage = () => {
           </div>
         </Card>
 
-        {/* Student Distribution */}
+       
         <Card className="shadow-sm border-gray-200" title="Phân Bổ Theo Khóa">
           <div className="mt-4">
             <PieChart
@@ -325,7 +319,7 @@ const StudentReportPage = () => {
         </Card>
       </div>
 
-      {/* Top Students Table */}
+     
       <Card className="shadow-sm border-gray-200" title="Bảng Vàng Thành Tích">
         <div className="mt-2">
           <Table
@@ -354,7 +348,7 @@ const StudentReportPage = () => {
         </div>
       </Card>
 
-      {/* Breakdown Grids */}
+    
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card title="Trạng Thái" className="shadow-sm border-gray-200">
           <div className="space-y-4 mt-2">
@@ -391,11 +385,9 @@ const StudentReportPage = () => {
   );
 };
 
-/**
- * Reusable Stat Card Component - Polished UI
- */
+
 const StatCard = ({ title, value, icon, variant = "blue", trend }) => {
-  // Map variant colors for consistent theming
+ 
   const variants = {
     blue: "bg-blue-50 text-blue-600 border-blue-100",
     green: "bg-emerald-50 text-emerald-600 border-emerald-100",
@@ -432,8 +424,6 @@ const StatCard = ({ title, value, icon, variant = "blue", trend }) => {
             </div>
           )}
         </div>
-
-        {/* Icon Container with shrink-0 to prevent layout breakage */}
         <div className={`p-3 rounded-xl shrink-0 ${currentStyle}`}>{icon}</div>
       </div>
     </div>

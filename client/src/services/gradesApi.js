@@ -1,85 +1,34 @@
 import api from "./api";
 
-// Mock data
-const getMockGrades = () => [
-  {
-    _id: "grade_mock_1",
-    course: {
-      _id: "course1",
-      name: "English A1",
-      code: "EN-A1",
-    },
-    enrollment: "enrollment1",
-    midtermScore: 8.5,
-    finalScore: 8.0,
-    attendance: 85,
-    status: "completed",
-    letterGrade: "A",
-    createdAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
-  },
-  {
-    _id: "grade_mock_2",
-    course: {
-      _id: "course2",
-      name: "English A2",
-      code: "EN-A2",
-    },
-    enrollment: "enrollment2",
-    midtermScore: 7.5,
-    finalScore: null,
-    attendance: 90,
-    status: "in-progress",
-    letterGrade: null,
-    createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
-  },
-  {
-    _id: "grade_mock_3",
-    course: {
-      _id: "course3",
-      name: "English B1",
-      code: "EN-B1",
-    },
-    enrollment: "enrollment3",
-    midtermScore: 9.0,
-    finalScore: 8.5,
-    attendance: 95,
-    status: "completed",
-    letterGrade: "A",
-    createdAt: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000),
-  },
-];
-
-// Lấy danh sách điểm của học viên
+// Lấy danh sách điểm của học viên từ server (KHÔNG dùng mock)
 export const getMyGrades = async () => {
   try {
-    // Thử endpoint 1
+    // Prefer student-scoped endpoint
     try {
       const response = await api.get("/grades/me");
-      if (response.data.success && Array.isArray(response.data.data)) {
-        console.log("✓ Grades from API:", response.data.data);
+      if (response.data?.success && Array.isArray(response.data.data)) {
         return response.data.data;
       }
-    } catch (err1) {
-      console.log("Endpoint /grades/me failed:", err1.response?.status);
+    } catch (err) {
+      console.debug("/grades/me failed:", err?.response?.status || err.message);
     }
 
-    // Thử endpoint 2
+    // Fallback to generic grades list if available
     try {
       const response = await api.get("/grades");
-      if (response.data.success && Array.isArray(response.data.data)) {
-        console.log("✓ Grades from /grades:", response.data.data);
+      if (response.data?.success && Array.isArray(response.data.data)) {
         return response.data.data;
       }
-    } catch (err2) {
-      console.log("Endpoint /grades failed:", err2.response?.status);
+    } catch (err) {
+      console.debug("/grades failed:", err?.response?.status || err.message);
     }
 
-    // Trả về mock data nếu cả hai đều fail
-    console.log("↪️  Using mock grades");
-    return getMockGrades();
+    // No server data available — return empty array (no mock)
+    console.warn("Grades endpoints unavailable — returning empty list");
+    return [];
   } catch (error) {
     console.error("Error getting grades:", error);
-    return getMockGrades();
+    return [];
   }
 };
 

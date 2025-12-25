@@ -90,4 +90,36 @@ export const directorService = {
       return [];
     }
   },
+
+  // Lấy thống kê doanh thu (stats cards)
+  getRevenueStats: async (period = "month") => {
+    try {
+      const response = await api.get(
+        `/api/director/reports/revenue-stats?period=${period}`
+      );
+      return response.data.data || {};
+    } catch (error) {
+      console.error("Failed to fetch revenue stats:", error);
+      return {
+        totalRevenue: 0,
+        totalProfit: 0,
+        totalExpenses: 0,
+        growth: 0,
+        margin: 0,
+      };
+    }
+  },
+
+  // Lấy dữ liệu biểu đồ doanh thu (revenue chart)
+  getRevenueChart: async (period = "month", limit = 12) => {
+    try {
+      const response = await api.get(
+        `/api/director/reports/charts/revenue?period=${period}&limit=${limit}`
+      );
+      return response.data.data || [];
+    } catch (error) {
+      console.error("Failed to fetch revenue chart:", error);
+      return [];
+    }
+  },
 };

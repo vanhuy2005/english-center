@@ -45,6 +45,7 @@ import SchedulePage from "@pages/student/SchedulePage";
 import StudentTimetablePage from "@pages/student/StudentTimetablePage";
 import GradesPage from "@pages/student/GradesPage";
 import TuitionPage from "@pages/student/TuitionPage";
+import PaymentPage from "@pages/student/PaymentPage";
 import MyCoursesPage from "@pages/student/MyCoursesPage";
 import RequestListPage from "@pages/student/RequestListPage";
 import RequestFormPage from "@pages/student/RequestFormPage";
@@ -283,6 +284,14 @@ function App() {
           }
         />
         <Route
+          path="/tuition/:id"
+          element={
+            <ProtectedRoute allowedRoles={["student"]}>
+              <PaymentPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/my-courses"
           element={
             <ProtectedRoute allowedRoles={["student"]}>
@@ -300,6 +309,24 @@ function App() {
         />
         <Route
           path="/requests/new"
+          element={
+            <ProtectedRoute allowedRoles={["student"]}>
+              <RequestFormPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Backwards-compatible student-scoped routes (some links use /student/requests) */}
+        <Route
+          path="/student/requests"
+          element={
+            <ProtectedRoute allowedRoles={["student"]}>
+              <RequestListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/student/requests/new"
           element={
             <ProtectedRoute allowedRoles={["student"]}>
               <RequestFormPage />

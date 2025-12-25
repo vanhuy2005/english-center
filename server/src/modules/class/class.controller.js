@@ -32,6 +32,7 @@ exports.getClassStudents = async (req, res) => {
     });
   }
 };
+const mongoose = require("mongoose");
 const Class = require("../../shared/models/Class.model");
 const Student = require("../../shared/models/Student.model");
 const Staff = require("../../shared/models/Staff.model");
@@ -187,6 +188,7 @@ exports.createClass = async (req, res) => {
     if (!finalName) missing.push("name");
     if (!course) missing.push("course");
     if (!startDate) missing.push("startDate");
+    if (!endDate) missing.push("endDate");
 
     if (missing.length) {
       console.warn("Create class validation failed - missing:", missing);
@@ -194,6 +196,22 @@ exports.createClass = async (req, res) => {
         success: false,
         message: "Vui lòng cung cấp đầy đủ thông tin bắt buộc",
         missing,
+      });
+    }
+
+    // Validate date ordering
+    const sd = new Date(startDate);
+    const ed = new Date(endDate);
+    if (isNaN(sd.getTime()) || isNaN(ed.getTime())) {
+      return res.status(400).json({
+        success: false,
+        message: "Ngày bắt đầu hoặc kết thúc không hợp lệ",
+      });
+    }
+    if (ed <= sd) {
+      return res.status(400).json({
+        success: false,
+        message: "Ngày kết thúc phải lớn hơn ngày bắt đầu",
       });
     }
 
@@ -220,18 +238,25 @@ exports.createClass = async (req, res) => {
       }
     }
 
+    // Normalize schedule: the client may send a free-text string (legacy UI).
+    // The Class model expects an array of schedule items; if the incoming
+    // `schedule` is not an array, we default to an empty array to avoid
+    // triggering subdocument validation errors.
+    const normalizedSchedule = Array.isArray(schedule) ? schedule : [];
+
     // Create class
     const newClass = await Class.create({
       name: finalName,
       classCode: classCode || undefined,
       course,
       teacher,
-      schedule,
+      schedule: normalizedSchedule,
       startDate,
       endDate,
       capacity: { max: maxStudents || 30 },
       room,
-      tuitionFee: tuitionFee || courseExists.fee.amount,
+      tuitionFee:
+        tuitionFee || (courseExists.fee && courseExists.fee.amount) || 0,
       status: status || "upcoming",
       createdBy: req.user._id,
     });
@@ -248,6 +273,29 @@ exports.createClass = async (req, res) => {
     });
   } catch (error) {
     console.error("Error creating class:", error);
+
+    // Mongoose validation errors -> return 400 with details
+    if (error && error.name === "ValidationError") {
+      const errors = Object.keys(error.errors || {}).map((k) => ({
+        field: k,
+        message: error.errors[k].message,
+      }));
+      return res.status(400).json({
+        success: false,
+        message: "Validation error when creating class",
+        errors,
+      });
+    }
+
+    // Duplicate key (unique) error
+    if (error && error.code === 11000) {
+      return res.status(409).json({
+        success: false,
+        message: "Duplicate value error",
+        error: error.keyValue || error.message,
+      });
+    }
+
     res.status(500).json({
       success: false,
       message: "Lỗi khi tạo lớp học",
@@ -263,14 +311,23 @@ exports.createClass = async (req, res) => {
  */
 exports.updateClass = async (req, res) => {
   try {
+    console.log("📝 UPDATE CLASS - Request params:", req.params);
+    console.log(
+      "📝 UPDATE CLASS - Request body:",
+      JSON.stringify(req.body, null, 2)
+    );
+
     const classData = await Class.findById(req.params.id);
 
     if (!classData) {
+      console.log("❌ Class not found:", req.params.id);
       return res.status(404).json({
         success: false,
         message: "Không tìm thấy lớp học",
       });
     }
+
+    console.log("✅ Found class:", classData.name);
 
     const {
       className,
@@ -288,37 +345,104 @@ exports.updateClass = async (req, res) => {
 
     // Check if teacher exists (if provided)
     if (teacher && teacher !== classData.teacher?.toString()) {
+      console.log("🔍 Validating top-level teacher:", teacher);
       const teacherExists = await Staff.findOne({
         _id: teacher,
         staffType: "teacher",
       });
       if (!teacherExists) {
+        console.log("❌ Teacher not found:", teacher);
         return res.status(404).json({
           success: false,
           message: "Giáo viên không tồn tại",
         });
       }
+      console.log("✅ Teacher validated:", teacherExists.fullName);
+    }
+
+    // Validate teachers in schedule items (if schedule provided)
+    if (schedule && Array.isArray(schedule)) {
+      console.log("🔍 Validating schedule items:", schedule.length);
+
+      for (let i = 0; i < schedule.length; i++) {
+        const item = schedule[i];
+        console.log(`🔍 Schedule item ${i}:`, item);
+
+        if (item.teacher) {
+          // Skip validation if teacher is null or empty string
+          if (item.teacher === null || item.teacher === "") {
+            console.log(
+              `⚠️ Schedule item ${i}: Empty teacher, setting to null`
+            );
+            item.teacher = null; // Normalize empty values
+            continue;
+          }
+
+          console.log(
+            `🔍 Validating teacher in schedule item ${i}:`,
+            item.teacher
+          );
+
+          // Check if it's a valid ObjectId format first
+          if (!mongoose.Types.ObjectId.isValid(item.teacher)) {
+            console.log(
+              `❌ Invalid teacher ID format in schedule item ${i}:`,
+              item.teacher
+            );
+            return res.status(400).json({
+              success: false,
+              message: `ID giáo viên không hợp lệ trong lịch học ngày ${item.dayOfWeek}`,
+            });
+          }
+
+          const teacherExists = await Staff.findOne({
+            _id: item.teacher,
+            staffType: "teacher",
+          });
+
+          if (!teacherExists) {
+            console.log(
+              `❌ Teacher not found in schedule item ${i}:`,
+              item.teacher
+            );
+            return res.status(404).json({
+              success: false,
+              message: `Giáo viên không tồn tại trong lịch học ngày ${item.dayOfWeek}`,
+            });
+          }
+          console.log(
+            `✅ Teacher validated in schedule item ${i}:`,
+            teacherExists.fullName
+          );
+        }
+      }
     }
 
     // Update fields
-    if (className || name) classData.name = className || name;
-    if (classCode) classData.classCode = classCode;
-    if (teacher) classData.teacher = teacher;
-    if (schedule) classData.schedule = schedule;
-    if (startDate) classData.startDate = startDate;
-    if (endDate) classData.endDate = endDate;
-    if (maxStudents) classData.capacity.max = maxStudents;
-    if (room) classData.room = room;
-    if (tuitionFee) classData.tuitionFee = tuitionFee;
-    if (status) classData.status = status;
+    const updateFields = {};
+    if (className || name) updateFields.name = className || name;
+    if (classCode) updateFields.classCode = classCode;
+    if (teacher) updateFields.teacher = teacher;
+    if (schedule) updateFields.schedule = schedule;
+    if (startDate) updateFields.startDate = startDate;
+    if (endDate) updateFields.endDate = endDate;
+    if (maxStudents) updateFields["capacity.max"] = maxStudents;
+    if (room) updateFields.room = room;
+    if (tuitionFee) updateFields.tuitionFee = tuitionFee;
+    if (status) updateFields.status = status;
 
-    await classData.save();
+    console.log("💾 Saving class data with findByIdAndUpdate...");
 
-    // Populate for response
-    const updatedClass = await Class.findById(classData._id)
+    const updatedClass = await Class.findByIdAndUpdate(
+      req.params.id,
+      { $set: updateFields },
+      { new: true, runValidators: true }
+    )
       .populate("course", "name courseCode level")
       .populate("teacher", "fullName email")
-      .populate("students", "studentCode fullName");
+      .populate("students.student", "studentCode fullName");
+
+    console.log("✅ Update successful, returning data");
 
     res.status(200).json({
       success: true,
@@ -326,11 +450,16 @@ exports.updateClass = async (req, res) => {
       data: updatedClass,
     });
   } catch (error) {
-    console.error("Error updating class:", error);
+    console.error("❌ ERROR updating class:", error);
+    console.error("❌ Error stack:", error.stack);
+    console.error("❌ Error name:", error.name);
+    console.error("❌ Error message:", error.message);
+
     res.status(500).json({
       success: false,
       message: "Lỗi khi cập nhật lớp học",
       error: error.message,
+      details: process.env.NODE_ENV === "development" ? error.stack : undefined,
     });
   }
 };

@@ -53,7 +53,7 @@ const ClassReportsPage = () => {
       const response = await api.get(`/classes/${classId}`);
       const classData = response.data?.data || response.data;
 
-      // Danh sách học viên
+     
       let students = [];
       if (Array.isArray(classData.students)) {
         // Fetch details if needed (mock for now or assume populated)
@@ -68,7 +68,7 @@ const ClassReportsPage = () => {
           .filter((s) => s && s._id);
       }
 
-      // Tính toán thống kê
+    
       const stats = calculateStats(classData, students);
       setClassStats(stats);
     } catch (error) {
@@ -85,9 +85,8 @@ const ClassReportsPage = () => {
       (s) => s.enrollmentStatus === "active" || s.status === "active"
     ).length;
 
-    // Mock scores (Replace with real data logic)
-    // Giả sử lấy điểm từ API grades nếu có, ở đây mock tạm để demo UI
-    const scores = students.map(() => Math.floor(Math.random() * 4) + 6); // Mock 6-10
+   
+    const scores = students.map(() => Math.floor(Math.random() * 4) + 6); 
 
     const scoreRanges = {
       excellent: scores.filter((s) => s >= 9).length,

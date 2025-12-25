@@ -27,19 +27,16 @@ const gradeSchema = new mongoose.Schema(
         type: Number,
         min: 0,
         max: 100,
-        default: 0,
       },
       participation: {
         type: Number,
         min: 0,
         max: 100,
-        default: 0,
       },
       homework: {
         type: Number,
         min: 0,
         max: 100,
-        default: 0,
       },
       midterm: {
         type: Number,
@@ -131,31 +128,53 @@ gradeSchema.pre("save", function (next) {
   const s = this.scores;
   const w = this.weights;
 
-  // Only calculate if we have required scores
-  if (
-    s.attendance !== undefined &&
-    s.participation !== undefined &&
-    s.homework !== undefined &&
-    s.midterm !== undefined &&
-    s.final !== undefined
-  ) {
-    this.totalScore =
-      (s.attendance * w.attendance +
-        s.participation * w.participation +
-        s.homework * w.homework +
-        s.midterm * w.midterm +
-        s.final * w.final) /
-      100;
+  let totalWeightedScore = 0;
+  let totalWeight = 0;
+
+  // Helper to check if a score is valid (not null/undefined)
+  const isValid = (val) => val !== undefined && val !== null;
+
+  if (isValid(s.attendance)) {
+    totalWeightedScore += s.attendance * w.attendance;
+    totalWeight += w.attendance;
+  }
+  if (isValid(s.participation)) {
+    totalWeightedScore += s.participation * w.participation;
+    totalWeight += w.participation;
+  }
+  if (isValid(s.homework)) {
+    totalWeightedScore += s.homework * w.homework;
+    totalWeight += w.homework;
+  }
+  if (isValid(s.midterm)) {
+    totalWeightedScore += s.midterm * w.midterm;
+    totalWeight += w.midterm;
+  }
+  if (isValid(s.final)) {
+    totalWeightedScore += s.final * w.final;
+    totalWeight += w.final;
+  }
+
+  // Only calculate if we have at least one score and total weight > 0
+  if (totalWeight > 0) {
+    // Normalize to 10 scale
+    // Example: 9*40 + 10*60 = 960. Total weight = 100. Result = 9.6
+    // Example: 9*30 + 10*40 = 670. Total weight = 70. Result = 9.57
+    this.totalScore = totalWeightedScore / totalWeight;
+
+    // Round to 1 decimal place
+    this.totalScore = Math.round(this.totalScore * 10) / 10;
 
     // Calculate letter grade
     this.letterGrade = this.calculateLetterGrade(this.totalScore);
 
     // Determine status
-    if (this.totalScore < 50) {
-      this.status = "failed";
-    } else if (this.final !== undefined && this.final > 0) {
-      this.status = "completed";
-    }
+    this.status = this.totalScore >= 5.0 ? "completed" : "failed";
+  } else {
+    // If no scores, reset total
+    this.totalScore = undefined;
+    this.letterGrade = undefined;
+    this.status = "in_progress";
   }
 
   // Set graded date if not already set and scores are entered
@@ -173,14 +192,15 @@ gradeSchema.pre("save", function (next) {
 
 // Method to calculate letter grade
 gradeSchema.methods.calculateLetterGrade = function (score) {
-  if (score >= 95) return "A+";
-  if (score >= 90) return "A";
-  if (score >= 85) return "B+";
-  if (score >= 80) return "B";
-  if (score >= 75) return "C+";
-  if (score >= 70) return "C";
-  if (score >= 65) return "D+";
-  if (score >= 60) return "D";
+  // Scale 10
+  if (score >= 9.5) return "A+";
+  if (score >= 9.0) return "A";
+  if (score >= 8.5) return "B+";
+  if (score >= 8.0) return "B";
+  if (score >= 7.5) return "C+";
+  if (score >= 7.0) return "C";
+  if (score >= 6.5) return "D+";
+  if (score >= 6.0) return "D";
   return "F";
 };
 
@@ -199,7 +219,7 @@ gradeSchema.virtual("skillsAverage").get(function () {
 
 // Virtual for pass/fail
 gradeSchema.virtual("isPassing").get(function () {
-  return this.totalScore >= 60;
+  return this.totalScore >= 5.0;
 });
 
 // Compound index to prevent duplicate grades

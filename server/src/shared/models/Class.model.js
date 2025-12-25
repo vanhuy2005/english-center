@@ -85,6 +85,14 @@ const classSchema = new mongoose.Schema(
             message: "End time must be in HH:mm format (00:00-23:59).",
           },
         },
+        room: {
+          type: String,
+          trim: true,
+        },
+        teacher: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Staff",
+        },
       },
     ],
     startDate: {

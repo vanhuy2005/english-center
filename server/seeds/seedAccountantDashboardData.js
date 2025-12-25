@@ -3,66 +3,93 @@
    Nguyên tắc: KHÔNG XÓA dữ liệu cũ, chỉ thêm mới.
 */
 
-const mongoose = require('mongoose');
-require('dotenv').config();
+const mongoose = require("mongoose");
+require("dotenv").config();
 
 // --- IMPORT MODELS (Điều chỉnh đường dẫn cho phù hợp với dự án của bạn) ---
-const Student = require('./models/Student');
-const Class = require('./models/Class');
-const Receipt = require('./models/Receipt'); // Hoặc Transaction
-const User = require('./models/User');
+const Student = require("../src/shared/models/Student.model");
+const Class = require("../src/shared/models/Class.model");
+const Receipt = require("../src/shared/models/Receipt.model");
+const Staff = require("../src/shared/models/Staff.model");
 
 // --- CẤU HÌNH ---
 const TARGET_RECEIPT_COUNT = 100; // Mục tiêu: Database nên có ít nhất 100 giao dịch
+const MONGO_URI =
+  process.env.MONGODB_URI ||
+  process.env.MONGO_URI ||
+  "mongodb://localhost:27017/english-center-db";
 
 const connectDB = async () => {
   try {
-    await mongoose.connect(process.env.MONGO_URI);
-    console.log('✅ Connected to MongoDB');
+    await mongoose.connect(MONGO_URI);
+    console.log("✅ Connected to MongoDB");
   } catch (error) {
-    console.error('❌ Connection failed:', error);
+    console.error("❌ Connection failed:", error);
     process.exit(1);
   }
 };
 
 const getRandomItem = (arr) => arr[Math.floor(Math.random() * arr.length)];
-const getRandomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+const getRandomInt = (min, max) =>
+  Math.floor(Math.random() * (max - min + 1)) + min;
 
 // Hàm tạo ngày ngẫu nhiên trong khoảng thời gian (để làm biểu đồ Trend)
 const getRandomDate = (start, end) => {
-  return new Date(start.getTime() + Math.random() * (end.getTime() - start.getTime()));
+  return new Date(
+    start.getTime() + Math.random() * (end.getTime() - start.getTime())
+  );
 };
 
 const seedAccountant = async () => {
   await connectDB();
-  console.log('🚀 Starting Accountant Data Seeding...');
+  console.log("🚀 Starting Accountant Data Seeding...");
 
   try {
-    // 1. Lấy dữ liệu nền (Học viên & Lớp học)
+    // 1. Lấy dữ liệu nền (Học viên & Lớp học & Nhân viên)
     const students = await Student.find();
     const classes = await Class.find();
+    const staff = await Staff.findOne({
+      role: { $in: ["accountant", "director", "admin"] },
+    });
 
     if (students.length === 0 || classes.length === 0) {
-      console.error('⚠️ Cảnh báo: Không tìm thấy Học viên hoặc Lớp học. Hãy chạy script seed dữ liệu Học vụ trước (seedData.js).');
+      console.error(
+        "⚠️ Cảnh báo: Không tìm thấy Học viên hoặc Lớp học. Hãy chạy script seed dữ liệu Học vụ trước (seedData.js)."
+      );
       process.exit(1);
     }
+
+    if (!staff) {
+      console.error(
+        "⚠️ Cảnh báo: Không tìm thấy Nhân viên (Accountant/Director). Tạo tạm một nhân viên."
+      );
+      // Create dummy staff if needed, or just exit
+      // For now, let's try to find ANY staff
+    }
+
+    const staffId = staff ? staff._id : (await Staff.findOne())._id;
 
     // 2. Kiểm tra số lượng biên lai hiện tại
     const currentCount = await Receipt.countDocuments();
     console.log(`📊 Hiện tại đang có ${currentCount} biên lai trong hệ thống.`);
 
     if (currentCount >= TARGET_RECEIPT_COUNT) {
-      console.log('✅ Dữ liệu tài chính đã đủ dùng. Không cần thêm mới.');
+      console.log("✅ Dữ liệu tài chính đã đủ dùng. Không cần thêm mới.");
       // Tuy nhiên, ta vẫn sẽ thêm vài giao dịch "hôm nay" để dashboard phần "Doanh thu tháng" luôn có số liệu
-      console.log('🔄 Đang thêm vài giao dịch mới nhất cho tháng này...');
+      console.log("🔄 Đang thêm vài giao dịch mới nhất cho tháng này...");
     } else {
-      console.log(`➕ Đang bổ sung thêm khoảng ${TARGET_RECEIPT_COUNT - currentCount} giao dịch mẫu...`);
+      console.log(
+        `➕ Đang bổ sung thêm khoảng ${
+          TARGET_RECEIPT_COUNT - currentCount
+        } giao dịch mẫu...`
+      );
     }
 
     // 3. Tạo dữ liệu mẫu
-    const paymentMethods = ['cash', 'bank_transfer', 'credit_card', 'momo'];
-    const statuses = ['paid', 'paid', 'paid', 'pending', 'overdue']; // Tỉ lệ Paid cao hơn
-    const receiptTypes = ['tuition_fee', 'material_fee', 'exam_fee'];
+    const paymentMethods = ["cash", "bank_transfer", "credit_card", "momo"];
+    // const statuses = ['paid', 'paid', 'paid', 'pending', 'overdue']; // OLD
+    const statuses = ["active"]; // NEW: Receipt model only supports 'active' or 'voided'
+    const receiptTypes = ["tuition_fee", "material_fee", "exam_fee"];
 
     const receiptsToCreate = [];
     const needed = Math.max(TARGET_RECEIPT_COUNT - currentCount, 10); // Luôn thêm ít nhất 10 cái mới
@@ -75,9 +102,10 @@ const seedAccountant = async () => {
     for (let i = 0; i < needed; i++) {
       const student = getRandomItem(students);
       // Cố gắng lấy lớp học mà học viên này đang học, nếu không thì lấy random
-      const relatedClass = (student.enrolledCourses && student.enrolledCourses.length > 0) 
-        ? getRandomItem(student.enrolledCourses) 
-        : getRandomItem(classes); // Fallback: random class
+      const relatedClass =
+        student.enrolledCourses && student.enrolledCourses.length > 0
+          ? getRandomItem(student.enrolledCourses)
+          : getRandomItem(classes); // Fallback: random class
 
       // Logic giá tiền (random cho đẹp)
       const amount = getRandomInt(10, 50) * 100000; // 1tr - 5tr
@@ -92,37 +120,47 @@ const seedAccountant = async () => {
         date = getRandomDate(threeMonthsAgo, today);
       }
 
+      // Ensure unique receiptNumber for insertMany (because insertMany bypasses pre-save hooks)
+      const now = new Date();
+      const y = now.getFullYear();
+      const m = String(now.getMonth() + 1).padStart(2, "0");
+      const uniqueSuffix = `${Date.now()}${getRandomInt(1000, 9999)}`;
+
       receiptsToCreate.push({
         student: student._id,
-        class: relatedClass?._id, // Có thể null nếu chỉ đóng phí thi
-        receiptNumber: `REC-${Date.now()}-${getRandomInt(100, 999)}`, // Đảm bảo unique
-        type: getRandomItem(receiptTypes),
+        class: relatedClass?._id,
+        receiptNumber: `RCP${y}${m}${uniqueSuffix}`,
         amount: amount,
         paymentMethod: getRandomItem(paymentMethods),
-        status: getRandomItem(statuses),
+        status: "active",
         description: `Thu phí học viên ${student.fullName}`,
+        note: "Auto-generated by seed script",
+        createdBy: staffId,
         createdAt: date, // Quan trọng cho biểu đồ
-        updatedAt: date
+        updatedAt: date,
       });
     }
 
     // 4. Lưu vào Database
     if (receiptsToCreate.length > 0) {
       await Receipt.insertMany(receiptsToCreate);
-      console.log(`✅ Đã thêm thành công ${receiptsToCreate.length} biên lai mới.`);
+      console.log(
+        `✅ Đã thêm thành công ${receiptsToCreate.length} biên lai mới.`
+      );
     }
 
     // 5. Cập nhật trạng thái "Đã đóng tiền" cho học viên (Optional)
     // Logic này giúp trang "Tình hình học phí" của từng học viên khớp với biên lai
-    console.log('🔄 Updating Student tuition status...');
+    console.log("🔄 Updating Student tuition status...");
     // (Phần này tùy thuộc vào logic dự án của bạn, ví dụ update field `tuitionStatus` trong Student)
 
-    console.log('🎉 Accountant Data Seeding Completed!');
-    console.log('👉 Hãy refresh trang Accountant Dashboard để thấy biểu đồ và số liệu mới.');
+    console.log("🎉 Accountant Data Seeding Completed!");
+    console.log(
+      "👉 Hãy refresh trang Accountant Dashboard để thấy biểu đồ và số liệu mới."
+    );
     process.exit(0);
-
   } catch (error) {
-    console.error('❌ Seeding Error:', error);
+    console.error("❌ Seeding Error:", error);
     process.exit(1);
   }
 };

@@ -11,6 +11,7 @@ import {
 } from "antd";
 import { DollarOutlined } from "@ant-design/icons";
 import api from "@services/api";
+import { receiptService } from "@services/receiptService";
 
 const UpdateTuitionPage = () => {
   const [form] = Form.useForm();
@@ -55,12 +56,21 @@ const UpdateTuitionPage = () => {
   const handleSubmit = async (values) => {
     setLoading(true);
     try {
-      // TODO: API call to update tuition
-      console.log("Update tuition:", values);
-      message.success("Cập nhật học phí thành công!");
+      // Call receiptService to create a transaction (record payment)
+      await receiptService.createReceipt({
+        studentId: values.studentId,
+        classId: values.classId,
+        amount: values.amount,
+        paymentMethod: values.paymentMethod || "cash",
+        note: values.note || "Cập nhật đóng học phí bổ sung",
+        type: "tuition",
+      });
+
+      message.success("Cập nhật học phí (Tạo phiếu thu) thành công!");
       form.resetFields();
     } catch (error) {
-      message.error("Cập nhật học phí thất bại!");
+      console.error("Update tuition error:", error);
+      message.error(error.response?.data?.message || "Cập nhật thất bại!");
     } finally {
       setLoading(false);
     }

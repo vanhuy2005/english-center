@@ -2,7 +2,10 @@ const Request = require("../../../shared/models/Request.model");
 const Student = require("../../../shared/models/Student.model");
 const Course = require("../../../shared/models/Course.model");
 const Finance = require("../../../shared/models/Finance.model");
-const { successResponse, errorResponse } = require("../../../shared/utils/response.util");
+const {
+  successResponse,
+  errorResponse,
+} = require("../../../shared/utils/response.util");
 
 /**
  * @desc    Get all requests (for academic staff)
@@ -30,29 +33,34 @@ exports.getAllRequests = async (req, res) => {
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(parseInt(limit)),
-      Request.countDocuments(query)
+      Request.countDocuments(query),
     ]);
 
     // Filter by search if provided
     let filteredRequests = requests;
     if (search) {
       const searchLower = search.toLowerCase();
-      filteredRequests = requests.filter(req => 
-        req.student?.fullName?.toLowerCase().includes(searchLower) ||
-        req.student?.studentCode?.toLowerCase().includes(searchLower) ||
-        req.requestCode?.toLowerCase().includes(searchLower)
+      filteredRequests = requests.filter(
+        (req) =>
+          req.student?.fullName?.toLowerCase().includes(searchLower) ||
+          req.student?.studentCode?.toLowerCase().includes(searchLower) ||
+          req.requestCode?.toLowerCase().includes(searchLower)
       );
     }
 
-    successResponse(res, {
-      requests: filteredRequests,
-      pagination: {
-        total,
-        page: parseInt(page),
-        limit: parseInt(limit),
-        totalPages: Math.ceil(total / limit)
-      }
-    }, "Lấy danh sách yêu cầu thành công");
+    successResponse(
+      res,
+      {
+        requests: filteredRequests,
+        pagination: {
+          total,
+          page: parseInt(page),
+          limit: parseInt(limit),
+          totalPages: Math.ceil(total / limit),
+        },
+      },
+      "Lấy danh sách yêu cầu thành công"
+    );
   } catch (error) {
     console.error("Get All Requests Error:", error);
     errorResponse(res, error.message, 500);
@@ -69,7 +77,10 @@ exports.getRequestById = async (req, res) => {
     const { id } = req.params;
 
     const request = await Request.findById(id)
-      .populate("student", "fullName studentCode phone email dateOfBirth gender address")
+      .populate(
+        "student",
+        "fullName studentCode phone email dateOfBirth gender address"
+      )
       .populate("course", "name courseCode fee duration level")
       .populate("class", "name classCode schedule")
       .populate("targetClass", "name classCode schedule")
@@ -114,12 +125,12 @@ exports.approveRequest = async (req, res) => {
     if (request.type === "course_enrollment" && request.course) {
       // Add course to student
       await Student.findByIdAndUpdate(request.student, {
-        $addToSet: { enrolledCourses: request.course }
+        $addToSet: { enrolledCourses: request.course },
       });
 
       // Get course details for fee
       const course = await Course.findById(request.course);
-      if (course && course.fee) {
+      if (course && course.fee && course.fee.amount) {
         // Create finance record for tuition
         const dueDate = new Date();
         dueDate.setDate(dueDate.getDate() + 7); // Due in 7 days
@@ -128,14 +139,14 @@ exports.approveRequest = async (req, res) => {
           student: request.student,
           course: request.course,
           type: "tuition",
-          amount: course.fee,
+          amount: course.fee.amount,
           paidAmount: 0,
-          remainingAmount: course.fee,
+          remainingAmount: course.fee.amount,
           status: "pending",
           dueDate: dueDate,
           paymentMethod: "cash", // Default, can be changed when payment is made
           description: `Học phí khóa học ${course.name}`,
-          createdBy: staffId
+          createdBy: staffId,
         });
       }
     }
@@ -146,7 +157,7 @@ exports.approveRequest = async (req, res) => {
       .populate("processedBy", "fullName");
 
     const Notification = require("../../../shared/models/Notification.model");
-    const noteText = note ? ` Ghi chú: ${note}` : '';
+    const noteText = note ? ` Ghi chú: ${note}` : "";
     await Notification.create({
       recipient: updatedRequest.student._id || updatedRequest.student,
       sender: staffId,
@@ -154,7 +165,7 @@ exports.approveRequest = async (req, res) => {
       title: "Yêu cầu đã được phê duyệt",
       message: `Yêu cầu của bạn đã được phê duyệt.${noteText}`,
       link: "/student/requests",
-      priority: "normal"
+      priority: "normal",
     });
 
     successResponse(res, updatedRequest, "Phê duyệt yêu cầu thành công");
@@ -197,7 +208,7 @@ exports.rejectRequest = async (req, res) => {
       .populate("processedBy", "fullName");
 
     const Notification = require("../../../shared/models/Notification.model");
-    const noteText = note ? ` Ghi chú: ${note}` : '';
+    const noteText = note ? ` Ghi chú: ${note}` : "";
     await Notification.create({
       recipient: updatedRequest.student._id || updatedRequest.student,
       sender: staffId,
@@ -205,7 +216,7 @@ exports.rejectRequest = async (req, res) => {
       title: "Yêu cầu bị từ chối",
       message: `Yêu cầu của bạn đã bị từ chối. Lý do: ${reason}.${noteText}`,
       link: "/student/requests",
-      priority: "normal"
+      priority: "normal",
     });
 
     successResponse(res, updatedRequest, "Từ chối yêu cầu thành công");
@@ -226,9 +237,7 @@ exports.getRequestStats = async (req, res) => {
       Request.countDocuments({ status: "pending" }),
       Request.countDocuments({ status: "approved" }),
       Request.countDocuments({ status: "rejected" }),
-      Request.aggregate([
-        { $group: { _id: "$type", count: { $sum: 1 } } }
-      ])
+      Request.aggregate([{ $group: { _id: "$type", count: { $sum: 1 } } }]),
     ]);
 
     const stats = {
@@ -239,7 +248,7 @@ exports.getRequestStats = async (req, res) => {
       byType: byType.reduce((acc, item) => {
         acc[item._id] = item.count;
         return acc;
-      }, {})
+      }, {}),
     };
 
     successResponse(res, stats, "Lấy thống kê yêu cầu thành công");

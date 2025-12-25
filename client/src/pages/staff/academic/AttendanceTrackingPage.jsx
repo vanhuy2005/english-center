@@ -35,7 +35,7 @@ const AttendanceTrackingPage = () => {
   const [viewMode, setViewMode] = useState("table"); // 'table' | 'grid'
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Date Logic
+ 
   const localDefaultDate = (() => {
     const d = new Date();
     const tzOffset = d.getTimezoneOffset() * 60000;
@@ -43,11 +43,10 @@ const AttendanceTrackingPage = () => {
   })();
   const [date, setDate] = useState(localDefaultDate);
 
-  // Edit State
   const [editingRow, setEditingRow] = useState(null); // ID of student being edited
   const [editForm, setEditForm] = useState({ status: "", note: "" });
   
-  // Refs for data persistence
+  
   const modifiedRef = useRef({});
   const modifiedDataRef = useRef({});
   const prevSelectedClassRef = useRef(selectedClass);
@@ -114,7 +113,7 @@ const AttendanceTrackingPage = () => {
         });
       }
 
-      // If no attendance records, fetch student list to create empty rows
+     
       if (rows.length === 0) {
         try {
           const rosterRes = await api.get(`/classes/${selectedClass}/students`);
@@ -129,10 +128,10 @@ const AttendanceTrackingPage = () => {
                 attendanceId: null,
               }))
             : [];
-        } catch (err) { /* ignore */ }
+        } catch (err) { }
       }
 
-      // Merge logic (keep optimistic updates)
+ 
       const prevMap = { ...modifiedDataRef.current[date] };
       if (lastFetchDateRef.current === date) {
         (attendanceData || []).forEach((r) => { if (r?._id) prevMap[r._id] = r; });
@@ -143,7 +142,7 @@ const AttendanceTrackingPage = () => {
         if (modifiedRef.current[date]?.has(id)) {
           return { ...r, ...prevMap[id] };
         }
-        // Preserve un-synced "no_record" changes
+    
         if (prevMap[id]?.status !== "no_record" && r.status === "no_record") {
            return { ...r, ...prevMap[id] };
         }
@@ -170,7 +169,7 @@ const AttendanceTrackingPage = () => {
     };
 
     try {
-      // Optimistic Update
+   
       setAttendanceData((prev) =>
         prev.map((r) =>
           r._id === studentId
@@ -179,7 +178,7 @@ const AttendanceTrackingPage = () => {
         )
       );
 
-      // Track modification
+   
       if (!modifiedRef.current[date]) modifiedRef.current[date] = new Set();
       modifiedRef.current[date].add(studentId);
       if (!modifiedDataRef.current[date]) modifiedDataRef.current[date] = {};
@@ -190,14 +189,14 @@ const AttendanceTrackingPage = () => {
          localOverride: true
       };
 
-      // API Call
+     
       await api.post(`/staff/academic/attendance`, payload);
       toast.success("Cập nhật thành công");
       setEditingRow(null);
     } catch (err) {
       console.error(err);
       toast.error("Lỗi cập nhật điểm danh");
-      // Revert optimistic update here if needed
+      
     }
   };
 
@@ -216,7 +215,7 @@ const AttendanceTrackingPage = () => {
       s.studentCode?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // --- RENDER HELPERS ---
+ 
 
   const getStatusBadge = (status) => {
     const opt = statusOptions.find(o => o.value === status) || statusOptions[4];
@@ -233,7 +232,7 @@ const AttendanceTrackingPage = () => {
     <div className="min-h-screen bg-gray-50/50 p-6 md:p-8 font-sans text-gray-800">
       <div className="max-w-[1600px] mx-auto space-y-6">
         
-        {/* --- HEADER --- */}
+      
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
           <div>
             <h1 className="text-2xl font-bold text-[var(--color-primary)] flex items-center gap-3">
@@ -268,7 +267,6 @@ const AttendanceTrackingPage = () => {
           </div>
         </div>
 
-        {/* --- TOOLBAR --- */}
         <Card className="border border-gray-200 shadow-sm">
            <div className="p-4 flex flex-col xl:flex-row gap-4 items-center justify-between">
               
@@ -296,7 +294,7 @@ const AttendanceTrackingPage = () => {
                  </div>
               </div>
 
-              {/* Search & Bulk Actions */}
+            
               <div className="flex flex-col md:flex-row gap-4 w-full xl:w-auto">
                  <div className="relative flex-1 md:w-64">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -321,7 +319,7 @@ const AttendanceTrackingPage = () => {
            </div>
         </Card>
 
-        {/* --- CONTENT AREA --- */}
+        
         {!selectedClass ? (
            <div className="flex flex-col items-center justify-center py-24 bg-white rounded-xl border border-dashed border-gray-200">
               <div className="p-4 bg-gray-50 rounded-full mb-3">
@@ -331,7 +329,7 @@ const AttendanceTrackingPage = () => {
            </div>
         ) : (
            <>
-              {/* TABLE VIEW */}
+             
               {viewMode === 'table' && (
                  <Card className="border border-gray-200 shadow-sm overflow-hidden bg-white">
                     <div className="overflow-x-auto">
@@ -429,7 +427,7 @@ const AttendanceTrackingPage = () => {
                  </Card>
               )}
 
-              {/* GRID VIEW */}
+            
               {viewMode === 'grid' && (
                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                     {filteredData.map((row) => (
@@ -454,7 +452,6 @@ const AttendanceTrackingPage = () => {
                                 </div>
                              </div>
 
-                             {/* Quick Actions Grid */}
                              <div className="grid grid-cols-2 gap-2 mt-4">
                                 <button 
                                    onClick={() => handleSaveStatus(row._id, 'present')}
@@ -472,7 +469,7 @@ const AttendanceTrackingPage = () => {
                                 </button>
                              </div>
                              
-                             {/* Expanded Options */}
+                            
                              <div className="mt-2 text-center">
                                 <button 
                                    className="text-xs text-gray-400 hover:text-blue-600 flex items-center justify-center gap-1 w-full py-1"

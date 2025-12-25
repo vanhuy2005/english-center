@@ -15,30 +15,35 @@ import {
   ArrowUpRight,
   ArrowDownRight,
 } from "lucide-react";
+import { directorService } from "@services/directorService";
+import toast from "react-hot-toast";
 
-// Import dữ liệu Mock
+// Import mock data for fallback or sources/expenses (if not available from API)
 import {
-  revenueStats,
-  revenueTrendData,
   revenueSourceData,
   expenseBreakdownData,
   recentTransactions,
 } from "./mockRevenueData";
 
-/**
- * Revenue Report Page - Báo cáo doanh thu (Polished UI)
- */
 const RevenueReportPage = () => {
   const { t } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState("month"); // day, week, month, quarter, year
 
-  // State quản lý dữ liệu
-  const [stats, setStats] = useState(revenueStats);
+  // Real data from API
+  const [stats, setStats] = useState({
+    totalRevenue: 0,
+    totalProfit: 0,
+    totalExpenses: 0,
+    growth: 0,
+    margin: 0,
+  });
   const [chartData, setChartData] = useState([]);
-  const [sourceData, setSourceData] = useState([]);
-  const [expenseData, setExpenseData] = useState([]);
-  const [transactions, setTransactions] = useState([]);
+
+  // Mock data for now (can be replaced with API calls later)
+  const [sourceData, setSourceData] = useState(revenueSourceData);
+  const [expenseData, setExpenseData] = useState(expenseBreakdownData);
+  const [transactions, setTransactions] = useState(recentTransactions);
 
   useEffect(() => {
     fetchRevenueData();
@@ -48,130 +53,30 @@ const RevenueReportPage = () => {
     try {
       setLoading(true);
 
-      // ✅ FIX: Gọi API thực tế từ server
-      const { reportService } = await import("@services");
+      console.log("📊 Fetching revenue data for period:", period);
 
-      // Gọi song song các API
-      const periodLimits = { week: 8, month: 12, quarter: 8, year: 5 };
-      const chartLimit = periodLimits[period] || 12;
-
-      const [statsRes, chartRes] = await Promise.all([
-        reportService.getRevenueStats({ period }).catch((err) => {
-          console.error("Revenue stats error:", err);
-          return { data: revenueStats };
-        }),
-        reportService
-          .getRevenueChart({ period, limit: chartLimit })
-          .catch((err) => {
-            console.error("Revenue chart error:", err);
-            return { data: revenueTrendData };
-          }),
+      // Fetch real data from API
+      const [statsData, chartDataResult] = await Promise.all([
+        directorService.getRevenueStats(period),
+        directorService.getRevenueChart(period, 12),
       ]);
 
-      // Xử lý response - API trả về trong data hoặc trực tiếp
-      const statsData = statsRes.data?.data || statsRes.data || revenueStats;
-      // Ensure all stat fields are present to avoid blank cards
-      const normalizedStats = {
-        ...revenueStats,
-        ...statsData,
-      };
-      const chartDataRes =
-        chartRes.data?.data || chartRes.data || revenueTrendData;
+      console.log("📈 Revenue Stats:", statsData);
+      console.log("📉 Chart Data:", chartDataResult);
 
-      // Nếu API trả về mảng rỗng hoặc không có doanh thu, fallback mock để tránh biểu đồ trống
-      const chartList = Array.isArray(chartDataRes)
-        ? chartDataRes
-        : revenueTrendData;
-      const hasChartData = chartList.some(
-        (item) =>
-          (item.revenue || 0) + (item.expenses || 0) + (item.profit || 0) > 0
-      );
+      setStats(statsData);
+      setChartData(chartDataResult);
 
-      setStats(normalizedStats);
-      setChartData(hasChartData ? chartList : revenueTrendData);
-
-      // Tính toán revenue sources từ chart data
-      if (hasChartData) {
-        const totalRev = chartList.reduce(
-          (sum, item) => sum + (item.revenue || 0),
-          0
-        );
-        setSourceData([
-          {
-            name: "Học phí khóa học",
-            value: Math.round(totalRev * 0.85),
-            color: "#3b82f6",
-          },
-          {
-            name: "Giáo trình/Tài liệu",
-            value: Math.round(totalRev * 0.1),
-            color: "#10b981",
-          },
-          {
-            name: "Thi xếp lớp/Chứng chỉ",
-            value: Math.round(totalRev * 0.04),
-            color: "#f59e0b",
-          },
-          {
-            name: "Khác",
-            value: Math.round(totalRev * 0.01),
-            color: "#6366f1",
-          },
-        ]);
-
-        // Tính toán expense breakdown từ total expenses
-        const totalExp = chartList.reduce(
-          (sum, item) => sum + (item.expenses || 0),
-          0
-        );
-        setExpenseData([
-          {
-            name: "Lương Giáo viên",
-            value: Math.round(totalExp * 0.5),
-            fill: "#ef4444",
-          },
-          {
-            name: "Lương Nhân viên",
-            value: Math.round(totalExp * 0.25),
-            fill: "#f97316",
-          },
-          {
-            name: "Mặt bằng/Điện nước",
-            value: Math.round(totalExp * 0.15),
-            fill: "#eab308",
-          },
-          {
-            name: "Marketing/Ads",
-            value: Math.round(totalExp * 0.06),
-            fill: "#8b5cf6",
-          },
-          {
-            name: "Vận hành khác",
-            value: Math.round(totalExp * 0.04),
-            fill: "#64748b",
-          },
-        ]);
-      } else {
-        setSourceData(revenueSourceData);
-        setExpenseData(expenseBreakdownData);
-      }
-
-      // Transactions vẫn dùng mock (chưa có API)
-      setTransactions(recentTransactions);
+      // TODO: Fetch sourceData, expenseData, transactions from API when available
+      // For now, using mock data
     } catch (error) {
-      console.error("Error fetching revenue data:", error);
-      // Fallback về mock data khi lỗi
-      setStats(revenueStats);
-      setChartData(revenueTrendData);
-      setSourceData(revenueSourceData);
-      setExpenseData(expenseBreakdownData);
-      setTransactions(recentTransactions);
+      console.error("❌ Error fetching revenue data:", error);
+      toast.error("Không thể tải dữ liệu báo cáo tài chính");
     } finally {
       setLoading(false);
     }
   };
 
-  // Helper format tiền tệ VND
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat("vi-VN", {
       style: "currency",
@@ -303,7 +208,6 @@ const RevenueReportPage = () => {
     );
   }
 
-  // Cấu hình cột cho bảng giao dịch
   const transactionColumns = [
     { key: "id", label: "Mã GD", className: "text-sm text-gray-500 font-mono" },
     {
@@ -337,7 +241,6 @@ const RevenueReportPage = () => {
         </button>
       </div>
 
-      {/* 2. Filter Bar */}
       <Card className="shadow-sm border-gray-200">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2 text-gray-700 font-medium">
@@ -366,7 +269,6 @@ const RevenueReportPage = () => {
         </div>
       </Card>
 
-      {/* 3. Statistics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard
           title="Tổng Doanh Thu"
@@ -404,19 +306,10 @@ const RevenueReportPage = () => {
         className="shadow-sm border-gray-200"
       >
         <div className="mt-4">
-          <LineChart
-            data={lineChartConfig}
-            height={350}
-            options={{
-              animation: false,
-              plugins: { legend: { position: "top" } },
-              scales: { y: { beginAtZero: true } },
-            }}
-          />
+          <LineChart data={lineChartConfig} height={350} />
         </div>
       </Card>
 
-      {/* 5. Breakdown Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Revenue Sources (Pie Chart) */}
         <Card
@@ -425,14 +318,7 @@ const RevenueReportPage = () => {
           icon={<PieIcon className="w-4 h-4 text-gray-400" />}
         >
           <div className="mt-4 flex flex-col items-center">
-            <PieChart
-              data={pieChartConfig}
-              height={300}
-              options={{
-                animation: false,
-                plugins: { legend: { position: "bottom" } },
-              }}
-            />
+            <PieChart data={pieChartConfig} height={300} />
           </div>
         </Card>
 
@@ -443,22 +329,11 @@ const RevenueReportPage = () => {
           icon={<CreditCard className="w-4 h-4 text-gray-400" />}
         >
           <div className="mt-4">
-            <BarChart
-              data={barChartConfig}
-              height={300}
-              options={{
-                animation: false,
-                scales: {
-                  x: { grid: { display: false } },
-                  y: { beginAtZero: true, grid: { borderDash: [2, 4] } },
-                },
-              }}
-            />
+            <BarChart data={barChartConfig} height={300} />
           </div>
         </Card>
       </div>
 
-      {/* 6. Recent Transactions Table */}
       <Card title="Giao Dịch Gần Đây" className="shadow-sm border-gray-200">
         <div className="mt-2">
           <Table

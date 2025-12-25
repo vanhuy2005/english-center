@@ -17,7 +17,6 @@ import {
   UserCheck,
 } from "lucide-react";
 
-// Import dữ liệu Mock MỚI
 import {
   retentionStats,
   retentionTrendData,
@@ -28,15 +27,10 @@ import {
   teacherRetentionData, // Thêm cái này
 } from "./mockRetentionData";
 
-/**
- * Retention Report Page - Full Option
- */
 const RetentionReportPage = () => {
   const { t } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("atRisk"); // Tab state: atRisk | dropped | paused
-
-  // State
   const [stats, setStats] = useState(retentionStats);
   const [trendData, setTrendData] = useState([]);
   const [reasonData, setReasonData] = useState([]);
@@ -155,7 +149,7 @@ const RetentionReportPage = () => {
     );
   }
 
-  // Helper format tiền tệ
+
   const formatCurrency = (value) => {
     return new Intl.NumberFormat("vi-VN", {
       style: "currency",
@@ -163,7 +157,7 @@ const RetentionReportPage = () => {
     }).format(value);
   };
 
-  // Cấu hình cột bảng động theo Tab
+ 
   const getTableColumns = () => {
     const common = [
       { key: "studentInfo", label: "Học Viên", width: "250px" },
@@ -185,8 +179,7 @@ const RetentionReportPage = () => {
         { key: "date", label: "Ngày Nghỉ" },
         { key: "status", label: "Trạng Thái", align: "center" },
       ];
-    } else {
-      // paused
+    } else { 
       return [
         ...common,
         { key: "reason", label: "Lý Do" },
@@ -196,7 +189,7 @@ const RetentionReportPage = () => {
     }
   };
 
-  // Render Data cho bảng theo Tab
+
   const getTableData = () => {
     const currentList = lists[activeTab] || [];
 
@@ -215,7 +208,7 @@ const RetentionReportPage = () => {
           <Phone className="w-3 h-3" /> {student.phone}
         </div>
       ),
-      // Fields cho AtRisk
+     
       metrics: activeTab === "atRisk" && (
         <div className="text-sm">
           <div>
@@ -245,10 +238,9 @@ const RetentionReportPage = () => {
           Xử lý
         </button>
       ),
-      // Fields cho Dropped/Paused
-      reason: activeTab !== "atRisk" && student.reason,
-      date: activeTab === "dropped" && student.leaveDate,
-      duration: activeTab === "paused" && (
+      reason: (activeTab !== "atRisk") && student.reason,
+      date: (activeTab === "dropped") && student.leaveDate,
+      duration: (activeTab === "paused") && (
         <div className="text-sm">
           <div>{student.startDate}</div>
           <div className="text-gray-400 text-xs">đến {student.endDate}</div>
@@ -264,7 +256,6 @@ const RetentionReportPage = () => {
 
   return (
     <div className="p-6 space-y-8 bg-gray-50/50 min-h-screen font-sans">
-      {/* 1. Header Section */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight">
@@ -282,7 +273,7 @@ const RetentionReportPage = () => {
         </div>
       </div>
 
-      {/* 2. Statistics Cards (Updated with Revenue) */}
+    
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         <StatCard
           title="Tỉ Lệ Nghỉ"
@@ -331,13 +322,9 @@ const RetentionReportPage = () => {
         </div>
       </div>
 
-      {/* 3. Charts & Teacher Analysis */}
+     
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Retention Trend */}
-        <Card
-          title="Xu Hướng Biến Động"
-          className="lg:col-span-2 shadow-sm border-gray-200"
-        >
+        <Card title="Xu Hướng Biến Động" className="lg:col-span-2 shadow-sm border-gray-200">
           <div className="mt-4">
             <LineChart
               data={trendLineConfig}
@@ -417,8 +404,6 @@ const RetentionReportPage = () => {
             />
           </div>
         </Card>
-
-        {/* Reason Pie Chart */}
         <Card title="Nguyên Nhân Chính" className="shadow-sm border-gray-200">
           <div className="mt-4">
             <PieChart
@@ -433,7 +418,7 @@ const RetentionReportPage = () => {
         </Card>
       </div>
 
-      {/* 4. Detailed Student Lists with Tabs (Major Update) */}
+      
       <Card className="shadow-sm border-gray-200">
         <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 gap-4">
           <h3 className="font-bold text-lg text-gray-900">
@@ -484,7 +469,6 @@ const RetentionReportPage = () => {
   );
 };
 
-// --- Helper Component ---
 const StatCard = ({ title, value, icon, variant = "gray", subtitle }) => {
   const variants = {
     red: "bg-red-50 text-red-600 border-red-100",

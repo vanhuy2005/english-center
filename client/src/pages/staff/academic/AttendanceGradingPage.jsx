@@ -61,14 +61,13 @@ const AttendanceGradingPage = () => {
   const fetchStudents = async (classId) => {
     setLoading(true);
     try {
-      // Logic fetch students giữ nguyên
+     
       const response = await api.get(`/classes/${classId}`);
       const classData = response.data?.data || response.data;
       const studentIds = classData.students || [];
 
       if (studentIds.length > 0) {
-        // Giả lập lấy chi tiết từng học viên (Nếu API backend hỗ trợ lấy list full thì tốt hơn)
-        // Ở đây giữ nguyên logic cũ của bạn
+   
         const studentsPromises = studentIds.map((id) =>
           api.get(`/students/${id}`).catch((err) => null)
         );
@@ -96,7 +95,7 @@ const AttendanceGradingPage = () => {
       student?.studentCode?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // --- RENDER HELPERS ---
+  
   const getStatusBadge = (status) => {
       const config = {
           active: { label: "Đang học", color: "success" },
@@ -113,7 +112,7 @@ const AttendanceGradingPage = () => {
     <div className="min-h-screen bg-gray-50/50 p-6 md:p-8 font-sans text-gray-800">
       <div className="max-w-[1600px] mx-auto space-y-6">
         
-        {/* --- HEADER --- */}
+      
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
           <div>
             <h1 className="text-2xl font-bold text-[var(--color-primary)] flex items-center gap-3">
@@ -128,7 +127,7 @@ const AttendanceGradingPage = () => {
           </div>
         </div>
 
-        {/* --- TOOLBAR (Select Class & Search) --- */}
+      
         <Card className="border border-gray-200 shadow-sm">
            <div className="p-4 flex flex-col md:flex-row gap-4 items-center">
               <div className="relative w-full md:w-1/3">
@@ -161,7 +160,7 @@ const AttendanceGradingPage = () => {
            </div>
         </Card>
 
-        {/* --- CONTENT --- */}
+        
         {selectedClass ? (
            <>
               {loading ? (
@@ -184,7 +183,7 @@ const AttendanceGradingPage = () => {
                                 <tr key={student._id} className="hover:bg-blue-50/30 transition-colors group">
                                    <td className="px-6 py-4 text-gray-400 font-mono text-xs">{index + 1}</td>
                                    
-                                   {/* Student Info */}
+                             
                                    <td className="px-6 py-4">
                                       <div className="flex items-center gap-3">
                                          <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 font-bold border border-gray-200 text-xs">
@@ -197,7 +196,7 @@ const AttendanceGradingPage = () => {
                                       </div>
                                    </td>
 
-                                   {/* Contact */}
+                                 
                                    <td className="px-6 py-4">
                                       <div className="text-xs text-gray-600 space-y-1">
                                          <p>{student.email || "N/A"}</p>
@@ -205,12 +204,12 @@ const AttendanceGradingPage = () => {
                                       </div>
                                    </td>
 
-                                   {/* Status */}
+                               
                                    <td className="px-6 py-4 text-center">
                                       {getStatusBadge(student.status)}
                                    </td>
 
-                                   {/* Actions */}
+                               
                                    <td className="px-6 py-4 text-center">
                                       <div className="flex justify-center gap-2">
                                          {/* Nút Điểm Danh */}
@@ -227,7 +226,7 @@ const AttendanceGradingPage = () => {
                                          <Button 
                                             size="sm" 
                                             className="h-8 px-3 text-xs bg-[var(--color-secondary)] hover:bg-[var(--color-secondary-dark)] text-white shadow-sm border-none"
-                                            // TODO: Thêm onClick mở modal nhập điểm
+                                           
                                          >
                                             <Edit2 size={14} className="mr-1.5" /> Nhập điểm
                                          </Button>

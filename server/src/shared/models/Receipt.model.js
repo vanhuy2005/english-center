@@ -30,6 +30,20 @@ const receiptSchema = new mongoose.Schema(
       enum: ["cash", "bank_transfer", "credit_card", "momo", "refund", "other"],
       required: true,
     },
+
+    // --- BẮT BUỘC PHẢI CÓ 2 TRƯỜNG NÀY ---
+    type: {
+      type: String,
+      enum: ["tuition", "refund", "other"],
+      default: "tuition",
+    },
+    status: {
+      type: String,
+      enum: ["active", "refunded", "cancelled"],
+      default: "active",
+    },
+    // ---------------------------------------
+
     description: {
       type: String,
       trim: true,
@@ -37,11 +51,6 @@ const receiptSchema = new mongoose.Schema(
     note: {
       type: String,
       trim: true,
-    },
-    status: {
-      type: String,
-      enum: ["active", "voided"],
-      default: "active",
     },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,

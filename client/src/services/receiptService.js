@@ -22,9 +22,15 @@ export const receiptService = {
     return response.data.data || response.data;
   },
 
-  // Create new receipt
+  // Create new receipt -> use receipts endpoint which handles both payments and refunds and updates Finance/Notification
   createReceipt: async (data) => {
     const response = await api.post("/receipts", data);
+    return response.data;
+  },
+
+  // Get tuition status (for Accountant tuition page)
+  getTuitionStatus: async (params) => {
+    const response = await api.get("/staff/accountant/tuition", { params });
     return response.data;
   },
 

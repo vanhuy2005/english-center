@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { Card, Button, Loading, Badge } from "@components/common";
 import { scheduleService } from "@services";
+import { getMyClasses } from "../../services/student";
 import toast from "react-hot-toast";
 import { useAuth, useLanguage } from "@hooks";
 
-/**
- * ScheduleCalendarPage - Calendar view for schedules
- */
+
 const ScheduleCalendarPage = () => {
   const { user, role } = useAuth();
   const { t } = useLanguage();
@@ -23,13 +22,56 @@ const ScheduleCalendarPage = () => {
   const fetchSchedules = async () => {
     try {
       setLoading(true);
-      // TODO: Implement proper API call based on role
-      // For teacher: scheduleService.getByTeacher(user.profileId, currentDate)
-      // For student: scheduleService.getByStudent(user.profileId, currentDate)
 
-      // Mock data for demonstration
-      const mockSchedules = generateMockSchedules();
-      setSchedules(mockSchedules);
+      if (role === "student") {
+        const classes = await getMyClasses();
+        const generatedSchedules = [];
+        
+        const startOfWeek = new Date(currentDate);
+        const day = startOfWeek.getDay() || 7; // 1=Mon, ..., 7=Sun
+        startOfWeek.setDate(startOfWeek.getDate() - day + 1);
+        startOfWeek.setHours(0, 0, 0, 0);
+
+      
+        for (let i = 0; i < 7; i++) {
+            const date = new Date(startOfWeek);
+            date.setDate(startOfWeek.getDate() + i);
+
+          // Map JS getDay() (0=Sun, 1=Mon) to DB dayOfWeek (2=Mon, ..., 8=Sun)
+          const jsDay = date.getDay();
+          const dbDayOfWeek = jsDay === 0 ? 8 : jsDay + 1;
+
+          classes.forEach((cls) => {
+            if (cls.schedule && Array.isArray(cls.schedule)) {
+              cls.schedule.forEach((sch) => {
+                if (sch.dayOfWeek === dbDayOfWeek) {
+                  generatedSchedules.push({
+                    _id: `${cls._id}-${date.getTime()}`,
+                    date: date.toISOString(),
+                    dayOfWeek: date.toLocaleDateString("vi-VN", {
+                      weekday: "long",
+                    }),
+                    startTime: sch.startTime,
+                    endTime: sch.endTime,
+                    class: {
+                      _id: cls._id,
+                      className: cls.name,
+                      classCode: cls.classCode,
+                    },
+                    room: sch.room || cls.room,
+                    status: cls.status === "ongoing" ? "scheduled" : cls.status,
+                  });
+                }
+              });
+            }
+          });
+        }
+        setSchedules(generatedSchedules);
+      } else {
+       
+        const mockSchedules = generateMockSchedules();
+        setSchedules(mockSchedules);
+      }
     } catch (error) {
       console.error("Error fetching schedules:", error);
       toast.error("Không thể tải lịch học");
@@ -46,7 +88,7 @@ const ScheduleCalendarPage = () => {
       const date = new Date(today);
       date.setDate(today.getDate() + i);
 
-      // Add 2-3 random schedules per day
+      
       const schedulesPerDay = Math.floor(Math.random() * 2) + 1;
 
       for (let j = 0; j < schedulesPerDay; j++) {
@@ -152,7 +194,7 @@ const ScheduleCalendarPage = () => {
         </div>
       </div>
 
-      {/* Legend */}
+     
       <Card>
         <div className="flex gap-4 text-sm">
           <div className="flex items-center gap-2">
@@ -170,7 +212,7 @@ const ScheduleCalendarPage = () => {
         </div>
       </Card>
 
-      {/* Weekly Calendar */}
+      
       <div className="grid grid-cols-7 gap-4">
         {weekDays.map((day, index) => {
           const daySchedules = getSchedulesForDate(day);
@@ -227,7 +269,7 @@ const ScheduleCalendarPage = () => {
         })}
       </div>
 
-      {/* Today's Schedule Detail */}
+      
       <Card>
         <h3 className="text-lg font-semibold mb-4">Lịch học hôm nay</h3>
         {getSchedulesForDate(new Date()).length === 0 ? (
@@ -288,7 +330,7 @@ const ScheduleCalendarPage = () => {
           </div>
         )}
       </Card>
-      {/* Floating action button for academic staff to manage schedules */}
+     
       {role === "academic" && (
         <div className="fixed bottom-6 right-6 z-50">
           <Button

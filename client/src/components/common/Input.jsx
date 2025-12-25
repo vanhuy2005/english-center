@@ -23,6 +23,7 @@ export const Input = React.forwardRef(
       required = false,
       disabled = false,
       icon,
+      startIcon,
       helperText,
       className,
       id,
@@ -32,6 +33,8 @@ export const Input = React.forwardRef(
   ) => {
     const generatedId = useId();
     const inputId = id || generatedId;
+    const finalIcon = icon || startIcon;
+
     return (
       <div className="w-full">
         {label && (
@@ -44,9 +47,9 @@ export const Input = React.forwardRef(
           </label>
         )}
         <div className="relative">
-          {icon && (
+          {finalIcon && (
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              {icon}
+              {finalIcon}
             </div>
           )}
           <input
@@ -60,7 +63,7 @@ export const Input = React.forwardRef(
               "focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent",
               "disabled:bg-gray-100 disabled:cursor-not-allowed",
               error ? "border-danger" : "border-gray-300",
-              icon && "pl-10",
+              finalIcon && "pl-10",
               className
             )}
             {...props}

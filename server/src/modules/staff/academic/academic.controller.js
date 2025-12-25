@@ -11,9 +11,10 @@ exports.getDashboard = async (req, res) => {
     const totalClasses = await Class.countDocuments({
       status: { $in: ["ongoing", "upcoming"] },
     });
-    const totalStudents = await Student.countDocuments({
-      academicStatus: "active",
-    });
+    // Show total students (count all). Previously this counted only
+    // students with academicStatus === "active", which caused the
+    // dashboard to show fewer students than exist in the DB.
+    const totalStudents = await Student.countDocuments();
 
     const pendingRequestsCount = await Request.countDocuments({
       status: "pending",
@@ -124,10 +125,10 @@ exports.getStatistics = async (req, res) => {
       status: { $in: ["ongoing", "upcoming"] },
     });
 
-    const totalStudents = await Student.countDocuments({
-      academicStatus: "active",
-    });
+    // Use total students for overall statistics as well.
+    const totalStudents = await Student.countDocuments();
 
+    // Overall Attendance Rate
     const attendanceStats = await Attendance.aggregate([
       { $group: { _id: "$status", count: { $sum: 1 } } },
     ]);
@@ -142,11 +143,106 @@ exports.getStatistics = async (req, res) => {
         ? Math.round((presentCount / totalAttendance) * 100)
         : 0;
 
+    // Average Grade
     const gradeStats = await Grade.aggregate([
       { $match: { totalScore: { $ne: null } } },
       { $group: { _id: null, avgScore: { $avg: "$totalScore" } } },
     ]);
     const averageGrade = gradeStats[0]?.avgScore || 0;
+
+    // 1. Attendance Trend (Last 7 Days)
+    const last7Days = [];
+    const labels = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dateStr = d.toISOString().split("T")[0];
+      last7Days.push(dateStr);
+      labels.push(`${d.getDate()}/${d.getMonth() + 1}`);
+    }
+
+    const attendanceTrendRaw = await Attendance.aggregate([
+      {
+        $match: {
+          date: {
+            $gte: new Date(new Date().setDate(new Date().getDate() - 7)),
+          },
+        },
+      },
+      {
+        $group: {
+          _id: { $dateToString: { format: "%Y-%m-%d", date: "$date" } },
+          total: { $sum: 1 },
+          present: {
+            $sum: { $cond: [{ $eq: ["$status", "present"] }, 1, 0] },
+          },
+        },
+      },
+    ]);
+
+    const attendanceTrendData = last7Days.map((date) => {
+      const dayStat = attendanceTrendRaw.find((d) => d._id === date);
+      if (!dayStat || dayStat.total === 0) return 0;
+      return Math.round((dayStat.present / dayStat.total) * 100);
+    });
+
+    // 2. Grade Distribution
+    const gradeDistRaw = await Grade.aggregate([
+      { $match: { totalScore: { $ne: null } } },
+      {
+        $bucket: {
+          groupBy: "$totalScore",
+          boundaries: [0, 5, 6.5, 8, 9, 11], // 0-5 (Yếu), 5-6.5 (TB), 6.5-8 (Khá), 8-9 (Giỏi), 9-11 (XS)
+          default: "Other",
+          output: { count: { $sum: 1 } },
+        },
+      },
+    ]);
+
+    const distMap = {};
+    gradeDistRaw.forEach((b) => (distMap[b._id] = b.count));
+
+    // Order: Xuất sắc, Giỏi, Khá, Trung bình, Yếu
+    const gradeDistData = [
+      distMap[9] || 0,
+      distMap[8] || 0,
+      distMap[6.5] || 0,
+      distMap[5] || 0,
+      distMap[0] || 0,
+    ];
+
+    // 3. Enrollment Trend (Last 6 Months)
+    const enrollmentTrendRaw = await Student.aggregate([
+      {
+        $match: {
+          createdAt: {
+            $gte: new Date(new Date().setMonth(new Date().getMonth() - 6)),
+          },
+        },
+      },
+      {
+        $group: {
+          _id: { $dateToString: { format: "%Y-%m", date: "$createdAt" } },
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]);
+
+    const last6Months = [];
+    const enrollmentLabels = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date();
+      d.setMonth(d.getMonth() - i);
+      const monthStr = d.toISOString().slice(0, 7); // YYYY-MM
+      last6Months.push(monthStr);
+      enrollmentLabels.push(`T${d.getMonth() + 1}`);
+    }
+
+    const enrollmentData = last6Months.map((month) => {
+      const mStat = enrollmentTrendRaw.find((d) => d._id === month);
+      return mStat ? mStat.count : 0;
+    });
 
     const data = {
       stats: {
@@ -156,13 +252,15 @@ exports.getStatistics = async (req, res) => {
         averageGrade: Math.round(averageGrade * 10) / 10,
       },
       attendanceTrend: {
-        labels: ["T2", "T3", "T4", "T5", "T6", "T7", "CN"],
+        labels: labels,
         datasets: [
           {
             label: "Tỉ lệ chuyên cần (%)",
-            data: [82, 85, 83, 87, 86, 85, 88],
+            data: attendanceTrendData,
             borderColor: "rgb(59, 151, 151)",
             backgroundColor: "rgba(59, 151, 151, 0.1)",
+            fill: true,
+            tension: 0.4,
           },
         ],
       },
@@ -170,7 +268,7 @@ exports.getStatistics = async (req, res) => {
         labels: ["Xuất sắc", "Giỏi", "Khá", "Trung bình", "Yếu"],
         datasets: [
           {
-            data: [15, 30, 35, 15, 5],
+            data: gradeDistData,
             backgroundColor: [
               "rgba(34, 197, 94, 0.8)",
               "rgba(59, 130, 246, 0.8)",
@@ -178,6 +276,17 @@ exports.getStatistics = async (req, res) => {
               "rgba(249, 115, 22, 0.8)",
               "rgba(239, 68, 68, 0.8)",
             ],
+          },
+        ],
+      },
+      enrollmentTrend: {
+        labels: enrollmentLabels,
+        datasets: [
+          {
+            label: "Học viên mới",
+            data: enrollmentData,
+            borderColor: "rgb(99, 102, 241)",
+            backgroundColor: "rgba(99, 102, 241, 0.5)",
           },
         ],
       },
@@ -444,18 +553,49 @@ exports.getGradesByClass = async (req, res) => {
 
 exports.updateGrade = async (req, res) => {
   try {
-    const grade = await Grade.findByIdAndUpdate(
-      req.params.id,
-      { ...req.body, gradedBy: req.user._id },
-      { new: true, runValidators: true }
-    )
-      .populate("student", "studentCode fullName")
-      .populate("class", "classCode name")
-      .populate("course", "name courseCode");
+    const grade = await Grade.findById(req.params.id);
 
     if (!grade) {
       return ApiResponse.notFound(res, "Không tìm thấy bản ghi điểm");
     }
+
+    // Update fields manually to ensure deep merge for scores/weights
+    if (req.body.scores) {
+      // Merge scores
+      Object.keys(req.body.scores).forEach((key) => {
+        grade.scores[key] = req.body.scores[key];
+      });
+    }
+
+    if (req.body.weights) {
+      // Merge weights
+      Object.keys(req.body.weights).forEach((key) => {
+        grade.weights[key] = req.body.weights[key];
+      });
+    }
+
+    // Update other fields
+    const allowedFields = [
+      "teacherComment",
+      "strengths",
+      "weaknesses",
+      "recommendations",
+      "isPublished",
+    ];
+    allowedFields.forEach((field) => {
+      if (req.body[field] !== undefined) {
+        grade[field] = req.body[field];
+      }
+    });
+
+    grade.gradedBy = req.user._id;
+
+    // Save triggers the pre-save hook which recalculates totalScore
+    await grade.save();
+
+    await grade.populate("student", "studentCode fullName");
+    await grade.populate("class", "classCode name");
+    await grade.populate("course", "name courseCode");
 
     return ApiResponse.success(res, grade, "Cập nhật điểm thành công");
   } catch (error) {
@@ -596,20 +736,81 @@ exports.rejectRequest = async (req, res) => {
 exports.getStudents = async (req, res) => {
   try {
     const { academicStatus, search } = req.query;
-    const filter = {};
+    const matchStage = {};
 
-    if (academicStatus) filter.academicStatus = academicStatus;
+    if (academicStatus) matchStage.academicStatus = academicStatus;
     if (search) {
-      filter.$or = [
+      matchStage.$or = [
         { fullName: { $regex: search, $options: "i" } },
         { studentCode: { $regex: search, $options: "i" } },
         { email: { $regex: search, $options: "i" } },
       ];
     }
 
-    const students = await Student.find(filter)
-      .select("-password -refreshToken")
-      .sort({ createdAt: -1 });
+    const students = await Student.aggregate([
+      { $match: matchStage },
+      { $sort: { createdAt: -1 } },
+      // Lookup Grades
+      {
+        $lookup: {
+          from: "grades",
+          localField: "_id",
+          foreignField: "student",
+          as: "grades",
+        },
+      },
+      // Lookup Attendance
+      {
+        $lookup: {
+          from: "attendances",
+          localField: "_id",
+          foreignField: "student",
+          as: "attendances",
+        },
+      },
+      // Add computed fields
+      {
+        $addFields: {
+          average: {
+            $avg: "$grades.totalScore",
+          },
+          attendanceRate: {
+            $cond: {
+              if: { $eq: [{ $size: "$attendances" }, 0] },
+              then: 0,
+              else: {
+                $multiply: [
+                  {
+                    $divide: [
+                      {
+                        $size: {
+                          $filter: {
+                            input: "$attendances",
+                            as: "att",
+                            cond: { $eq: ["$$att.status", "present"] },
+                          },
+                        },
+                      },
+                      { $size: "$attendances" },
+                    ],
+                  },
+                  100,
+                ],
+              },
+            },
+          },
+        },
+      },
+      // Project to remove heavy arrays and sensitive info
+      {
+        $project: {
+          password: 0,
+          refreshToken: 0,
+          grades: 0,
+          attendances: 0,
+        },
+      },
+    ]);
 
     return ApiResponse.success(
       res,

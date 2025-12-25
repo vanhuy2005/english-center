@@ -4,12 +4,7 @@ import { useAuth } from "@hooks";
 import { getMyEnrolledCourses } from "@services/enrollmentApi";
 import { getMySchedules } from "@services/scheduleApi";
 import { getMyGrades } from "@services/gradesApi";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@components/common";
+import { Card, CardContent, CardHeader, CardTitle } from "@components/common";
 import { Badge } from "@components/common";
 import { Progress } from "@components/common";
 import { Button } from "@components/common";
@@ -33,6 +28,8 @@ import {
   MapPin,
   ChevronRight,
   LayoutDashboard,
+  FileText,
+  Send,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -41,7 +38,7 @@ const THEME_COLORS = {
   primary: "#132440",
   primaryLight: "#1a3254",
   accent: "#16476a",
-  secondary: "#3b9797",  // Màu Teal chủ đạo cho Chart
+  secondary: "#3b9797", // Màu Teal chủ đạo cho Chart
   secondaryLight: "#4eb5b5",
   danger: "#bf092f",
   highlight: "#770000",
@@ -65,6 +62,7 @@ const StudentDashboard = () => {
     grades: [],
     attendanceTrend: [],
     gradeDistribution: [],
+    noData: false,
   });
 
   // --- LOGIC GIỮ NGUYÊN ---
@@ -77,33 +75,73 @@ const StudentDashboard = () => {
         getMyGrades(),
       ]);
 
+      console.debug("fetchDashboardData results:", {
+        coursesData,
+        schedulesData,
+        gradesData,
+      });
+
       const courses = Array.isArray(coursesData) ? coursesData : [];
       const schedules = Array.isArray(schedulesData) ? schedulesData : [];
       const grades = Array.isArray(gradesData) ? gradesData : [];
 
-      const activeCourses = courses.filter((c) => c.status === "active").length;
-      const completedCourses = courses.filter((c) => c.status === "completed").length;
-      const totalHours = courses.reduce((sum, c) => sum + (c.course?.duration?.hours || 0), 0);
+      // Treat newly enrolled / pending / in_progress statuses as active for student-facing dashboard
+      const activeStatuses = new Set([
+        "active",
+        "pending",
+        "in_progress",
+        "enrolled",
+      ]);
+      const activeCourses = courses.filter(
+        (c) => !c.status || activeStatuses.has(c.status)
+      ).length;
+      const completedCourses = courses.filter(
+        (c) => c.status === "completed"
+      ).length;
+      const totalHours = courses.reduce(
+        (sum, c) => sum + (c.course?.duration?.hours || 0),
+        0
+      );
 
-      const avgAttendance = grades.length > 0
-          ? Math.round(grades.reduce((sum, g) => sum + (g.attendance || 0), 0) / grades.length)
+      const avgAttendance =
+        grades.length > 0
+          ? Math.round(
+              grades.reduce((sum, g) => sum + (g.attendance || 0), 0) /
+                grades.length
+            )
           : 0;
 
       const completedGrades = grades.filter((g) => g.finalScore);
-      const avgGrade = completedGrades.length > 0
-          ? (completedGrades.reduce((sum, g) => sum + g.finalScore, 0) / completedGrades.length).toFixed(2)
+      const avgGrade =
+        completedGrades.length > 0
+          ? (
+              completedGrades.reduce((sum, g) => sum + g.finalScore, 0) /
+              completedGrades.length
+            ).toFixed(2)
           : 0;
 
       const attendanceTrend = generateAttendanceTrend(grades);
       const gradeDistribution = generateGradeDistribution(grades);
 
+      const noDataFlag =
+        (!Array.isArray(courses) || courses.length === 0) &&
+        (!Array.isArray(schedules) || schedules.length === 0) &&
+        (!Array.isArray(grades) || grades.length === 0);
+
       setDashboardData({
-        stats: { activeCourses, completedCourses, totalHours, avgAttendance, avgGrade },
+        stats: {
+          activeCourses,
+          completedCourses,
+          totalHours,
+          avgAttendance,
+          avgGrade,
+        },
         courses,
         schedules,
         grades,
         attendanceTrend,
         gradeDistribution,
+        noData: noDataFlag,
       });
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
@@ -113,31 +151,61 @@ const StudentDashboard = () => {
     }
   }, []);
 
-  useEffect(() => { fetchDashboardData(); }, [fetchDashboardData]);
+  useEffect(() => {
+    fetchDashboardData();
+  }, [fetchDashboardData]);
 
-  const activeCourses = useMemo(() => (dashboardData.courses || []).filter((c) => c.status === "active"), [dashboardData.courses]);
-  const todaySchedules = useMemo(() => (dashboardData.schedules || []).slice(0, 3), [dashboardData.schedules]);
+  const activeCourses = useMemo(() => {
+    const activeStatuses = new Set([
+      "active",
+      "pending",
+      "in_progress",
+      "enrolled",
+    ]);
+    return (dashboardData.courses || []).filter(
+      (c) => !c.status || activeStatuses.has(c.status)
+    );
+  }, [dashboardData.courses]);
+  const todaySchedules = useMemo(
+    () => (dashboardData.schedules || []).slice(0, 3),
+    [dashboardData.schedules]
+  );
 
   const generateAttendanceTrend = useCallback((grades) => {
-    if (grades.length === 0) {
-      return Array.from({ length: 6 }, (_, i) => ({ week: `T${i + 1}`, attendance: 0 }));
-    }
-    const avg = grades.reduce((sum, g) => sum + (g.attendance || 0), 0) / grades.length;
-    // Mocking trend for demo UI based on real avg
-    return [
-      { week: "T1", attendance: Math.max(0, avg - 5) },
-      { week: "T2", attendance: Math.max(0, avg - 3) },
-      { week: "T3", attendance: Math.max(0, avg - 2) },
-      { week: "T4", attendance: avg },
-      { week: "T5", attendance: Math.min(100, avg + 2) },
-      { week: "T6", attendance: avg },
-    ];
+    const today = new Date();
+    // last 6 days (inclusive of today)
+    const days = Array.from({ length: 6 }, (_, idx) => {
+      const d = new Date(today);
+      d.setDate(today.getDate() - (5 - idx));
+      const label = `T${idx + 1}`;
+      const dateKey = d.toISOString().split("T")[0];
+
+      const gradesForDay = grades.filter((g) => {
+        if (!g.createdAt && !g.date) return false;
+        const gDate = new Date(g.createdAt || g.date)
+          .toISOString()
+          .split("T")[0];
+        return gDate === dateKey;
+      });
+
+      const attendanceAvg =
+        gradesForDay.length > 0
+          ? Math.round(
+              gradesForDay.reduce((s, gg) => s + (gg.attendance || 0), 0) /
+                gradesForDay.length
+            )
+          : 0;
+
+      return { week: label, attendance: attendanceAvg };
+    });
+
+    return days;
   }, []);
 
   const generateGradeDistribution = useCallback((grades) => {
     const completedGrades = grades.filter((g) => g.finalScore);
     if (completedGrades.length === 0) return [];
-    
+
     // Áp dụng bảng màu Theme vào biểu đồ tròn
     const distribution = [
       {
@@ -147,12 +215,16 @@ const StudentDashboard = () => {
       },
       {
         name: "Giỏi",
-        value: completedGrades.filter((g) => g.finalScore >= 7 && g.finalScore < 8.5).length,
+        value: completedGrades.filter(
+          (g) => g.finalScore >= 7 && g.finalScore < 8.5
+        ).length,
         color: THEME_COLORS.accent, // Xanh Navy sáng
       },
       {
         name: "Khá",
-        value: completedGrades.filter((g) => g.finalScore >= 5.5 && g.finalScore < 7).length,
+        value: completedGrades.filter(
+          (g) => g.finalScore >= 5.5 && g.finalScore < 7
+        ).length,
         color: THEME_COLORS.primary, // Xanh đậm
       },
       {
@@ -170,7 +242,9 @@ const StudentDashboard = () => {
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="flex flex-col items-center gap-4">
           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[var(--color-secondary)]"></div>
-          <p className="text-[var(--color-primary)] text-sm animate-pulse">Đang tải dữ liệu...</p>
+          <p className="text-[var(--color-primary)] text-sm animate-pulse">
+            Đang tải dữ liệu...
+          </p>
         </div>
       </div>
     );
@@ -178,13 +252,16 @@ const StudentDashboard = () => {
 
   const { stats } = dashboardData;
 
+  const showNoDataWarning = dashboardData.noData && user;
+
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       return (
         <div className="bg-white p-3 border border-gray-100 shadow-xl rounded-lg">
           <p className="text-xs text-gray-400 mb-1">{label}</p>
           <p className="text-sm font-bold text-[var(--color-primary)]">
-            {payload[0].value}% <span className="text-gray-500 font-normal">Chuyên cần</span>
+            {payload[0].value}%{" "}
+            <span className="text-gray-500 font-normal">Chuyên cần</span>
           </p>
         </div>
       );
@@ -194,22 +271,30 @@ const StudentDashboard = () => {
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-8 bg-gray-50/30 min-h-screen font-sans">
-      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-[var(--color-primary)] flex items-center gap-3">
-             <div className="p-2 bg-[var(--color-primary)] rounded-lg shadow-sm">
-                <LayoutDashboard className="w-5 h-5 text-white" />
-             </div>
-             <span>Dashboard</span>
+            <div className="p-2 bg-[var(--color-primary)] rounded-lg shadow-sm">
+              <LayoutDashboard className="w-5 h-5 text-white" />
+            </div>
+            <span>Dashboard</span>
           </h1>
           <p className="text-gray-500 text-sm mt-1 ml-11">
-            Tổng quan học tập của <span className="font-bold text-[var(--color-accent)]">{user?.fullName}</span>
+            Tổng quan học tập của{" "}
+            <span className="font-bold text-[var(--color-accent)]">
+              {user?.fullName}
+            </span>
           </p>
         </div>
       </div>
 
-      {/* Stats Cards */}
+      {showNoDataWarning && (
+        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-md text-sm text-yellow-800">
+          <strong>Chú ý:</strong> Không có dữ liệu thống kê từ server. Kiểm tra
+          trạng thái backend hoặc quyền truy cập (token).
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
         <StatsCard
           title="Đang Học"
@@ -234,12 +319,43 @@ const StudentDashboard = () => {
         />
       </div>
 
+      {/* Quick Actions */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <Card
+          className="cursor-pointer hover:shadow-md transition-shadow border-l-4 border-l-blue-500"
+          onClick={() => navigate("/student/requests")}
+        >
+          <div className="p-4 flex items-center gap-4">
+            <div className="p-3 rounded-full bg-blue-50 text-blue-600">
+              <FileText size={24} />
+            </div>
+            <div>
+              <h3 className="font-bold text-gray-800">Lịch sử Yêu cầu</h3>
+              <p className="text-xs text-gray-500">Theo dõi đơn từ</p>
+            </div>
+          </div>
+        </Card>
+
+        <Card
+          className="cursor-pointer hover:shadow-md transition-shadow border-l-4 border-l-green-500"
+          onClick={() => navigate("/student/enroll")}
+        >
+          <div className="p-4 flex items-center gap-4">
+            <div className="p-3 rounded-full bg-green-50 text-green-600">
+              <Send size={24} />
+            </div>
+            <div>
+              <h3 className="font-bold text-gray-800">Đăng ký / Tư vấn</h3>
+              <p className="text-xs text-gray-500">Khóa học mới</p>
+            </div>
+          </div>
+        </Card>
+      </div>
+
       {/* Main Content */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
         {/* Left Column (Charts & Courses) */}
         <div className="lg:col-span-2 space-y-6">
-          
           {/* Chart Section */}
           <Card className="border-none shadow-[var(--shadow-card)] hover:shadow-[var(--shadow-card-hover)] transition-shadow duration-300">
             <CardHeader className="pb-2">
@@ -253,17 +369,35 @@ const StudentDashboard = () => {
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={dashboardData.attendanceTrend}>
                     <defs>
-                      <linearGradient id="colorAttendance" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor={THEME_COLORS.secondary} stopOpacity={0.15} />
-                        <stop offset="95%" stopColor={THEME_COLORS.secondary} stopOpacity={0} />
+                      <linearGradient
+                        id="colorAttendance"
+                        x1="0"
+                        y1="0"
+                        x2="0"
+                        y2="1"
+                      >
+                        <stop
+                          offset="5%"
+                          stopColor={THEME_COLORS.secondary}
+                          stopOpacity={0.15}
+                        />
+                        <stop
+                          offset="95%"
+                          stopColor={THEME_COLORS.secondary}
+                          stopOpacity={0}
+                        />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={THEME_COLORS.gray} />
-                    <XAxis 
-                      dataKey="week" 
-                      axisLine={false} 
-                      tickLine={false} 
-                      tick={{ fill: THEME_COLORS.accent, fontSize: 12 }} 
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      vertical={false}
+                      stroke={THEME_COLORS.gray}
+                    />
+                    <XAxis
+                      dataKey="week"
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: THEME_COLORS.accent, fontSize: 12 }}
                       dy={10}
                     />
                     <Tooltip content={<CustomTooltip />} />
@@ -281,11 +415,10 @@ const StudentDashboard = () => {
             </CardContent>
           </Card>
 
-          {/* Active Courses */}
           <div>
             <h2 className="text-lg font-bold text-[var(--color-primary)] mb-4 flex items-center gap-2">
-               <BookOpen className="w-4 h-4 text-[var(--color-secondary)]" />
-               Khóa học đang diễn ra
+              <BookOpen className="w-4 h-4 text-[var(--color-secondary)]" />
+              Khóa học đang diễn ra
             </h2>
             {activeCourses.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -299,10 +432,7 @@ const StudentDashboard = () => {
           </div>
         </div>
 
-        {/* Right Column (Schedule & Grade Pie) */}
         <div className="space-y-6">
-          
-          {/* Schedule */}
           <Card className="border-none shadow-[var(--shadow-card)] h-fit">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-base font-bold text-[var(--color-primary)] flex items-center gap-2">
@@ -319,16 +449,18 @@ const StudentDashboard = () => {
             </CardHeader>
             <CardContent className="pt-2">
               <div className="space-y-0 relative">
-                {/* Timeline vertical line */}
                 <div className="absolute left-[7px] top-2 bottom-2 w-[2px] bg-gray-100 z-0"></div>
-                
+
                 {todaySchedules.length > 0 ? (
                   todaySchedules.map((schedule, idx) => (
-                    <div key={idx} className="relative pl-6 py-3 z-10 hover:bg-gray-50 rounded-r-lg transition-colors group">
+                    <div
+                      key={idx}
+                      className="relative pl-6 py-3 z-10 hover:bg-gray-50 rounded-r-lg transition-colors group"
+                    >
                       <div className="absolute left-0 top-5 h-4 w-4 rounded-full border-2 border-white bg-[var(--color-secondary-light)] flex items-center justify-center">
-                         <div className="w-1.5 h-1.5 rounded-full bg-[var(--color-secondary)]"></div>
+                        <div className="w-1.5 h-1.5 rounded-full bg-[var(--color-secondary)]"></div>
                       </div>
-                      
+
                       <div className="flex flex-col">
                         <span className="text-xs font-bold text-[var(--color-secondary)] mb-0.5">
                           {schedule.startTime} - {schedule.endTime}
@@ -354,9 +486,8 @@ const StudentDashboard = () => {
             </CardContent>
           </Card>
 
-          {/* Grade Distribution */}
           <Card className="border-none shadow-[var(--shadow-card)]">
-             <CardHeader className="pb-2">
+            <CardHeader className="pb-2">
               <CardTitle className="text-base font-bold text-[var(--color-primary)] flex items-center gap-2">
                 <Award className="w-4 h-4 text-[var(--color-secondary)]" />
                 Phân bố điểm
@@ -390,10 +521,16 @@ const StudentDashboard = () => {
                   </div>
                 )}
               </div>
-               <div className="flex flex-wrap gap-3 justify-center mt-2">
+              <div className="flex flex-wrap gap-3 justify-center mt-2">
                 {dashboardData.gradeDistribution.map((item, idx) => (
-                  <div key={idx} className="flex items-center text-xs text-gray-600">
-                    <div className="w-2.5 h-2.5 rounded-full mr-1.5" style={{ backgroundColor: item.color }}></div>
+                  <div
+                    key={idx}
+                    className="flex items-center text-xs text-gray-600"
+                  >
+                    <div
+                      className="w-2.5 h-2.5 rounded-full mr-1.5"
+                      style={{ backgroundColor: item.color }}
+                    ></div>
                     {item.name}
                   </div>
                 ))}
@@ -406,25 +543,30 @@ const StudentDashboard = () => {
   );
 };
 
-// --- SUB COMPONENTS WITH THEME CSS VARS ---
-
 const StatsCard = ({ title, value, icon, trend }) => {
   return (
     <Card className="border-none shadow-[var(--shadow-card)] hover:shadow-[var(--shadow-card-hover)] transition-all duration-300 bg-white">
       <CardContent className="p-5 flex items-start justify-between">
         <div>
           <p className="text-sm font-medium text-gray-500 mb-1">{title}</p>
-          <h3 className="text-2xl font-bold text-[var(--color-primary)]">{value}</h3>
+          <h3 className="text-2xl font-bold text-[var(--color-primary)]">
+            {value}
+          </h3>
           {trend && (
-             <div 
-               className="flex items-center text-xs mt-2 font-medium"
-               style={{ color: trend === 'up' ? 'var(--color-secondary)' : 'var(--color-danger)' }}
-             >
-                {trend === 'up' ? '▲ Tốt' : '▼ Cần chú ý'}
-             </div>
+            <div
+              className="flex items-center text-xs mt-2 font-medium"
+              style={{
+                color:
+                  trend === "up"
+                    ? "var(--color-secondary)"
+                    : "var(--color-danger)",
+              }}
+            >
+              {trend === "up" ? "▲ Tốt" : "▼ Cần chú ý"}
+            </div>
           )}
         </div>
-        {/* Background dùng opacity của màu Secondary, Icon dùng màu Secondary */}
+
         <div className="p-2.5 rounded-lg bg-[var(--color-secondary)]/10 text-[var(--color-secondary)]">
           {icon}
         </div>
@@ -440,46 +582,51 @@ const CourseCard = ({ course }) => {
       className="group border-none shadow-[var(--shadow-card)] hover:shadow-[var(--shadow-card-hover)] hover:-translate-y-1 transition-all duration-300 cursor-pointer overflow-hidden bg-white"
       onClick={() => navigate(`/student/courses/${course.course?._id}`)}
     >
-      {/* Top Border dùng màu Primary để branding */}
       <div className="h-1.5 bg-[var(--color-primary)] w-full opacity-90 group-hover:opacity-100 transition-opacity" />
-      
+
       <CardContent className="p-5">
         <div className="flex justify-between items-start mb-3">
-          <Badge variant="secondary" className="bg-gray-100 text-[var(--color-accent)] font-medium border-none px-2 py-0.5 text-xs">
+          <Badge
+            variant="secondary"
+            className="bg-gray-100 text-[var(--color-accent)] font-medium border-none px-2 py-0.5 text-xs"
+          >
             {course.course?.code}
           </Badge>
           <div className="text-gray-300 group-hover:text-[var(--color-secondary)] transition-colors">
-             <ChevronRight className="w-5 h-5" />
+            <ChevronRight className="w-5 h-5" />
           </div>
         </div>
-        
+
         <h3 className="font-bold text-base text-[var(--color-primary)] group-hover:text-[var(--color-secondary)] transition-colors line-clamp-2 mb-4 min-h-[3rem]">
           {course.course?.name}
         </h3>
 
         <div className="space-y-4">
           <div>
-             <div className="flex justify-between text-xs font-medium text-gray-500 mb-1.5">
-               <span>Tiến độ</span>
-               <span className="text-[var(--color-secondary)]">{course.progress || 0}%</span>
-             </div>
-             {/* Custom Progress bar color using inline style or Tailwind arbitrary value */}
-             <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-[var(--color-secondary)] transition-all duration-500" 
-                  style={{ width: `${course.progress || 0}%` }}
-                />
-             </div>
+            <div className="flex justify-between text-xs font-medium text-gray-500 mb-1.5">
+              <span>Tiến độ</span>
+              <span className="text-[var(--color-secondary)]">
+                {course.progress || 0}%
+              </span>
+            </div>
+            <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-[var(--color-secondary)] transition-all duration-500"
+                style={{ width: `${course.progress || 0}%` }}
+              />
+            </div>
           </div>
 
           <div className="flex items-center justify-between pt-3 border-t border-gray-50">
             <div className="flex items-center text-xs text-gray-500 gap-1.5">
-                <Clock className="w-3.5 h-3.5 text-[var(--color-secondary)]" />
-                <span>{course.course?.duration?.weeks || 0} tuần</span>
+              <Clock className="w-3.5 h-3.5 text-[var(--color-secondary)]" />
+              <span>{course.course?.duration?.weeks || 0} tuần</span>
             </div>
-             <div className="flex items-center text-xs text-gray-500 gap-1.5">
-                <Calendar className="w-3.5 h-3.5 text-[var(--color-secondary)]" />
-                <span>{new Date(course.enrollmentDate).toLocaleDateString("vi-VN")}</span>
+            <div className="flex items-center text-xs text-gray-500 gap-1.5">
+              <Calendar className="w-3.5 h-3.5 text-[var(--color-secondary)]" />
+              <span>
+                {new Date(course.enrollmentDate).toLocaleDateString("vi-VN")}
+              </span>
             </div>
           </div>
         </div>
@@ -491,7 +638,7 @@ const CourseCard = ({ course }) => {
 const EmptyState = ({ message }) => (
   <div className="flex flex-col items-center justify-center py-10 px-4 border border-dashed border-gray-200 rounded-xl bg-gray-50/50">
     <div className="mb-3 p-3 bg-white rounded-full shadow-sm">
-        <BookOpen className="w-6 h-6 text-[var(--color-secondary)]" />
+      <BookOpen className="w-6 h-6 text-[var(--color-secondary)]" />
     </div>
     <p className="text-gray-500 text-sm font-medium">{message}</p>
   </div>

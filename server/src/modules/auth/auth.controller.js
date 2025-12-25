@@ -420,23 +420,32 @@ exports.changePassword = async (req, res) => {
       return errorResponse(res, "Không tìm thấy người dùng", 404);
     }
 
-    // Nếu không phải đăng nhập lần đầu, cần kiểm tra mật khẩu hiện tại
-    if (!isFirstLogin) {
+    // Determine from DB whether this is first login (safer than trusting client input)
+    const isFirstLoginUser = !!user.isFirstLogin;
+
+    // If not first login, require currentPassword and verify it
+    if (!isFirstLoginUser) {
       if (!currentPassword) {
         return errorResponse(res, "Vui lòng nhập mật khẩu hiện tại", 400);
       }
 
-      // Check current password
       const isMatch = await user.comparePassword(currentPassword);
       if (!isMatch) {
         return errorResponse(res, "Mật khẩu hiện tại không đúng", 401);
       }
+    } else {
+      // If it is first login, allow password change without currentPassword
+      // (we trust default seeded password or admin-set password)
+      console.log(
+        `User ${user._id} isFirstLogin=true - skipping current password check for change`
+      );
     }
 
-    // Update password
+    // Update password and mark first login complete
     user.password = newPassword;
     user.isFirstLogin = false;
     user.refreshToken = null;
+
     await user.save();
 
     successResponse(res, null, "Đổi mật khẩu thành công");
