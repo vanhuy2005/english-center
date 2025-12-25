@@ -320,7 +320,7 @@ exports.getDashboard = async (req, res) => {
 exports.getRevenueChart = async (req, res) => {
   try {
     // Validate and sanitize period
-    const allowedPeriods = ["day", "week", "month", "year"];
+    const allowedPeriods = ["day", "week", "month", "quarter", "year"];
     let period = req.query.period || "month";
     if (!allowedPeriods.includes(period)) {
       period = "month";
@@ -328,8 +328,9 @@ exports.getRevenueChart = async (req, res) => {
 
     // Validate and sanitize limit
     let limit = parseInt(req.query.limit, 10);
+    const defaultLimits = { week: 8, month: 12, quarter: 8, year: 5 };
     if (isNaN(limit) || limit < 1 || limit > 100) {
-      limit = 6;
+      limit = defaultLimits[period] || 12;
     }
 
     const chartData = await getRevenueChartData(period, limit);
@@ -375,7 +376,7 @@ exports.getStudentDistribution = async (req, res) => {
     );
 
     const distribution = await Promise.all(
-      courses.map(async (course) => {
+      courses.map(async (course, index) => {
         const count = await Student.countDocuments({
           enrolledCourses: course._id,
           academicStatus: "active",
@@ -384,7 +385,7 @@ exports.getStudentDistribution = async (req, res) => {
         return {
           name: course.name,
           value: count,
-          color: getRandomColor(),
+          color: getColorByIndex(index),
         };
       })
     );
@@ -496,72 +497,151 @@ async function getFinanceStatistics() {
  * Get revenue chart data
  */
 async function getRevenueChartData(period, limit) {
-  const months = [
-    "T1",
-    "T2",
-    "T3",
-    "T4",
-    "T5",
-    "T6",
-    "T7",
-    "T8",
-    "T9",
-    "T10",
-    "T11",
-    "T12",
-  ];
+  const now = new Date();
 
-  const currentMonth = new Date().getMonth();
-  const currentYear = new Date().getFullYear();
-
-  const startMonth = limit - 1;
-  const firstDay = new Date(currentYear, currentMonth - startMonth, 1);
-
-  const revenueData = await Finance.aggregate([
-    {
-      $match: {
-        status: "paid",
-        paidDate: { $gte: firstDay },
+  const configs = {
+    week: {
+      limit: limit || 8,
+      startDate: () => {
+        const d = new Date(now);
+        d.setDate(d.getDate() - 7 * ((limit || 8) - 1));
+        d.setHours(0, 0, 0, 0);
+        return d;
       },
-    },
-    {
-      $group: {
+      group: {
         _id: {
-          year: { $year: "$paidDate" },
-          month: { $month: "$paidDate" },
+          year: { $isoWeekYear: "$paidDate" },
+          week: { $isoWeek: "$paidDate" },
         },
         total: { $sum: "$paidAmount" },
       },
+      label: (year, week) => `W${week}/${year}`,
+      buildSlots: () => {
+        const slots = [];
+        const d = new Date(now);
+        for (let i = (limit || 8) - 1; i >= 0; i--) {
+          const slotDate = new Date(d);
+          slotDate.setDate(slotDate.getDate() - i * 7);
+          const week = getISOWeek(slotDate);
+          const year = getISOWeekYear(slotDate);
+          slots.push({ key: `${year}-W${week}`, label: `W${week}/${year}` });
+        }
+        return slots;
+      },
+    },
+    month: {
+      limit: limit || 12,
+      startDate: () =>
+        new Date(now.getFullYear(), now.getMonth() - ((limit || 12) - 1), 1),
+      group: {
+        _id: { year: { $year: "$paidDate" }, month: { $month: "$paidDate" } },
+        total: { $sum: "$paidAmount" },
+      },
+      label: (year, month) => `T${month}`,
+      buildSlots: () => {
+        const slots = [];
+        for (let i = (limit || 12) - 1; i >= 0; i--) {
+          const m = (now.getMonth() - i + 12) % 12;
+          const y =
+            m > now.getMonth() ? now.getFullYear() - 1 : now.getFullYear();
+          slots.push({ key: `${y}-${m + 1}`, label: `T${m + 1}` });
+        }
+        return slots;
+      },
+    },
+    quarter: {
+      limit: limit || 8,
+      startDate: () => {
+        const currentQuarter = Math.floor(now.getMonth() / 3);
+        return new Date(
+          now.getFullYear(),
+          currentQuarter * 3 - 3 * ((limit || 8) - 1),
+          1
+        );
+      },
+      group: {
+        _id: {
+          year: { $year: "$paidDate" },
+          quarter: { $ceil: { $divide: [{ $month: "$paidDate" }, 3] } },
+        },
+        total: { $sum: "$paidAmount" },
+      },
+      label: (year, quarter) => `Q${quarter}/${year}`,
+      buildSlots: () => {
+        const slots = [];
+        const currentQuarter = Math.floor(now.getMonth() / 3) + 1;
+        for (let i = (limit || 8) - 1; i >= 0; i--) {
+          let q = currentQuarter - i;
+          let y = now.getFullYear();
+          while (q <= 0) {
+            q += 4;
+            y -= 1;
+          }
+          while (q > 4) {
+            q -= 4;
+            y += 1;
+          }
+          slots.push({ key: `${y}-Q${q}`, label: `Q${q}/${y}` });
+        }
+        return slots;
+      },
+    },
+    year: {
+      limit: limit || 5,
+      startDate: () => new Date(now.getFullYear() - ((limit || 5) - 1), 0, 1),
+      group: {
+        _id: { year: { $year: "$paidDate" } },
+        total: { $sum: "$paidAmount" },
+      },
+      label: (year) => `${year}`,
+      buildSlots: () => {
+        const slots = [];
+        for (let i = (limit || 5) - 1; i >= 0; i--) {
+          const y = now.getFullYear() - i;
+          slots.push({ key: `${y}`, label: `${y}` });
+        }
+        return slots;
+      },
+    },
+  };
+
+  const cfg = configs[period] || configs.month;
+  const startDate = cfg.startDate();
+
+  const revenueData = await Finance.aggregate([
+    { $match: { status: "paid", paidDate: { $gte: startDate } } },
+    { $group: cfg.group },
+    {
+      $sort: { "_id.year": 1, "_id.month": 1, "_id.week": 1, "_id.quarter": 1 },
     },
   ]);
 
-  // Create a map for quick lookup
   const revenueMap = new Map();
   revenueData.forEach((item) => {
-    const key = `${item._id.year}-${item._id.month}`;
-    revenueMap.set(key, item.total);
+    if (item._id.week) {
+      revenueMap.set(`${item._id.year}-W${item._id.week}`, item.total);
+    } else if (item._id.quarter) {
+      revenueMap.set(`${item._id.year}-Q${item._id.quarter}`, item.total);
+    } else if (item._id.month) {
+      revenueMap.set(`${item._id.year}-${item._id.month}`, item.total);
+    } else if (item._id.year) {
+      revenueMap.set(`${item._id.year}`, item.total);
+    }
   });
 
-  // Build the data array
-  const data = [];
-  for (let i = limit - 1; i >= 0; i--) {
-    const month = (currentMonth - i + 12) % 12;
-    const year = month > currentMonth ? currentYear - 1 : currentYear;
-    const key = `${year}-${month + 1}`;
-
-    const revenueAmount = revenueMap.get(key) || 0;
-    const profit = Math.round(revenueAmount * 0.7);
-    const expenses = Math.round(revenueAmount * 0.3);
-
-    data.push({
-      month: months[month],
+  const slots = cfg.buildSlots();
+  return slots.map((slot) => {
+    const revenueAmount = revenueMap.get(slot.key) || 0;
+    const profit = Math.round(revenueAmount * 0.35);
+    const expenses = Math.round(revenueAmount * 0.65);
+    return {
+      name: slot.label,
+      month: slot.label,
       revenue: revenueAmount,
       profit,
       expenses,
-    });
-  }
-
-  return data;
+    };
+  });
 }
 
 /**
@@ -707,6 +787,105 @@ async function getAttendanceChartData(period) {
   return data;
 }
 
+// Revenue stats per period (current vs previous)
+async function getRevenueStatisticsByPeriod(period) {
+  const now = new Date();
+
+  const ranges = {
+    week: () => {
+      const start = new Date(now);
+      start.setDate(start.getDate() - 6);
+      start.setHours(0, 0, 0, 0);
+
+      const prevStart = new Date(start);
+      prevStart.setDate(prevStart.getDate() - 7);
+      const prevEnd = new Date(start);
+      prevEnd.setDate(prevEnd.getDate() - 1);
+      prevEnd.setHours(23, 59, 59, 999);
+      return { start, prevStart, prevEnd };
+    },
+    month: () => {
+      const start = new Date(now.getFullYear(), now.getMonth(), 1);
+      const prevStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const prevEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+      return { start, prevStart, prevEnd };
+    },
+    quarter: () => {
+      const currentQuarter = Math.floor(now.getMonth() / 3);
+      const start = new Date(now.getFullYear(), currentQuarter * 3, 1);
+      const prevStart = new Date(
+        now.getFullYear(),
+        (currentQuarter - 1) * 3,
+        1
+      );
+      const prevEnd = new Date(now.getFullYear(), currentQuarter * 3, 0);
+      return { start, prevStart, prevEnd };
+    },
+    year: () => {
+      const start = new Date(now.getFullYear(), 0, 1);
+      const prevStart = new Date(now.getFullYear() - 1, 0, 1);
+      const prevEnd = new Date(now.getFullYear(), 0, 0);
+      return { start, prevStart, prevEnd };
+    },
+  };
+
+  const rangeBuilder = ranges[period] || ranges.month;
+  const { start, prevStart, prevEnd } = rangeBuilder();
+
+  const [current, previous] = await Promise.all([
+    Finance.aggregate([
+      { $match: { status: "paid", paidDate: { $gte: start } } },
+      { $group: { _id: null, total: { $sum: "$paidAmount" } } },
+    ]),
+    Finance.aggregate([
+      {
+        $match: {
+          status: "paid",
+          paidDate: { $gte: prevStart, $lte: prevEnd },
+        },
+      },
+      { $group: { _id: null, total: { $sum: "$paidAmount" } } },
+    ]),
+  ]);
+
+  const currentRevenue = current[0]?.total || 0;
+  const previousRevenue = previous[0]?.total || 0;
+  const growth =
+    previousRevenue > 0
+      ? ((currentRevenue - previousRevenue) / previousRevenue) * 100
+      : 0;
+  const margin = 35; // percent
+  const profit = Math.round(currentRevenue * (margin / 100));
+  const expenses = Math.round(currentRevenue - profit);
+
+  return {
+    currentRevenue,
+    profit,
+    expenses,
+    growth: Math.round(growth * 10) / 10,
+    margin,
+  };
+}
+
+// Helpers for ISO week
+function getISOWeek(date) {
+  const tmp = new Date(date.valueOf());
+  const dayNr = (date.getDay() + 6) % 7;
+  tmp.setDate(tmp.getDate() - dayNr + 3);
+  const firstThursday = tmp.valueOf();
+  tmp.setMonth(0, 1);
+  if (tmp.getDay() !== 4) {
+    tmp.setMonth(0, 1 + ((4 - tmp.getDay() + 7) % 7));
+  }
+  return 1 + Math.ceil((firstThursday - tmp) / 604800000);
+}
+
+function getISOWeekYear(date) {
+  const tmp = new Date(date.valueOf());
+  tmp.setDate(tmp.getDate() - ((date.getDay() + 6) % 7) + 3);
+  return tmp.getFullYear();
+}
+
 /**
  * Get ISO week number for a date
  */
@@ -721,23 +900,23 @@ function getWeekNumber(date) {
 }
 
 /**
- * Get random color for chart
+ * Get fixed color based on index (not random)
  */
-function getRandomColor() {
+function getColorByIndex(index) {
   const colors = [
-    "#132440", // Primary
-    "#16476A", // Accent
-    "#3B9797", // Secondary
-    "#BF092F", // Danger
-    "#770000", // Highlight
-    "#4A90E2",
-    "#50C878",
-    "#FF6B6B",
-    "#9B59B6",
-    "#F39C12",
+    "#2563eb", // Blue
+    "#dc2626", // Red
+    "#059669", // Green
+    "#7c3aed", // Purple
+    "#ea580c", // Orange
+    "#06b6d4", // Cyan
+    "#ec4899", // Pink
+    "#f59e0b", // Amber
+    "#14b8a6", // Teal
+    "#8b5cf6", // Violet
   ];
 
-  return colors[Math.floor(Math.random() * colors.length)];
+  return colors[index % colors.length];
 }
 
 // ============ New Report Endpoints ============
@@ -750,19 +929,16 @@ function getRandomColor() {
 exports.getRevenueStats = async (req, res) => {
   try {
     const { period = "month" } = req.query;
-    const financeStats = await getFinanceStatistics();
-
-    // Calculate profit and expenses (mock data - adjust based on your model)
-    const totalProfit = Math.round(financeStats.totalRevenue * 0.7);
-    const totalExpenses = Math.round(financeStats.totalRevenue * 0.3);
+    const stats = await getRevenueStatisticsByPeriod(period);
 
     successResponse(
       res,
       {
-        totalRevenue: financeStats.totalRevenue,
-        totalProfit,
-        totalExpenses,
-        growth: financeStats.revenueGrowth,
+        totalRevenue: stats.currentRevenue,
+        totalProfit: stats.profit,
+        totalExpenses: stats.expenses,
+        growth: stats.growth,
+        margin: stats.margin,
       },
       "Lấy thống kê doanh thu thành công"
     );
@@ -792,15 +968,19 @@ exports.getStudentStats = async (req, res) => {
       activeStudents,
       newStudents,
       newStudentsLastMonth,
-      graduatedStudents,
+      completedStudents,
     ] = await Promise.all([
       Student.countDocuments(),
       Student.countDocuments({ academicStatus: "active" }),
-      Student.countDocuments({ createdAt: { $gte: firstDayThisMonth } }),
       Student.countDocuments({
-        createdAt: { $gte: firstDayLastMonth, $lt: firstDayThisMonth },
+        enrollmentDate: { $gte: firstDayThisMonth },
+        academicStatus: "active",
       }),
-      Student.countDocuments({ academicStatus: "graduated" }),
+      Student.countDocuments({
+        enrollmentDate: { $gte: firstDayLastMonth, $lt: firstDayThisMonth },
+        academicStatus: "active",
+      }),
+      Student.countDocuments({ academicStatus: "completed" }),
     ]);
 
     const growth =
@@ -816,7 +996,7 @@ exports.getStudentStats = async (req, res) => {
         totalStudents,
         activeStudents,
         newStudents,
-        graduatedStudents,
+        graduatedStudents: completedStudents,
         growth,
       },
       "Lấy thống kê học viên thành công"
@@ -861,11 +1041,12 @@ exports.getEnrollmentTrend = async (req, res) => {
 
       const [newStudents, activeStudents] = await Promise.all([
         Student.countDocuments({
-          createdAt: { $gte: firstDay, $lte: lastDay },
+          enrollmentDate: { $gte: firstDay, $lte: lastDay },
+          academicStatus: "active",
         }),
         Student.countDocuments({
           academicStatus: "active",
-          createdAt: { $lte: lastDay },
+          enrollmentDate: { $lte: lastDay },
         }),
       ]);
 

@@ -16,11 +16,11 @@ import {
   RevenueReportPage,
   StudentReportPage,
   ClassReportPage,
-  TeacherReportPage,
+  // TeacherReportPage,
   RetentionReportPage,
-  DepartmentsPage,
+  // DepartmentsPage,
 } from "@pages/director";
-import TeacherDashboardPage from "@pages/teacher/TeacherDashboardPage";
+// import TeacherDashboardPage from "@pages/teacher/TeacherDashboardPage";
 import StudentDashboard from "@pages/student/StudentDashboard";
 import EnrollmentStaffDashboard from "@pages/staff/EnrollmentStaffDashboard";
 import AcademicStaffDashboard from "@pages/staff/academic/AcademicStaffDashboardPage";
@@ -190,14 +190,14 @@ function App() {
             </ProtectedRoute>
           }
         />
-        <Route
+        {/* <Route
           path="/reports/teachers"
           element={
             <ProtectedRoute allowedRoles={["director"]}>
               <TeacherReportPage />
             </ProtectedRoute>
           }
-        />
+        /> */}
         <Route
           path="/reports/retention"
           element={
@@ -206,14 +206,14 @@ function App() {
             </ProtectedRoute>
           }
         />
-        <Route
+        {/* <Route
           path="/departments"
           element={
             <ProtectedRoute allowedRoles={["director"]}>
               <DepartmentsPage />
             </ProtectedRoute>
           }
-        />
+        /> */}
 
         {/* Student Routes */}
         <Route

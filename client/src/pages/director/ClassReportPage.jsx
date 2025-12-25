@@ -11,17 +11,17 @@ import {
   Calendar,
   Clock,
   BookOpen,
-  MoreHorizontal
+  MoreHorizontal,
 } from "lucide-react";
 
 // Import dữ liệu giả lập từ file vừa tạo
-import { 
-  classStats, 
-  classStatusData, 
-  classCapacityData, 
+import {
+  classStats,
+  classStatusData,
+  classCapacityData,
   classListData,
-  breakdownStats
-} from './mockClassData';
+  breakdownStats,
+} from "./mockClassData";
 
 /**
  * Class Report Page - Thống kê lớp học (Polished UI)
@@ -29,24 +29,71 @@ import {
 const ClassReportPage = () => {
   const { t } = useLanguage();
   const [loading, setLoading] = useState(true);
-  
+
   // State quản lý dữ liệu
   const [stats, setStats] = useState(classStats);
   const [classData, setClassData] = useState([]);
   const [capacityData, setCapacityData] = useState([]);
   const [classList, setClassList] = useState([]);
-  const [breakdown, setBreakdown] = useState({ byLevel: [], byTime: [], byDay: [] });
+  const [breakdown, setBreakdown] = useState({
+    byLevel: [],
+    byTime: [],
+    byDay: [],
+  });
 
   useEffect(() => {
     fetchClassData();
   }, []);
 
+  // Chart.js configs (must be defined before early returns)
+  const classStatusConfig = React.useMemo(() => {
+    // Use state data if available, fallback to mock
+    const data = classData.length > 0 ? classData : classStatusData;
+
+    if (!data || data.length === 0) {
+      return { labels: [], datasets: [] };
+    }
+
+    return {
+      labels: data.map((i) => i.name),
+      datasets: [
+        {
+          data: data.map((i) => i.value || 0),
+          backgroundColor: data.map((i) => i.color || "#3b82f6"),
+          borderWidth: 0,
+        },
+      ],
+    };
+  }, [classData]);
+
+  const capacityBarConfig = React.useMemo(() => {
+    // Use state data if available, fallback to mock
+    const data = capacityData.length > 0 ? capacityData : classCapacityData;
+
+    if (!data || data.length === 0) {
+      return { labels: [], datasets: [] };
+    }
+
+    return {
+      labels: data.map((i) => i.name),
+      datasets: [
+        {
+          label: "Số lượng lớp",
+          data: data.map((i) => i.count || 0),
+          backgroundColor: data.map((i) => i.fill || "#3b82f6"),
+          borderRadius: 4,
+          barThickness: 48,
+        },
+      ],
+    };
+  }, [capacityData]);
+
   const fetchClassData = async () => {
     try {
       setLoading(true);
-      
+
       // Giả lập độ trễ mạng (0.8s) để tạo hiệu ứng loading mượt mà
-      await new Promise(resolve => setTimeout(resolve, 800));
+      await new Promise((resolve) => setTimeout(resolve, 800));
 
       // Gán dữ liệu trực tiếp từ Mock Data
       // (Không gọi API để tránh lỗi service function missing)
@@ -55,7 +102,6 @@ const ClassReportPage = () => {
       setCapacityData(classCapacityData);
       setClassList(classListData);
       setBreakdown(breakdownStats);
-
     } catch (error) {
       console.error("Error loading data:", error);
     } finally {
@@ -74,7 +120,7 @@ const ClassReportPage = () => {
   // Helper render Progress Bar cho cột Sĩ số
   const renderCapacityBar = (current, max) => {
     const percent = Math.round((current / max) * 100) || 0;
-    
+
     // Logic màu sắc: >90% đỏ, >70% vàng, còn lại xanh
     let colorClass = "bg-emerald-500";
     if (percent >= 90) colorClass = "bg-rose-500";
@@ -84,7 +130,9 @@ const ClassReportPage = () => {
       <div className="w-full max-w-[140px]">
         <div className="flex justify-between text-xs mb-1.5 font-medium text-gray-600">
           <span>{percent}%</span>
-          <span>{current}/{max} HV</span>
+          <span>
+            {current}/{max} HV
+          </span>
         </div>
         <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
           <div
@@ -98,8 +146,17 @@ const ClassReportPage = () => {
 
   // Cấu hình cột cho bảng
   const tableColumns = [
-    { key: "classCode", label: "Mã Lớp", width: "110px", className: "text-sm font-mono text-gray-600" },
-    { key: "className", label: "Tên Lớp", className: "font-semibold text-gray-900" },
+    {
+      key: "classCode",
+      label: "Mã Lớp",
+      width: "110px",
+      className: "text-sm font-mono text-gray-600",
+    },
+    {
+      key: "className",
+      label: "Tên Lớp",
+      className: "font-semibold text-gray-900",
+    },
     { key: "course", label: "Khóa Học" },
     { key: "teacher", label: "Giảng Viên" },
     { key: "capacity", label: "Sĩ Số & Lấp Đầy" },
@@ -108,7 +165,6 @@ const ClassReportPage = () => {
 
   return (
     <div className="p-6 space-y-8 bg-gray-50/50 min-h-screen font-sans">
-      
       {/* 1. Header Section */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -119,14 +175,14 @@ const ClassReportPage = () => {
             Tổng quan tình trạng phòng học, lịch học và công suất đào tạo.
           </p>
         </div>
-        
-         <div className="flex items-center gap-2">
+
+        <div className="flex items-center gap-2">
           <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 shadow-sm transition-all">
             <Calendar className="w-4 h-4" />
             Kỳ hiện tại
           </button>
           <button className="p-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 shadow-sm text-gray-700">
-             <MoreHorizontal className="w-4 h-4" />
+            <MoreHorizontal className="w-4 h-4" />
           </button>
         </div>
       </div>
@@ -171,99 +227,147 @@ const ClassReportPage = () => {
         {/* Pie Chart: Status */}
         <Card title="Trạng Thái Lớp Học" className="shadow-sm border-gray-200">
           <div className="mt-4">
-             <PieChart
-              data={classData}
-              dataKey="value"
-              nameKey="name"
+            <PieChart
+              data={classStatusConfig}
               height={300}
-              // Dùng mảng màu từ data
+              options={{
+                animation: false,
+                plugins: { legend: { position: "bottom" } },
+              }}
             />
           </div>
         </Card>
 
         {/* Bar Chart: Capacity */}
-        <Card title="Phân Tích Tỷ Lệ Lấp Đầy" className="shadow-sm border-gray-200">
+        <Card
+          title="Phân Tích Tỷ Lệ Lấp Đầy"
+          className="shadow-sm border-gray-200"
+        >
           <div className="mt-4">
             <BarChart
-              data={capacityData}
-              bars={[
-                {
-                  dataKey: "count",
-                  name: "Số lượng lớp",
-                  fill: "#3b82f6",
-                  radius: [4, 4, 0, 0],
-                  barSize: 48
-                },
-              ]}
+              data={capacityBarConfig}
               height={300}
+              options={{
+                animation: false,
+                scales: {
+                  x: { grid: { display: false } },
+                  y: { beginAtZero: true },
+                },
+                plugins: { legend: { position: "top" } },
+              }}
             />
           </div>
         </Card>
       </div>
 
       {/* 4. Main Class List Table */}
-      <Card title="Danh Sách Lớp Học Tiêu Biểu" className="shadow-sm border-gray-200">
+      <Card
+        title="Danh Sách Lớp Học Tiêu Biểu"
+        className="shadow-sm border-gray-200"
+      >
         <div className="mt-2">
-            <Table
+          <Table
             columns={tableColumns}
             data={classList.map((cls) => ({
-                classCode: cls.classCode,
-                className: cls.className,
-                course: <span className="text-blue-600 font-medium">{cls.course}</span>,
-                teacher: (
-                    <div className="flex items-center gap-3">
-                        {cls.teacher ? (
-                          <>
-                            <img src={cls.teacher.avatar || `https://ui-avatars.com/api/?name=${cls.teacher.fullName}&background=random`} alt="" className="w-7 h-7 rounded-full border border-gray-200"/>
-                            <span className="text-sm">{cls.teacher.fullName}</span>
-                          </>
-                        ) : (
-                          <span className="text-gray-400 italic text-sm">Chưa phân công</span>
-                        )}
-                    </div>
-                ),
-                capacity: renderCapacityBar(cls.currentStudents, cls.maxStudents),
-                status: (
+              classCode: cls.classCode,
+              className: cls.className,
+              course: (
+                <span className="text-blue-600 font-medium">{cls.course}</span>
+              ),
+              teacher: (
+                <div className="flex items-center gap-3">
+                  {cls.teacher ? (
+                    <>
+                      <img
+                        src={
+                          cls.teacher.avatar ||
+                          `https://ui-avatars.com/api/?name=${cls.teacher.fullName}&background=random`
+                        }
+                        alt=""
+                        className="w-7 h-7 rounded-full border border-gray-200"
+                      />
+                      <span className="text-sm">{cls.teacher.fullName}</span>
+                    </>
+                  ) : (
+                    <span className="text-gray-400 italic text-sm">
+                      Chưa phân công
+                    </span>
+                  )}
+                </div>
+              ),
+              capacity: renderCapacityBar(cls.currentStudents, cls.maxStudents),
+              status: (
                 <Badge
-                    variant={
-                    cls.status === "active" ? "success" : 
-                    cls.status === "open" ? "primary" :
-                    cls.status === "full" ? "warning" : "default"
-                    }
+                  variant={
+                    cls.status === "active"
+                      ? "success"
+                      : cls.status === "open"
+                      ? "primary"
+                      : cls.status === "full"
+                      ? "warning"
+                      : "default"
+                  }
                 >
-                    {cls.status === "active" && "Đang học"}
-                    {cls.status === "open" && "Tuyển sinh"}
-                    {cls.status === "full" && "Full chỗ"}
-                    {cls.status === "closed" && "Kết thúc"}
+                  {cls.status === "active" && "Đang học"}
+                  {cls.status === "open" && "Tuyển sinh"}
+                  {cls.status === "full" && "Full chỗ"}
+                  {cls.status === "closed" && "Kết thúc"}
                 </Badge>
-                ),
+              ),
             }))}
-            />
+          />
         </div>
       </Card>
 
       {/* 5. Breakdown Info Cards */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card title="Phân Bổ Theo Trình Độ" className="shadow-sm border-gray-200" icon={<BookOpen className="w-5 h-5 text-gray-400"/>}>
+        <Card
+          title="Phân Bổ Theo Trình Độ"
+          className="shadow-sm border-gray-200"
+          icon={<BookOpen className="w-5 h-5 text-gray-400" />}
+        >
           <div className="space-y-4 mt-2">
             {breakdown.byLevel.map((item, index) => (
-                 <StatusItem key={index} label={item.label} count={item.count} color={item.color} />
+              <StatusItem
+                key={index}
+                label={item.label}
+                count={item.count}
+                color={item.color}
+              />
             ))}
           </div>
         </Card>
 
-        <Card title="Phân Bổ Theo Khung Giờ" className="shadow-sm border-gray-200" icon={<Clock className="w-5 h-5 text-gray-400"/>}>
+        <Card
+          title="Phân Bổ Theo Khung Giờ"
+          className="shadow-sm border-gray-200"
+          icon={<Clock className="w-5 h-5 text-gray-400" />}
+        >
           <div className="space-y-4 mt-2">
             {breakdown.byTime.map((item, index) => (
-                 <StatusItem key={index} label={item.label} count={item.count} color={item.color} />
+              <StatusItem
+                key={index}
+                label={item.label}
+                count={item.count}
+                color={item.color}
+              />
             ))}
           </div>
         </Card>
 
-        <Card title="Phân Bổ Theo Lịch Học" className="shadow-sm border-gray-200" icon={<Calendar className="w-5 h-5 text-gray-400"/>}>
-           <div className="space-y-4 mt-2">
+        <Card
+          title="Phân Bổ Theo Lịch Học"
+          className="shadow-sm border-gray-200"
+          icon={<Calendar className="w-5 h-5 text-gray-400" />}
+        >
+          <div className="space-y-4 mt-2">
             {breakdown.byDay.map((item, index) => (
-                 <StatusItem key={index} label={item.label} count={item.count} color={item.color} />
+              <StatusItem
+                key={index}
+                label={item.label}
+                count={item.count}
+                color={item.color}
+              />
             ))}
           </div>
         </Card>
@@ -285,7 +389,7 @@ const StatCard = ({ title, value, icon, variant = "blue", subtitle }) => {
     orange: "bg-orange-50 text-orange-600 border-orange-100",
     teal: "bg-teal-50 text-teal-600 border-teal-100",
   };
-  
+
   const currentStyle = variants[variant] || variants.blue;
 
   return (
@@ -296,9 +400,7 @@ const StatCard = ({ title, value, icon, variant = "blue", subtitle }) => {
           <h3 className="text-2xl font-bold text-gray-900">{value}</h3>
           {subtitle && <p className="text-xs text-gray-400 mt-1">{subtitle}</p>}
         </div>
-        <div className={`p-3 rounded-xl shrink-0 ${currentStyle}`}>
-          {icon}
-        </div>
+        <div className={`p-3 rounded-xl shrink-0 ${currentStyle}`}>{icon}</div>
       </div>
     </div>
   );
@@ -308,22 +410,34 @@ const StatCard = ({ title, value, icon, variant = "blue", subtitle }) => {
  * Status Item Component - Dùng cho các Card Breakdown cuối trang
  */
 const StatusItem = ({ label, count, color }) => {
-    // Kiểm tra xem color là mã hex hay class tailwind
-    const isTailwindClass = color.startsWith('bg-');
-    
-    return (
-      <div className="flex items-center justify-between group">
-        <div className="flex items-center gap-3">
-          <span className={`w-2.5 h-2.5 rounded-full ring-2 ring-opacity-20 ring-offset-1 ring-current shrink-0 ${isTailwindClass ? color.replace('bg-', 'text-') : ''}`} style={!isTailwindClass ? { color: color } : {}}>
-              <span className={`block w-full h-full rounded-full ${isTailwindClass ? color : ''}`} style={!isTailwindClass ? { backgroundColor: color } : {}} />
-          </span>
-          <span className="text-sm text-gray-600 font-medium group-hover:text-gray-900 transition-colors">{label}</span>
-        </div>
-        <span className="text-sm font-semibold text-gray-900 bg-gray-50 px-2.5 py-0.5 rounded-md border border-gray-100">
-          {count}
+  // Kiểm tra xem color là mã hex hay class tailwind
+  const isTailwindClass = color.startsWith("bg-");
+
+  return (
+    <div className="flex items-center justify-between group">
+      <div className="flex items-center gap-3">
+        <span
+          className={`w-2.5 h-2.5 rounded-full ring-2 ring-opacity-20 ring-offset-1 ring-current shrink-0 ${
+            isTailwindClass ? color.replace("bg-", "text-") : ""
+          }`}
+          style={!isTailwindClass ? { color: color } : {}}
+        >
+          <span
+            className={`block w-full h-full rounded-full ${
+              isTailwindClass ? color : ""
+            }`}
+            style={!isTailwindClass ? { backgroundColor: color } : {}}
+          />
+        </span>
+        <span className="text-sm text-gray-600 font-medium group-hover:text-gray-900 transition-colors">
+          {label}
         </span>
       </div>
-    );
+      <span className="text-sm font-semibold text-gray-900 bg-gray-50 px-2.5 py-0.5 rounded-md border border-gray-100">
+        {count}
+      </span>
+    </div>
+  );
 };
 
 export default ClassReportPage;

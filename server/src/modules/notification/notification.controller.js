@@ -111,7 +111,7 @@ exports.markAllAsRead = async (req, res) => {
   try {
     const userId = req.user._id;
     await Notification.updateMany(
-      { userId, isRead: false },
+      { recipient: userId, isRead: false },
       { isRead: true, readAt: new Date() }
     );
 
@@ -156,7 +156,7 @@ exports.deleteNotification = async (req, res) => {
 exports.deleteAllNotifications = async (req, res) => {
   try {
     const userId = req.user._id;
-    await Notification.deleteMany({ userId });
+    await Notification.deleteMany({ recipient: userId });
 
     res.json({
       success: true,

@@ -36,6 +36,7 @@ export const BarChart = ({
   title,
   height = 300,
   stacked = false,
+  options: optionsOverride,
 }) => {
   const defaultData = {
     labels: [],
@@ -44,9 +45,10 @@ export const BarChart = ({
 
   const chartData = data || defaultData;
 
-  const options = {
+  const baseOptions = {
     responsive: true,
     maintainAspectRatio: false,
+    animation: false,
     plugins: {
       legend: {
         position: "top",
@@ -56,6 +58,18 @@ export const BarChart = ({
       y: {
         beginAtZero: true,
       },
+    },
+  };
+  const options = {
+    ...baseOptions,
+    ...(optionsOverride || {}),
+    plugins: {
+      ...baseOptions.plugins,
+      ...(optionsOverride?.plugins || {}),
+    },
+    scales: {
+      ...baseOptions.scales,
+      ...(optionsOverride?.scales || {}),
     },
   };
 

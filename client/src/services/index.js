@@ -154,70 +154,73 @@ export const notificationService = {
 
 // Report Services (Director)
 export const reportService = {
-  getAll: (params) => apiClient.get("/director/reports", { params }),
-  getById: (id) => apiClient.get(`/director/reports/${id}`),
-  create: (data) => apiClient.post("/director/reports", data),
-  delete: (id) => apiClient.delete(`/director/reports/${id}`),
+  // Prefix all report endpoints with /api to hit the Express routes
+  getAll: (params) => apiClient.get("/api/director/reports", { params }),
+  getById: (id) => apiClient.get(`/api/director/reports/${id}`),
+  create: (data) => apiClient.post("/api/director/reports", data),
+  delete: (id) => apiClient.delete(`/api/director/reports/${id}`),
   getAcademicReport: (params) =>
-    apiClient.get("/director/reports/academic", { params }),
+    apiClient.get("/api/director/reports/academic", { params }),
   getFinancialReport: (params) =>
-    apiClient.get("/director/reports/financial", { params }),
+    apiClient.get("/api/director/reports/financial", { params }),
   getAttendanceReport: (params) =>
-    apiClient.get("/director/reports/attendance", { params }),
+    apiClient.get("/api/director/reports/attendance", { params }),
   getPerformanceReport: (params) =>
-    apiClient.get("/director/reports/performance", { params }),
+    apiClient.get("/api/director/reports/performance", { params }),
 
   // Dashboard specific
   getRevenueChart: (params) =>
-    apiClient.get("/director/reports/charts/revenue", { params }),
+    apiClient.get("/api/director/reports/charts/revenue", { params }),
   getAttendanceChart: (params) =>
-    apiClient.get("/director/reports/charts/attendance", { params }),
+    apiClient.get("/api/director/reports/charts/attendance", { params }),
   getStudentDistribution: () =>
-    apiClient.get("/director/reports/charts/student-distribution"),
+    apiClient.get("/api/director/reports/charts/student-distribution"),
   getRecentActivities: (params) =>
-    apiClient.get("/director/reports/activities", { params }),
+    apiClient.get("/api/director/reports/activities", { params }),
 
   // Revenue Reports
   getRevenueStats: (params) =>
-    apiClient.get("/director/reports/revenue-stats", { params }),
+    apiClient.get("/api/director/reports/revenue-stats", { params }),
 
   // Student Reports
-  getStudentStats: () => apiClient.get("/director/reports/student-stats"),
+  getStudentStats: () => apiClient.get("/api/director/reports/student-stats"),
   getEnrollmentTrend: (params) =>
-    apiClient.get("/director/reports/enrollment-trend", { params }),
+    apiClient.get("/api/director/reports/enrollment-trend", { params }),
   getTopStudents: (params) =>
-    apiClient.get("/director/reports/top-students", { params }),
+    apiClient.get("/api/director/reports/top-students", { params }),
 
   // Class Reports
-  getClassStats: () => apiClient.get("/director/reports/class-stats"),
+  getClassStats: () => apiClient.get("/api/director/reports/class-stats"),
   getClassesByStatus: () =>
-    apiClient.get("/director/reports/classes-by-status"),
-  getClassCapacity: () => apiClient.get("/director/reports/class-capacity"),
+    apiClient.get("/api/director/reports/classes-by-status"),
+  getClassCapacity: () => apiClient.get("/api/director/reports/class-capacity"),
   getAllClasses: (params) =>
-    apiClient.get("/director/reports/all-classes", { params }),
+    apiClient.get("/api/director/reports/all-classes", { params }),
 
   // Teacher Reports
-  getTeacherStats: () => apiClient.get("/director/reports/teacher-stats"),
+  getTeacherStats: () => apiClient.get("/api/director/reports/teacher-stats"),
   getTeacherPerformance: (params) =>
-    apiClient.get("/director/reports/teacher-performance", { params }),
+    apiClient.get("/api/director/reports/teacher-performance", { params }),
   getTopTeachers: (params) =>
-    apiClient.get("/director/reports/top-teachers", { params }),
+    apiClient.get("/api/director/reports/top-teachers", { params }),
   getTeacherRatingDistribution: () =>
-    apiClient.get("/director/reports/teacher-rating-distribution"),
+    apiClient.get("/api/director/reports/teacher-rating-distribution"),
 
   // Retention Reports
-  getRetentionStats: () => apiClient.get("/director/reports/retention-stats"),
+  getRetentionStats: () =>
+    apiClient.get("/api/director/reports/retention-stats"),
   getRetentionTrend: (params) =>
-    apiClient.get("/director/reports/retention-trend", { params }),
-  getDropoutReasons: () => apiClient.get("/director/reports/dropout-reasons"),
+    apiClient.get("/api/director/reports/retention-trend", { params }),
+  getDropoutReasons: () =>
+    apiClient.get("/api/director/reports/dropout-reasons"),
   getAtRiskStudents: (params) =>
-    apiClient.get("/director/reports/at-risk-students", { params }),
+    apiClient.get("/api/director/reports/at-risk-students", { params }),
   getRetentionByCourse: () =>
-    apiClient.get("/director/reports/retention-by-course"),
+    apiClient.get("/api/director/reports/retention-by-course"),
 
   // Department Reports
   getEnrollmentDepartment: () =>
-    apiClient.get("/director/reports/enrollment-department"),
+    apiClient.get("/api/director/reports/enrollment-department"),
   getAcademicDepartment: () =>
     apiClient.get("/director/reports/academic-department"),
   getAccountingDepartment: () =>

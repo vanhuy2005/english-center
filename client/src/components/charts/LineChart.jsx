@@ -8,6 +8,7 @@ import {
   Title,
   Tooltip,
   Legend,
+  Filler,
 } from "chart.js";
 import { Line } from "react-chartjs-2";
 
@@ -18,7 +19,8 @@ ChartJS.register(
   LineElement,
   Title,
   Tooltip,
-  Legend
+  Legend,
+  Filler
 );
 
 /**
@@ -37,6 +39,7 @@ export const LineChart = ({
   xKey = "name",
   title,
   height = 300,
+  options: optionsOverride,
 }) => {
   const defaultData = {
     labels: [],
@@ -45,9 +48,10 @@ export const LineChart = ({
 
   const chartData = data || defaultData;
 
-  const options = {
+  const baseOptions = {
     responsive: true,
     maintainAspectRatio: false,
+    animation: false,
     plugins: {
       legend: {
         position: "top",
@@ -57,6 +61,19 @@ export const LineChart = ({
       y: {
         beginAtZero: true,
       },
+    },
+  };
+
+  const options = {
+    ...baseOptions,
+    ...(optionsOverride || {}),
+    plugins: {
+      ...baseOptions.plugins,
+      ...(optionsOverride?.plugins || {}),
+    },
+    scales: {
+      ...baseOptions.scales,
+      ...(optionsOverride?.scales || {}),
     },
   };
 
