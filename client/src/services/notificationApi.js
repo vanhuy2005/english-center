@@ -35,8 +35,15 @@ export const getNotifications = async () => {
     try {
       const response = await api.get("/notifications");
       if (response.data.success && Array.isArray(response.data.data)) {
-        console.log("✓ Notifications from API:", response.data.data);
-        return response.data.data;
+        // Nếu có dữ liệu từ API, dùng nó
+        if (response.data.data.length > 0) {
+          console.log("✓ Notifications from API:", response.data.data);
+          return response.data.data;
+        } else {
+          // Nếu API trả về mảng rỗng, dùng mock data
+          console.log("↪️  API returned empty, using mock notifications");
+          return getMockNotifications();
+        }
       }
     } catch (err1) {
       console.log("Endpoint /notifications failed:", err1.response?.status);
@@ -46,11 +53,18 @@ export const getNotifications = async () => {
     try {
       const response = await api.get("/student/notifications");
       if (response.data.success && Array.isArray(response.data.data)) {
-        console.log(
-          "✓ Notifications from /student/notifications:",
-          response.data.data
-        );
-        return response.data.data;
+        if (response.data.data.length > 0) {
+          console.log(
+            "✓ Notifications from /student/notifications:",
+            response.data.data
+          );
+          return response.data.data;
+        } else {
+          console.log(
+            "↪️  Endpoint 2 returned empty, using mock notifications"
+          );
+          return getMockNotifications();
+        }
       }
     } catch (err2) {
       console.log(
@@ -60,7 +74,7 @@ export const getNotifications = async () => {
     }
 
     // Trả về mock data nếu cả hai đều fail
-    console.log("↪️  Using mock notifications");
+    console.log("↪️  All endpoints failed, using mock notifications");
     return getMockNotifications();
   } catch (error) {
     console.error("Error getting notifications:", error);

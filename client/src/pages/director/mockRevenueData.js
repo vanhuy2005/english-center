@@ -5,10 +5,10 @@
 
 // 1. Tổng quan (Stats Cards)
 export const revenueStats = {
-  totalRevenue: 2450000000, // 2.45 Tỷ
-  totalProfit: 850000000,   // 850 Triệu (~35%)
-  totalExpenses: 1600000000, // 1.6 Tỷ
-  growth: 12.5,             // Tăng trưởng so với kỳ trước (%)
+  totalRevenue: 400000000,
+  totalProfit: 400000000 * 0.35, 
+  totalExpenses: 600000000,
+  growth: 3.6,            
   margin: 34.6              // Tỷ suất lợi nhuận (%)
 };
 

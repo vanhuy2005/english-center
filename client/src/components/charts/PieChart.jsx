@@ -19,6 +19,7 @@ export const PieChart = ({
   height = 300,
   colors,
   showLabels = true,
+  options: optionsOverride,
 }) => {
   const defaultColors = [
     "#132440",
@@ -43,13 +44,22 @@ export const PieChart = ({
 
   const chartData = data || defaultData;
 
-  const options = {
+  const baseOptions = {
     responsive: true,
     maintainAspectRatio: false,
+    animation: false,
     plugins: {
       legend: {
         position: "bottom",
       },
+    },
+  };
+  const options = {
+    ...baseOptions,
+    ...(optionsOverride || {}),
+    plugins: {
+      ...baseOptions.plugins,
+      ...(optionsOverride?.plugins || {}),
     },
   };
 

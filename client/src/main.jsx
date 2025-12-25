@@ -23,6 +23,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
             <App />
             <Toaster
               position="top-right"
+              closeButton={true}
               toastOptions={{
                 duration: 3000,
                 style: {

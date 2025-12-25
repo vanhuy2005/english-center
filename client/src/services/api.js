@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API_BASE_URL = "http://localhost:5000/api";
+const API_BASE_URL = "http://localhost:5000";
 
 console.log("🌐 API Base URL:", API_BASE_URL);
 
@@ -35,6 +35,15 @@ if (savedToken) {
 // Request interceptor
 api.interceptors.request.use(
   (config) => {
+    // Tự động thêm /api prefix nếu chưa có
+    if (
+      config.url &&
+      !config.url.startsWith("/api/") &&
+      !config.url.startsWith("/reports/")
+    ) {
+      config.url = `/api${config.url}`;
+    }
+
     const token = localStorage.getItem("token");
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -70,7 +79,7 @@ api.interceptors.response.use(
         try {
           console.log("🔄 Refreshing token...");
           const response = await axios.post(
-            `${API_BASE_URL}/auth/refresh-token`,
+            `${API_BASE_URL}/api/auth/refresh-token`,
             { refreshToken }
           );
 

@@ -93,6 +93,11 @@ const studentSchema = new mongoose.Schema(
         ref: "Course",
       },
     ],
+    enrollmentDate: {
+      type: Date,
+      default: Date.now,
+      index: true,
+    },
     attendance: [
       {
         type: mongoose.Schema.Types.ObjectId,
@@ -107,7 +112,14 @@ const studentSchema = new mongoose.Schema(
     ],
     academicStatus: {
       type: String,
-      enum: ["active", "inactive", "paused", "on-leave", "completed", "dropped"],
+      enum: [
+        "active",
+        "inactive",
+        "paused",
+        "on-leave",
+        "completed",
+        "dropped",
+      ],
       default: "inactive",
     },
     notes: {
