@@ -28,15 +28,21 @@ const GradesPage = () => {
       setError(null);
 
       const data = await getMyGrades();
-      
+
       console.log("📊 All Grades data:", data);
       if (data && data.length > 0) {
-        console.log("📋 First grade full object:", JSON.stringify(data[0], null, 2));
+        console.log(
+          "📋 First grade full object:",
+          JSON.stringify(data[0], null, 2)
+        );
         console.log("✏️ letterGrade value:", data[0].letterGrade);
         console.log("✏️ letterGrade type:", typeof data[0].letterGrade);
-        console.log("✏️ letterGrade === undefined:", data[0].letterGrade === undefined);
+        console.log(
+          "✏️ letterGrade === undefined:",
+          data[0].letterGrade === undefined
+        );
         console.log("✏️ letterGrade === null:", data[0].letterGrade === null);
-        console.log("✏️ letterGrade === '':", data[0].letterGrade === '');
+        console.log("✏️ letterGrade === '':", data[0].letterGrade === "");
         console.log("📈 totalScore:", data[0].totalScore);
         console.log("📊 All keys in first grade:", Object.keys(data[0]));
       }
@@ -53,7 +59,7 @@ const GradesPage = () => {
   const getLetterGradeColor = (letterGrade) => {
     // Handle A+, B+, etc. by taking the first character or specific cases
     const grade = letterGrade?.charAt(0);
-    
+
     switch (grade) {
       case "A":
         return "bg-[var(--color-secondary)] text-white";
@@ -320,7 +326,10 @@ const GradesPage = () => {
                               <p className="text-base font-bold text-gray-800">
                                 {grade._midterm !== undefined &&
                                 grade._midterm !== null
-                                  ? (Number(grade._midterm) > 10 ? Number(grade._midterm) / 10 : Number(grade._midterm)).toFixed(1)
+                                  ? (Number(grade._midterm) > 10
+                                      ? Number(grade._midterm) / 10
+                                      : Number(grade._midterm)
+                                    ).toFixed(1)
                                   : "-"}
                               </p>
                             </div>
@@ -331,7 +340,10 @@ const GradesPage = () => {
                               <p className="text-base font-bold text-gray-800">
                                 {grade._final !== undefined &&
                                 grade._final !== null
-                                  ? (Number(grade._final) > 10 ? Number(grade._final) / 10 : Number(grade._final)).toFixed(1)
+                                  ? (Number(grade._final) > 10
+                                      ? Number(grade._final) / 10
+                                      : Number(grade._final)
+                                    ).toFixed(1)
                                   : "-"}
                               </p>
                             </div>
@@ -341,7 +353,14 @@ const GradesPage = () => {
                         <div className="flex-shrink-0 w-full md:w-auto flex justify-end md:block">
                           {(() => {
                             const letterGrade = getLetterGrade(grade);
-                            console.log("🔍 Grade:", grade.course?.name, "letterGrade:", letterGrade, "totalScore:", grade.totalScore);
+                            console.log(
+                              "🔍 Grade:",
+                              grade.course?.name,
+                              "letterGrade:",
+                              letterGrade,
+                              "totalScore:",
+                              grade.totalScore
+                            );
                             return letterGrade ? (
                               <div
                                 className={`
