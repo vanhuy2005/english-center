@@ -24,7 +24,7 @@ import {
 import api from "../../../services/api";
 import toast from "react-hot-toast";
 
-// --- HELPER: Safe Data Extraction ---
+
 const safeExtract = (res) => {
   if (!res) return [];
   if (res.data?.data?.requests) return res.data.data.requests;
@@ -34,15 +34,13 @@ const safeExtract = (res) => {
   return [];
 };
 
-// --- HELPER: Format Schedule (FIX LỖI OBJECT) ---
 const formatSchedule = (schedule) => {
   if (!schedule) return "Chưa xếp lịch";
-  // Nếu là chuỗi, trả về ngay
   if (typeof schedule === 'string') return schedule;
   
-  // Hàm format từng slot nhỏ
+
   const formatSlot = (slot) => {
-    // Mapping thứ sang tiếng Việt nếu cần (tuỳ dữ liệu backend)
+   
     const daysMap = {
       monday: "T2", tuesday: "T3", wednesday: "T4", thursday: "T5", friday: "T6", saturday: "T7", sunday: "CN",
       Monday: "T2", Tuesday: "T3", Wednesday: "T4", Thursday: "T5", Friday: "T6", Saturday: "T7", Sunday: "CN"
@@ -52,12 +50,12 @@ const formatSchedule = (schedule) => {
     return `${day} ${time}`;
   };
 
-  // Nếu là mảng object
+  
   if (Array.isArray(schedule)) {
     return schedule.map(formatSlot).join(", ");
   }
   
-  // Nếu là object đơn lẻ
+
   if (typeof schedule === 'object') {
     return formatSlot(schedule);
   }
@@ -81,19 +79,18 @@ const AssignClassesPage = () => {
     fetchPendingRequests();
   }, []);
 
-  // --- LOGIC FETCH DATA ---
   const fetchPendingRequests = async () => {
     try {
       setLoading(true);
       
-      // 1. Lấy danh sách yêu cầu "course_enrollment" đang pending
+
       const res = await api.get("/staff/enrollment/requests", {
         params: { status: "pending", type: "course_enrollment", limit: 100 },
       });
       const list = safeExtract(res);
       setRequests(list);
 
-      // 2. Lấy danh sách lớp học tương ứng
+   
       const courseIds = Array.from(
         new Set(list.map((r) => r.course?._id || r.course).filter(Boolean))
       );
@@ -109,7 +106,7 @@ const AssignClassesPage = () => {
         
         const clsData = safeExtract(clsRes);
         
-        // Map lớp học theo Course ID
+        
         const map = {};
         clsData.forEach((c) => {
           const cId = typeof c.course === 'object' ? c.course?._id : c.course;
@@ -129,7 +126,7 @@ const AssignClassesPage = () => {
     }
   };
 
-  // --- HANDLERS ---
+ 
   const openAssignModal = (request) => {
     setSelectedRequest(request);
     setSelectedClassId("");
@@ -162,7 +159,7 @@ const AssignClassesPage = () => {
     }
   };
 
-  // Filter requests locally
+
   const filteredRequests = requests.filter(r => {
     const sName = r.student?.fullName?.toLowerCase() || "";
     const sCode = r.student?.studentCode?.toLowerCase() || "";
@@ -171,14 +168,14 @@ const AssignClassesPage = () => {
     return sName.includes(search) || sCode.includes(search) || cName.includes(search);
   });
 
-  // --- UI RENDER ---
+
   if (loading) return <div className="h-screen flex items-center justify-center bg-gray-50"><Loading size="large" /></div>;
 
   return (
     <div className="min-h-screen bg-gray-50/50 p-6 md:p-8 font-sans text-gray-800">
       <div className="max-w-[1600px] mx-auto space-y-6">
         
-        {/* --- HEADER --- */}
+      
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
           <div>
             <h1 className="text-2xl font-bold text-[var(--color-primary)] flex items-center gap-3">
@@ -198,7 +195,7 @@ const AssignClassesPage = () => {
           </div>
         </div>
 
-        {/* --- SEARCH TOOLBAR --- */}
+        
         <Card className="border border-gray-200 shadow-sm">
            <div className="p-4 flex flex-col md:flex-row gap-4 items-center">
               <div className="relative flex-1 w-full">
@@ -218,7 +215,7 @@ const AssignClassesPage = () => {
            </div>
         </Card>
 
-        {/* --- REQUESTS TABLE --- */}
+    
         <Card className="border border-gray-200 shadow-sm overflow-hidden bg-white">
           {filteredRequests.length > 0 ? (
             <div className="overflow-x-auto">
@@ -236,7 +233,7 @@ const AssignClassesPage = () => {
                   {filteredRequests.map((req) => (
                     <tr key={req._id} className="hover:bg-blue-50/30 transition-colors group">
                       
-                      {/* Student Info */}
+                     
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 font-bold border border-gray-200">
@@ -251,7 +248,7 @@ const AssignClassesPage = () => {
                         </div>
                       </td>
 
-                      {/* Course Info */}
+                    
                       <td className="px-6 py-4">
                          <div className="flex items-center gap-2 text-gray-800 font-medium">
                             <BookOpen size={16} className="text-[var(--color-secondary)]" />
@@ -262,19 +259,18 @@ const AssignClassesPage = () => {
                          </div>
                       </td>
 
-                      {/* Date */}
                       <td className="px-6 py-4 text-gray-600">
                          {req.createdAt ? new Date(req.createdAt).toLocaleDateString("vi-VN") : "---"}
                       </td>
 
-                      {/* Status */}
+                     
                       <td className="px-6 py-4 text-center">
                          <Badge variant="warning" className="whitespace-nowrap px-3 py-1">
                             Chờ xếp lớp
                          </Badge>
                       </td>
 
-                      {/* Actions */}
+                      
                       <td className="px-6 py-4 text-right">
                          <Button 
                             className="bg-[var(--color-primary)] hover:bg-[var(--color-primary-light)] text-white shadow-sm flex items-center gap-2 ml-auto h-8 px-3 text-xs"
@@ -301,7 +297,7 @@ const AssignClassesPage = () => {
 
       </div>
 
-      {/* --- ASSIGN CLASS MODAL --- */}
+    
       {showAssignModal && selectedRequest && (
         <Modal 
            isOpen={showAssignModal} 
@@ -325,7 +321,7 @@ const AssignClassesPage = () => {
                  </div>
               </div>
 
-              {/* Class Selection */}
+            
               <div>
                  <h4 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2 uppercase tracking-wide">
                     <School size={16} className="text-[var(--color-secondary)]" /> Danh sách lớp phù hợp
@@ -404,7 +400,7 @@ const AssignClassesPage = () => {
                  </div>
               </div>
 
-              {/* Action Buttons */}
+             
               <div className="pt-4 border-t border-gray-100 flex justify-end gap-3">
                  <Button variant="outline" onClick={() => setShowAssignModal(false)} disabled={submitting}>Hủy bỏ</Button>
                  <Button 

@@ -470,6 +470,12 @@ exports.getMyCourses = async (req, res) => {
         // 3. ĐIỂM SỐ (GRADE)
         const grade = await Grade.findOne({ student: studentId, class: cls._id }).lean();
 
+        // Determine status: Prefer student's enrollment status, fallback to class status
+        // Map 'ongoing' class status to 'active' for frontend compatibility if needed
+        const enrollment = cls.students.find(s => s.student.toString() === studentId.toString());
+        let status = enrollment?.status || cls.status;
+        if (status === "ongoing") status = "active";
+
         return {
           classId: cls._id,
           className: cls.name,
@@ -485,7 +491,7 @@ exports.getMyCourses = async (req, res) => {
           averageGrade: grade?.totalScore || 0,
           letterGrade: grade?.letterGrade || "N/A", // Frontend may render N/A as muted
 
-          status: cls.status,
+          status: status,
         };
       })
     );

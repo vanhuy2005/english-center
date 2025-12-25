@@ -1,28 +1,25 @@
-/**
- * MOCK DATA - CLASS REPORT
- * Dữ liệu giả lập cho trang Thống kê Lớp học
- */
+
 
 export const classStats = {
-  totalClasses: 45,        // Tổng số lớp
-  activeClasses: 28,       // Đang hoạt động
-  openClasses: 8,          // Đang tuyển sinh
-  closedClasses: 7,        // Đã kết thúc
-  avgStudentsPerClass: 14, // Sĩ số trung bình
+  totalClasses: 45,        
+  activeClasses: 28,       
+  openClasses: 8,        
+  closedClasses: 7,       
+  avgStudentsPerClass: 14,
 };
 
 export const classStatusData = [
-  { name: "Đang hoạt động", value: 28, color: "#10b981" }, // Emerald-500
-  { name: "Đang tuyển sinh", value: 8, color: "#3b82f6" }, // Blue-500
-  { name: "Đã đầy", value: 5, color: "#f59e0b" },         // Amber-500
-  { name: "Đã kết thúc", value: 4, color: "#ef4444" },     // Red-500
+  { name: "Đang hoạt động", value: 28, color: "#10b981" }, 
+  { name: "Đang tuyển sinh", value: 8, color: "#3b82f6" }, 
+  { name: "Đã đầy", value: 5, color: "#f59e0b" },         
+  { name: "Đã kết thúc", value: 4, color: "#ef4444" },    
 ];
 
 export const classCapacityData = [
-  { name: "< 50%", count: 5, fill: "#9ca3af" },   // Gray-400
-  { name: "50-80%", count: 15, fill: "#3b82f6" }, // Blue-500
-  { name: "80-99%", count: 20, fill: "#10b981" }, // Emerald-500
-  { name: "100%", count: 5, fill: "#ef4444" },    // Red-500
+  { name: "< 50%", count: 5, fill: "#9ca3af" }, 
+  { name: "50-80%", count: 15, fill: "#3b82f6" }, 
+  { name: "80-99%", count: 20, fill: "#10b981" }, 
+  { name: "100%", count: 5, fill: "#ef4444" },  
 ];
 
 export const classListData = [

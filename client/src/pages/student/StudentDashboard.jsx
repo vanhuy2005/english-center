@@ -62,6 +62,7 @@ const StudentDashboard = () => {
     grades: [],
     attendanceTrend: [],
     gradeDistribution: [],
+    noData: false,
   });
 
   // --- LOGIC GIỮ NGUYÊN ---
@@ -74,11 +75,26 @@ const StudentDashboard = () => {
         getMyGrades(),
       ]);
 
+      console.debug("fetchDashboardData results:", {
+        coursesData,
+        schedulesData,
+        gradesData,
+      });
+
       const courses = Array.isArray(coursesData) ? coursesData : [];
       const schedules = Array.isArray(schedulesData) ? schedulesData : [];
       const grades = Array.isArray(gradesData) ? gradesData : [];
 
-      const activeCourses = courses.filter((c) => c.status === "active").length;
+      // Treat newly enrolled / pending / in_progress statuses as active for student-facing dashboard
+      const activeStatuses = new Set([
+        "active",
+        "pending",
+        "in_progress",
+        "enrolled",
+      ]);
+      const activeCourses = courses.filter(
+        (c) => !c.status || activeStatuses.has(c.status)
+      ).length;
       const completedCourses = courses.filter(
         (c) => c.status === "completed"
       ).length;
@@ -107,6 +123,11 @@ const StudentDashboard = () => {
       const attendanceTrend = generateAttendanceTrend(grades);
       const gradeDistribution = generateGradeDistribution(grades);
 
+      const noDataFlag =
+        (!Array.isArray(courses) || courses.length === 0) &&
+        (!Array.isArray(schedules) || schedules.length === 0) &&
+        (!Array.isArray(grades) || grades.length === 0);
+
       setDashboardData({
         stats: {
           activeCourses,
@@ -120,6 +141,7 @@ const StudentDashboard = () => {
         grades,
         attendanceTrend,
         gradeDistribution,
+        noData: noDataFlag,
       });
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
@@ -133,33 +155,51 @@ const StudentDashboard = () => {
     fetchDashboardData();
   }, [fetchDashboardData]);
 
-  const activeCourses = useMemo(
-    () => (dashboardData.courses || []).filter((c) => c.status === "active"),
-    [dashboardData.courses]
-  );
+  const activeCourses = useMemo(() => {
+    const activeStatuses = new Set([
+      "active",
+      "pending",
+      "in_progress",
+      "enrolled",
+    ]);
+    return (dashboardData.courses || []).filter(
+      (c) => !c.status || activeStatuses.has(c.status)
+    );
+  }, [dashboardData.courses]);
   const todaySchedules = useMemo(
     () => (dashboardData.schedules || []).slice(0, 3),
     [dashboardData.schedules]
   );
 
   const generateAttendanceTrend = useCallback((grades) => {
-    if (grades.length === 0) {
-      return Array.from({ length: 6 }, (_, i) => ({
-        week: `T${i + 1}`,
-        attendance: 0,
-      }));
-    }
-    const avg =
-      grades.reduce((sum, g) => sum + (g.attendance || 0), 0) / grades.length;
-    // Mocking trend for demo UI based on real avg
-    return [
-      { week: "T1", attendance: Math.max(0, avg - 5) },
-      { week: "T2", attendance: Math.max(0, avg - 3) },
-      { week: "T3", attendance: Math.max(0, avg - 2) },
-      { week: "T4", attendance: avg },
-      { week: "T5", attendance: Math.min(100, avg + 2) },
-      { week: "T6", attendance: avg },
-    ];
+    const today = new Date();
+    // last 6 days (inclusive of today)
+    const days = Array.from({ length: 6 }, (_, idx) => {
+      const d = new Date(today);
+      d.setDate(today.getDate() - (5 - idx));
+      const label = `T${idx + 1}`;
+      const dateKey = d.toISOString().split("T")[0];
+
+      const gradesForDay = grades.filter((g) => {
+        if (!g.createdAt && !g.date) return false;
+        const gDate = new Date(g.createdAt || g.date)
+          .toISOString()
+          .split("T")[0];
+        return gDate === dateKey;
+      });
+
+      const attendanceAvg =
+        gradesForDay.length > 0
+          ? Math.round(
+              gradesForDay.reduce((s, gg) => s + (gg.attendance || 0), 0) /
+                gradesForDay.length
+            )
+          : 0;
+
+      return { week: label, attendance: attendanceAvg };
+    });
+
+    return days;
   }, []);
 
   const generateGradeDistribution = useCallback((grades) => {
@@ -212,6 +252,8 @@ const StudentDashboard = () => {
 
   const { stats } = dashboardData;
 
+  const showNoDataWarning = dashboardData.noData && user;
+
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       return (
@@ -229,7 +271,6 @@ const StudentDashboard = () => {
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-8 bg-gray-50/30 min-h-screen font-sans">
-      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-[var(--color-primary)] flex items-center gap-3">
@@ -247,7 +288,13 @@ const StudentDashboard = () => {
         </div>
       </div>
 
-      {/* Stats Cards */}
+      {showNoDataWarning && (
+        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-md text-sm text-yellow-800">
+          <strong>Chú ý:</strong> Không có dữ liệu thống kê từ server. Kiểm tra
+          trạng thái backend hoặc quyền truy cập (token).
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
         <StatsCard
           title="Đang Học"
@@ -368,7 +415,6 @@ const StudentDashboard = () => {
             </CardContent>
           </Card>
 
-          {/* Active Courses */}
           <div>
             <h2 className="text-lg font-bold text-[var(--color-primary)] mb-4 flex items-center gap-2">
               <BookOpen className="w-4 h-4 text-[var(--color-secondary)]" />
@@ -386,9 +432,7 @@ const StudentDashboard = () => {
           </div>
         </div>
 
-        {/* Right Column (Schedule & Grade Pie) */}
         <div className="space-y-6">
-          {/* Schedule */}
           <Card className="border-none shadow-[var(--shadow-card)] h-fit">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-base font-bold text-[var(--color-primary)] flex items-center gap-2">
@@ -405,7 +449,6 @@ const StudentDashboard = () => {
             </CardHeader>
             <CardContent className="pt-2">
               <div className="space-y-0 relative">
-                {/* Timeline vertical line */}
                 <div className="absolute left-[7px] top-2 bottom-2 w-[2px] bg-gray-100 z-0"></div>
 
                 {todaySchedules.length > 0 ? (
@@ -443,7 +486,6 @@ const StudentDashboard = () => {
             </CardContent>
           </Card>
 
-          {/* Grade Distribution */}
           <Card className="border-none shadow-[var(--shadow-card)]">
             <CardHeader className="pb-2">
               <CardTitle className="text-base font-bold text-[var(--color-primary)] flex items-center gap-2">
@@ -501,8 +543,6 @@ const StudentDashboard = () => {
   );
 };
 
-// --- SUB COMPONENTS WITH THEME CSS VARS ---
-
 const StatsCard = ({ title, value, icon, trend }) => {
   return (
     <Card className="border-none shadow-[var(--shadow-card)] hover:shadow-[var(--shadow-card-hover)] transition-all duration-300 bg-white">
@@ -526,7 +566,7 @@ const StatsCard = ({ title, value, icon, trend }) => {
             </div>
           )}
         </div>
-        {/* Background dùng opacity của màu Secondary, Icon dùng màu Secondary */}
+
         <div className="p-2.5 rounded-lg bg-[var(--color-secondary)]/10 text-[var(--color-secondary)]">
           {icon}
         </div>
@@ -542,7 +582,6 @@ const CourseCard = ({ course }) => {
       className="group border-none shadow-[var(--shadow-card)] hover:shadow-[var(--shadow-card-hover)] hover:-translate-y-1 transition-all duration-300 cursor-pointer overflow-hidden bg-white"
       onClick={() => navigate(`/student/courses/${course.course?._id}`)}
     >
-      {/* Top Border dùng màu Primary để branding */}
       <div className="h-1.5 bg-[var(--color-primary)] w-full opacity-90 group-hover:opacity-100 transition-opacity" />
 
       <CardContent className="p-5">
@@ -570,7 +609,6 @@ const CourseCard = ({ course }) => {
                 {course.progress || 0}%
               </span>
             </div>
-            {/* Custom Progress bar color using inline style or Tailwind arbitrary value */}
             <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
               <div
                 className="h-full bg-[var(--color-secondary)] transition-all duration-500"

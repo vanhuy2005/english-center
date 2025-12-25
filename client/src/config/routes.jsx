@@ -17,6 +17,7 @@ import SchedulePage from "@pages/student/SchedulePage";
 import StudentTimetablePage from "@pages/student/StudentTimetablePage";
 import GradesPage from "@pages/student/GradesPage";
 import TuitionPage from "@pages/student/TuitionPage";
+import PaymentPage from "@pages/student/PaymentPage";
 import RequestFormPage from "@pages/student/RequestFormPage";
 import MyCoursesPage from "@pages/student/MyCoursesPage";
 import StudentGradesPage from "@pages/student/StudentGradesPage";
@@ -127,6 +128,7 @@ export const roleRoutes = {
     { path: "/timetable", element: <StudentTimetablePage /> },
     { path: "/grades", element: <GradesPage /> },
     { path: "/tuition", element: <TuitionPage /> },
+    { path: "/tuition/:id", element: <PaymentPage /> },
     { path: "/my-courses", element: <MyCoursesPage /> },
     { path: "/requests", element: <RequestListPage /> },
     { path: "/requests/new", element: <RequestFormPage /> },

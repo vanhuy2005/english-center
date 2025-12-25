@@ -1,85 +1,40 @@
 import api from "./api";
 
-// Mock data
-const getMockSchedules = () => [
-  {
-    _id: "schedule_mock_1",
-    course: {
-      _id: "course1",
-      name: "English A1",
-      code: "EN-A1",
-    },
-    dayOfWeek: "monday",
-    startTime: "08:00",
-    endTime: "10:00",
-    classroom: "Phòng A1",
-    date: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000),
-  },
-  {
-    _id: "schedule_mock_2",
-    course: {
-      _id: "course1",
-      name: "English A1",
-      code: "EN-A1",
-    },
-    dayOfWeek: "wednesday",
-    startTime: "14:00",
-    endTime: "16:00",
-    classroom: "Phòng A1",
-    date: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
-  },
-  {
-    _id: "schedule_mock_3",
-    course: {
-      _id: "course1",
-      name: "English A1",
-      code: "EN-A1",
-    },
-    dayOfWeek: "friday",
-    startTime: "10:00",
-    endTime: "12:00",
-    classroom: "Phòng A2",
-    date: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
-  },
-];
-
-// Lấy danh sách lịch học của học viên
+// Lấy danh sách lịch học của học viên từ server (KHÔNG dùng mock)
 export const getMySchedules = async (startDate, endDate) => {
   try {
-    // Thử endpoint 1
-    try {
-      const params = new URLSearchParams();
-      if (startDate) params.append("startDate", startDate);
-      if (endDate) params.append("endDate", endDate);
+    const params = new URLSearchParams();
+    if (startDate) params.append("startDate", startDate);
+    if (endDate) params.append("endDate", endDate);
 
+    try {
       const response = await api.get(
         `/schedules/me${params.toString() ? "?" + params.toString() : ""}`
       );
-      if (response.data.success && Array.isArray(response.data.data)) {
-        console.log("✓ Schedules from API:", response.data.data);
+      if (response.data?.success && Array.isArray(response.data.data)) {
         return response.data.data;
       }
-    } catch (err1) {
-      console.log("Endpoint /schedules/me failed:", err1.response?.status);
+    } catch (err) {
+      console.debug(
+        "/schedules/me failed:",
+        err?.response?.status || err.message
+      );
     }
 
-    // Thử endpoint 2
     try {
       const response = await api.get("/schedules");
-      if (response.data.success && Array.isArray(response.data.data)) {
-        console.log("✓ Schedules from /schedules:", response.data.data);
+      if (response.data?.success && Array.isArray(response.data.data)) {
         return response.data.data;
       }
-    } catch (err2) {
-      console.log("Endpoint /schedules failed:", err2.response?.status);
+    } catch (err) {
+      console.debug("/schedules failed:", err?.response?.status || err.message);
     }
 
-    // Trả về mock data nếu cả hai đều fail
-    console.log("↪️  Using mock schedules");
-    return getMockSchedules();
+    console.warn("Schedules endpoints unavailable — returning empty list");
+    return [];
   } catch (error) {
     console.error("Error getting schedules:", error);
-    return getMockSchedules();
+    return [];
   }
 };
 

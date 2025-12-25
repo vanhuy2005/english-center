@@ -76,7 +76,7 @@ export const ChangePasswordDialog = ({ open, onOpenChange }) => {
     <Modal
       isOpen={open}
       onClose={isFirstLogin ? undefined : () => onOpenChange(false)}
-      title={isFirstLogin ? "⚠️ Đổi mật khẩu lần đầu" : "Đổi mật khẩu"}
+      title={isFirstLogin ? "Đổi mật khẩu lần đầu" : "Đổi mật khẩu"}
       size="md"
       closeOnOverlay={!isFirstLogin}
     >

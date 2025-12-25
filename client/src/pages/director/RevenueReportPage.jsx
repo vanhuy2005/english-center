@@ -16,7 +16,7 @@ import {
   ArrowDownRight
 } from "lucide-react";
 
-// Import dữ liệu Mock
+
 import {
   revenueStats,
   revenueTrendData,
@@ -25,15 +25,13 @@ import {
   recentTransactions
 } from "./mockRevenueData";
 
-/**
- * Revenue Report Page - Báo cáo doanh thu (Polished UI)
- */
+
 const RevenueReportPage = () => {
   const { t } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState("month"); // day, week, month, quarter, year
   
-  // State quản lý dữ liệu
+ 
   const [stats, setStats] = useState(revenueStats);
   const [chartData, setChartData] = useState([]);
   const [sourceData, setSourceData] = useState([]);
@@ -47,7 +45,7 @@ const RevenueReportPage = () => {
   const fetchRevenueData = async () => {
     try {
       setLoading(true);
-      // Giả lập call API
+     
       await new Promise(resolve => setTimeout(resolve, 800));
 
       setStats(revenueStats);
@@ -63,7 +61,7 @@ const RevenueReportPage = () => {
     }
   };
 
-  // Helper format tiền tệ VND
+  
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
   };
@@ -80,7 +78,7 @@ const RevenueReportPage = () => {
     );
   }
 
-  // Cấu hình cột cho bảng giao dịch
+
   const transactionColumns = [
     { key: "id", label: "Mã GD", className: "text-sm text-gray-500 font-mono" },
     { key: "content", label: "Nội Dung", className: "font-medium text-gray-900" },
@@ -92,7 +90,7 @@ const RevenueReportPage = () => {
   return (
     <div className="p-6 space-y-8 bg-gray-50/50 min-h-screen font-sans">
       
-      {/* 1. Header Section */}
+      
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight">
@@ -111,7 +109,7 @@ const RevenueReportPage = () => {
         </button>
       </div>
 
-      {/* 2. Filter Bar */}
+      
       <Card className="shadow-sm border-gray-200">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2 text-gray-700 font-medium">
@@ -140,7 +138,7 @@ const RevenueReportPage = () => {
         </div>
       </Card>
 
-      {/* 3. Statistics Cards */}
+   
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard
           title="Tổng Doanh Thu"
@@ -172,7 +170,7 @@ const RevenueReportPage = () => {
         />
       </div>
 
-      {/* 4. Main Chart (Revenue vs Expenses) */}
+      
       <Card title="Biểu Đồ Doanh Thu & Lợi Nhuận" className="shadow-sm border-gray-200">
         <div className="mt-4">
             <LineChart
@@ -181,21 +179,21 @@ const RevenueReportPage = () => {
                 {
                 dataKey: "revenue",
                 name: "Doanh thu",
-                stroke: "#3b82f6", // Blue-500
+                stroke: "#3b82f6", 
                 strokeWidth: 2
                 },
                 {
                 dataKey: "expenses",
                 name: "Chi phí",
-                stroke: "#ef4444", // Red-500
+                stroke: "#ef4444", 
                 strokeWidth: 2
                 },
                 {
                 dataKey: "profit",
                 name: "Lợi nhuận",
-                stroke: "#10b981", // Emerald-500
+                stroke: "#10b981", 
                 strokeWidth: 2,
-                activeDot: { r: 6 } // Highlight dot
+                activeDot: { r: 6 } 
                 },
             ]}
             height={350}
@@ -203,9 +201,9 @@ const RevenueReportPage = () => {
         </div>
       </Card>
 
-      {/* 5. Breakdown Charts */}
+     
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Revenue Sources (Pie Chart) */}
+   
         <Card title="Cơ Cấu Nguồn Thu" className="shadow-sm border-gray-200" icon={<PieIcon className="w-4 h-4 text-gray-400"/>}>
             <div className="mt-4 flex flex-col items-center">
                 <PieChart
@@ -213,12 +211,12 @@ const RevenueReportPage = () => {
                     dataKey="value"
                     nameKey="name"
                     height={300}
-                    // Colors are defined in mock data
+                    
                 />
             </div>
         </Card>
 
-        {/* Expenses Breakdown (Bar Chart) */}
+       
         <Card title="Phân Bổ Chi Phí" className="shadow-sm border-gray-200" icon={<CreditCard className="w-4 h-4 text-gray-400"/>}>
             <div className="mt-4">
                 <BarChart
@@ -227,7 +225,7 @@ const RevenueReportPage = () => {
                         {
                         dataKey: "value",
                         name: "Chi phí (VND)",
-                        fill: "#f87171", // Mặc định nếu không có trong data
+                        fill: "#f87171", 
                         barSize: 40,
                         radius: [4, 4, 0, 0]
                         },
@@ -238,7 +236,7 @@ const RevenueReportPage = () => {
         </Card>
       </div>
 
-      {/* 6. Recent Transactions Table */}
+      
       <Card title="Giao Dịch Gần Đây" className="shadow-sm border-gray-200">
         <div className="mt-2">
             <Table 
@@ -268,9 +266,8 @@ const RevenueReportPage = () => {
   );
 };
 
-// --- Sub Component: StatCard (Soft UI Style) ---
 const StatCard = ({ title, value, icon, variant = "blue", growth, subtitle }) => {
-  // Map màu sắc Soft UI
+  
   const variants = {
     blue: "bg-blue-50 text-blue-600 border-blue-100",
     green: "bg-emerald-50 text-emerald-600 border-emerald-100",
@@ -288,7 +285,7 @@ const StatCard = ({ title, value, icon, variant = "blue", growth, subtitle }) =>
           <p className="text-sm font-medium text-gray-500 mb-1">{title}</p>
           <h3 className="text-2xl font-bold text-gray-900 tracking-tight">{value}</h3>
           
-          {/* Growth Indicator */}
+         
           {growth !== undefined && (
             <div className="flex items-center gap-1.5 mt-2">
               <span
@@ -305,13 +302,13 @@ const StatCard = ({ title, value, icon, variant = "blue", growth, subtitle }) =>
             </div>
           )}
 
-          {/* Subtitle (Alternative to Growth) */}
+         
           {subtitle && (
              <p className="text-xs text-gray-400 mt-2">{subtitle}</p>
           )}
         </div>
         
-        {/* Icon Container with shrink-0 */}
+      
         <div className={`p-3 rounded-xl shrink-0 ${currentStyle}`}>
           {icon}
         </div>

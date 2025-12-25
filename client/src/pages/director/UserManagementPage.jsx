@@ -27,7 +27,7 @@ const UserManagementPage = () => {
   const [loading, setLoading] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   
-  // State logic giữ nguyên
+  
   const [filters, setFilters] = useState({
     role: "",
     status: "",
@@ -135,7 +135,7 @@ const UserManagementPage = () => {
   const handleCreateUser = async (e) => {
     e.preventDefault();
 
-    // Logic validation giữ nguyên
+  
     if (!formData.fullName.trim()) {
       toast.error("Vui lòng nhập họ và tên");
       return;
@@ -164,7 +164,7 @@ const UserManagementPage = () => {
 
     setLoading(true);
     try {
-      // Prepare data based on role (Giữ nguyên logic mapping)
+      
       const submitData = {
         fullName: formData.fullName.trim(),
         phone: formData.phone.trim(),
@@ -228,7 +228,7 @@ const UserManagementPage = () => {
     }
   };
 
-  // Helper render badge cho đẹp
+ 
   const getRoleBadgeConfig = (role) => {
     const config = {
       student: { label: "Học viên", color: "blue" },
@@ -292,7 +292,7 @@ const UserManagementPage = () => {
     },
     {
       key: "actions",
-      label: "", // Empty label for action column
+      label: "", 
       render: (_, row) => (
         <div className="flex justify-end">
            <button
@@ -310,7 +310,7 @@ const UserManagementPage = () => {
   return (
     <div className="p-6 space-y-6 bg-gray-50/50 min-h-screen font-sans">
       
-      {/* Header */}
+      
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
@@ -330,7 +330,7 @@ const UserManagementPage = () => {
         </Button>
       </div>
 
-      {/* Filter Card */}
+    
       <Card className="shadow-sm border-gray-200">
         <div className="p-4 md:p-5">
            <div className="flex items-center gap-2 mb-4 text-gray-700 font-medium border-b pb-2">
@@ -347,7 +347,7 @@ const UserManagementPage = () => {
                     value={filters.search}
                     onChange={(e) => setFilters({ ...filters, search: e.target.value })}
                     className="pl-10 w-full" 
-                    // Note: Giả sử Input component hỗ trợ className hoặc có prop icon
+                   
                   />
               </div>
 
@@ -411,7 +411,7 @@ const UserManagementPage = () => {
           />
         </div>
 
-        {/* Pagination Styled */}
+      
         <div className="px-6 py-4 border-t border-gray-100 flex flex-col sm:flex-row justify-between items-center gap-4 bg-gray-50/50">
           <div className="text-sm text-gray-500 font-medium">
             Hiển thị {users.length} / {pagination.total} kết quả
@@ -442,12 +442,12 @@ const UserManagementPage = () => {
         </div>
       </Card>
 
-      {/* Modal Tạo tài khoản - Refined Layout */}
+   
       <Modal
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
         title="Thêm Người Dùng Mới"
-        size="lg" // Dùng size lớn hơn chút để thoải mái
+        size="lg" 
       >
         <form onSubmit={handleCreateUser} className="space-y-6 p-1">
           
@@ -508,7 +508,7 @@ const UserManagementPage = () => {
              </div>
           </div>
 
-          {/* Section 2: Thông tin cá nhân */}
+         
           <div className="space-y-4">
             <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wide flex items-center gap-2">
                 <User className="w-4 h-4" /> Thông tin cá nhân
@@ -547,7 +547,6 @@ const UserManagementPage = () => {
             </div>
           </div>
 
-          {/* Section 3: Dynamic Fields based on Role */}
           {formData.role === "student" && (
             <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 space-y-4">
                <div className="flex items-center gap-2 text-gray-800 font-semibold border-b border-gray-200 pb-2">

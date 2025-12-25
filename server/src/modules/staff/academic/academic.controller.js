@@ -11,9 +11,10 @@ exports.getDashboard = async (req, res) => {
     const totalClasses = await Class.countDocuments({
       status: { $in: ["ongoing", "upcoming"] },
     });
-    const totalStudents = await Student.countDocuments({
-      academicStatus: "active",
-    });
+    // Show total students (count all). Previously this counted only
+    // students with academicStatus === "active", which caused the
+    // dashboard to show fewer students than exist in the DB.
+    const totalStudents = await Student.countDocuments();
 
     const pendingRequestsCount = await Request.countDocuments({
       status: "pending",
@@ -124,9 +125,8 @@ exports.getStatistics = async (req, res) => {
       status: { $in: ["ongoing", "upcoming"] },
     });
 
-    const totalStudents = await Student.countDocuments({
-      academicStatus: "active",
-    });
+    // Use total students for overall statistics as well.
+    const totalStudents = await Student.countDocuments();
 
     // Overall Attendance Rate
     const attendanceStats = await Attendance.aggregate([
@@ -553,18 +553,49 @@ exports.getGradesByClass = async (req, res) => {
 
 exports.updateGrade = async (req, res) => {
   try {
-    const grade = await Grade.findByIdAndUpdate(
-      req.params.id,
-      { ...req.body, gradedBy: req.user._id },
-      { new: true, runValidators: true }
-    )
-      .populate("student", "studentCode fullName")
-      .populate("class", "classCode name")
-      .populate("course", "name courseCode");
+    const grade = await Grade.findById(req.params.id);
 
     if (!grade) {
       return ApiResponse.notFound(res, "Không tìm thấy bản ghi điểm");
     }
+
+    // Update fields manually to ensure deep merge for scores/weights
+    if (req.body.scores) {
+      // Merge scores
+      Object.keys(req.body.scores).forEach((key) => {
+        grade.scores[key] = req.body.scores[key];
+      });
+    }
+
+    if (req.body.weights) {
+      // Merge weights
+      Object.keys(req.body.weights).forEach((key) => {
+        grade.weights[key] = req.body.weights[key];
+      });
+    }
+
+    // Update other fields
+    const allowedFields = [
+      "teacherComment",
+      "strengths",
+      "weaknesses",
+      "recommendations",
+      "isPublished",
+    ];
+    allowedFields.forEach((field) => {
+      if (req.body[field] !== undefined) {
+        grade[field] = req.body[field];
+      }
+    });
+
+    grade.gradedBy = req.user._id;
+
+    // Save triggers the pre-save hook which recalculates totalScore
+    await grade.save();
+
+    await grade.populate("student", "studentCode fullName");
+    await grade.populate("class", "classCode name");
+    await grade.populate("course", "name courseCode");
 
     return ApiResponse.success(res, grade, "Cập nhật điểm thành công");
   } catch (error) {

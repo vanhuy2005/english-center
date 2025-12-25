@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { financeService } from "../../services";
+import { getMyPayments } from "@services/paymentApi";
 import apiClient from "@services/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@components/common";
 import { Button } from "@components/common";
@@ -23,18 +23,21 @@ const PaymentPage = () => {
   const fetchPaymentDetails = async () => {
     try {
       setLoading(true);
-      const response = await financeService.getMyPayments();
-      const paymentData = response.data?.find(p => p._id === id);
+      // Use paymentApi.getMyPayments which returns an array (or mock data)
+      const payments = await getMyPayments();
+      const paymentData = (Array.isArray(payments) ? payments : []).find(
+        (p) => p._id === id
+      );
       if (paymentData) {
         setPayment(paymentData);
         setAmount(paymentData.remainingAmount || paymentData.amount);
       } else {
         toast.error("Không tìm thấy thông tin thanh toán!");
-        navigate("/student/tuition");
+        navigate("/tuition");
       }
     } catch (error) {
       toast.error("Không thể tải thông tin thanh toán!");
-      navigate("/student/tuition");
+      navigate("/tuition");
     } finally {
       setLoading(false);
     }
@@ -54,7 +57,7 @@ const PaymentPage = () => {
     setProcessing(true);
     try {
       // Simulate payment processing
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await new Promise((resolve) => setTimeout(resolve, 2000));
 
       // TODO: Call actual payment API
       // await apiClient.post(`/finance/${id}/payment`, {
@@ -63,7 +66,7 @@ const PaymentPage = () => {
       // });
 
       toast.success("Thanh toán thành công!");
-      navigate("/student/tuition");
+      navigate("/tuition");
     } catch (error) {
       toast.error("Thanh toán thất bại! Vui lòng thử lại.");
     } finally {
@@ -121,11 +124,15 @@ const PaymentPage = () => {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Mã khóa học:</span>
-                  <span className="font-semibold">{payment.course?.courseCode}</span>
+                  <span className="font-semibold">
+                    {payment.course?.courseCode}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Tổng học phí:</span>
-                  <span className="font-semibold">{formatCurrency(payment.amount)}</span>
+                  <span className="font-semibold">
+                    {formatCurrency(payment.amount)}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Đã thanh toán:</span>
@@ -223,13 +230,19 @@ const PaymentPage = () => {
                   />
                   <div className="flex gap-2">
                     <button
-                      onClick={() => setAmount(payment.remainingAmount || payment.amount)}
+                      onClick={() =>
+                        setAmount(payment.remainingAmount || payment.amount)
+                      }
                       className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium transition-all"
                     >
                       Thanh toán toàn bộ
                     </button>
                     <button
-                      onClick={() => setAmount((payment.remainingAmount || payment.amount) / 2)}
+                      onClick={() =>
+                        setAmount(
+                          (payment.remainingAmount || payment.amount) / 2
+                        )
+                      }
                       className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium transition-all"
                     >
                       Thanh toán 50%
@@ -250,7 +263,9 @@ const PaymentPage = () => {
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Số tiền:</span>
-                    <span className="font-semibold">{formatCurrency(amount || 0)}</span>
+                    <span className="font-semibold">
+                      {formatCurrency(amount || 0)}
+                    </span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Phí giao dịch:</span>

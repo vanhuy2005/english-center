@@ -191,7 +191,7 @@ const LoginPage = () => {
         isOpen={showChangePassword}
         // Chặn đóng modal bằng cách click ra ngoài để bắt buộc đổi
         onClose={() => {}} 
-        title="🔒 Đổi mật khẩu bắt buộc"
+        title="Đổi mật khẩu bắt buộc"
         size="md"
       >
         <form onSubmit={handleChangePassword} className="space-y-4">

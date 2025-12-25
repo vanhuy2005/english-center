@@ -18,7 +18,7 @@ router.use(protect);
 router.post("/logout", authController.logout);
 router.get("/me", authController.getMe);
 router.put("/me", authController.updateMe);
-router.put("/change-password", authController.changePassword);
+router.post("/change-password", authController.changePassword);
 
 // Avatar upload
 const multer = require("multer");

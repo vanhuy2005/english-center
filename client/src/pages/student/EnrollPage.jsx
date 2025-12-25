@@ -97,7 +97,7 @@ const EnrollPage = () => {
           ? course.duration
           : { hours: course.duration || 60, weeks: course.sessions || 12 },
       maxStudents: course.maxStudents || 30,
-      tuition: (course.fee && course.fee.amount) || course.tuition || 0,
+      tuition: course.tuition ?? (course.fee && course.fee.amount) ?? 0,
       startDate: course.startDate || new Date().toISOString(),
     }));
   };
@@ -319,10 +319,7 @@ const EnrollPage = () => {
                     <div className="pt-3 mt-3 border-t border-gray-50 flex items-center justify-between">
                       <span className="text-sm text-gray-500">Học phí</span>
                       <span className="text-lg font-bold text-[var(--color-danger)]">
-                        {new Intl.NumberFormat("vi-VN", {
-                          style: "currency",
-                          currency: "VND",
-                        }).format(course.tuition || 0)}
+                        {course.tuition?.toLocaleString("vi-VN")} ₫
                       </span>
                     </div>
                   </div>

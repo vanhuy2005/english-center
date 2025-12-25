@@ -164,7 +164,7 @@ const ClassDetailPage = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+     
       <div className="flex items-center gap-4">
         <button
           onClick={() => navigate("/academic/classes")}
@@ -178,7 +178,7 @@ const ClassDetailPage = () => {
         </div>
       </div>
 
-      {/* Stats */}
+     
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white">
           <div>
@@ -211,7 +211,7 @@ const ClassDetailPage = () => {
         </Card>
       </div>
 
-      {/* Class Info */}
+      
       <Card>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div>
@@ -247,7 +247,7 @@ const ClassDetailPage = () => {
         </div>
       </Card>
 
-      {/* Empty State */}
+     
       {students.length === 0 ? (
         <Card className="text-center py-12 border-2 border-dashed border-gray-300">
           <Users size={48} className="mx-auto text-gray-400 mb-4" />
@@ -270,7 +270,7 @@ const ClassDetailPage = () => {
         </Card>
       ) : (
         <>
-          {/* Attendance Section */}
+       
           <Card>
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-2">
@@ -452,7 +452,7 @@ const ClassDetailPage = () => {
             </div>
           </Card>
 
-          {/* Low Attendance Alert */}
+         
           {students.some((s) => {
             const rate = s.totalSessions
               ? ((s.totalPresent || 0) / s.totalSessions) * 100
@@ -490,7 +490,7 @@ const ClassDetailPage = () => {
         </>
       )}
 
-      {/* Add Student Modal */}
+      
       {showAddStudentModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <Card className="w-full max-w-2xl max-h-96 overflow-y-auto">
@@ -510,7 +510,7 @@ const ClassDetailPage = () => {
               </button>
             </div>
 
-            {/* Search */}
+         
             <div className="mb-4">
               <input
                 type="text"
@@ -521,7 +521,7 @@ const ClassDetailPage = () => {
               />
             </div>
 
-            {/* Student List */}
+          
             <div className="space-y-2 mb-6 max-h-64 overflow-y-auto">
               {filteredAvailableStudents.length > 0 ? (
                 filteredAvailableStudents.map((student) => (
@@ -567,7 +567,7 @@ const ClassDetailPage = () => {
               )}
             </div>
 
-            {/* Actions */}
+        
             <div className="flex gap-3 border-t pt-6">
               <button
                 onClick={handleAddStudents}

@@ -23,25 +23,20 @@ import {
   Clock
 } from "lucide-react";
 
-/**
- * Director Dashboard - Polished & Connected
- * Theme: Primary #132440 | Secondary #3b9797
- */
 const DirectorDashboard = () => {
   const [loading, setLoading] = useState(true);
   
-  // State dữ liệu thực
+  
   const [stats, setStats] = useState({
     totalStudents: 0,
     totalTeachers: 0,
     totalRevenue: 0,
     totalCourses: 0,
-    revenueGrowth: 12.5, // Giả lập số liệu so sánh
+    revenueGrowth: 12.5, 
   });
   
   const [revenueData, setRevenueData] = useState([]);
-  
-  // Mock data cho các phần chưa có API (để UI không bị trống)
+
   const attendanceData = [
     { day: "T2", present: 85, absent: 5, late: 10 },
     { day: "T3", present: 88, absent: 8, late: 4 },
@@ -72,13 +67,13 @@ const DirectorDashboard = () => {
     try {
       setLoading(true);
       
-      // 1. Gọi dữ liệu song song từ Service
+   
       const [overview, revenueChart] = await Promise.all([
         directorService.getOverviewStats(),
         directorService.getRevenueChartData()
       ]);
 
-      // 2. Cập nhật State nếu có dữ liệu
+      
       if (overview) {
         setStats(prev => ({ ...prev, ...overview }));
       }
@@ -101,7 +96,6 @@ const DirectorDashboard = () => {
     <div className="min-h-screen bg-gray-50/50 p-6 md:p-8 font-sans text-gray-800">
       <div className="max-w-[1600px] mx-auto space-y-6">
         
-        {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
           <div>
             <h1 className="text-2xl font-bold text-[#132440] flex items-center gap-3">
@@ -120,7 +114,7 @@ const DirectorDashboard = () => {
           </div>
         </div>
 
-        {/* Statistics Cards */}
+        
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <StatCard
             title="Tổng Học Viên"
@@ -203,9 +197,9 @@ const DirectorDashboard = () => {
           </Card>
         </div>
 
-        {/* Charts Row 2 & Activities */}
+        
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Student Distribution */}
+          
           <Card className="lg:col-span-1 border border-gray-200 shadow-sm p-5">
             <h3 className="font-bold text-gray-800 mb-6 flex items-center gap-2 text-lg">
                 <BookOpen size={20} className="text-blue-600" /> Phân Bố Học Viên
@@ -218,7 +212,7 @@ const DirectorDashboard = () => {
             />
           </Card>
 
-          {/* Recent Activities */}
+          
           <Card className="lg:col-span-2 border border-gray-200 shadow-sm p-5">
             <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2 text-lg">
                 <Clock size={20} className="text-gray-500" /> Hoạt Động Gần Đây
@@ -231,7 +225,6 @@ const DirectorDashboard = () => {
           </Card>
         </div>
 
-        {/* Department Overview */}
         <Card className="border border-gray-200 shadow-sm p-6">
           <h3 className="font-bold text-gray-800 mb-6 flex items-center gap-2 text-lg">
              <Briefcase size={20} className="text-[#132440]" /> Tổng Quan Các Bộ Phận
@@ -259,7 +252,7 @@ const DirectorDashboard = () => {
   );
 };
 
-// --- SUB-COMPONENTS ---
+
 
 const StatCard = ({ title, value, icon, colorClass, bgClass, subtitle }) => (
   <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all">

@@ -75,7 +75,7 @@ const AcademicStaffDashboardPage = () => {
     <div className="min-h-screen bg-gray-50/50 p-6 md:p-8 font-sans text-gray-800">
       <div className="max-w-[1600px] mx-auto space-y-8">
         
-        {/* --- HEADER --- */}
+        
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
           <div>
             <h1 className="text-2xl font-bold text-[var(--color-primary)] flex items-center gap-3">
@@ -94,7 +94,7 @@ const AcademicStaffDashboardPage = () => {
           </div>
         </div>
 
-        {/* --- STATS GRID --- */}
+        
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <MetricCard
             title="Tổng Số Lớp"
@@ -126,13 +126,13 @@ const AcademicStaffDashboardPage = () => {
           />
         </div>
 
-        {/* --- MAIN LAYOUT --- */}
+       
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
           
-          {/* LEFT COLUMN (8/12) */}
+          
           <div className="xl:col-span-8 space-y-8">
             
-            {/* Charts Section */}
+           
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <Card className="border border-gray-200 shadow-sm">
                 <CardHeader className="border-b border-gray-50 pb-4">
@@ -161,7 +161,7 @@ const AcademicStaffDashboardPage = () => {
               </Card>
             </div>
 
-            {/* Class Performance (Full Width Chart) */}
+           
             <Card className="border border-gray-200 shadow-sm">
               <CardHeader className="border-b border-gray-50 pb-4">
                 <CardTitle className="text-base font-bold text-gray-700 flex items-center gap-2">
@@ -175,7 +175,7 @@ const AcademicStaffDashboardPage = () => {
               </CardContent>
             </Card>
 
-            {/* Recent Classes Table */}
+          
             <Card className="border border-gray-200 shadow-sm overflow-hidden">
               <CardHeader className="border-b border-gray-50 pb-4 flex flex-row items-center justify-between">
                 <CardTitle className="text-lg font-bold text-[var(--color-primary)] flex items-center gap-2">
@@ -217,10 +217,10 @@ const AcademicStaffDashboardPage = () => {
 
           </div>
 
-          {/* RIGHT COLUMN (4/12 - Sidebar Widgets) */}
+          
           <div className="xl:col-span-4 space-y-6">
             
-            {/* Alert: Pending Requests */}
+          
             <div className="bg-amber-50 rounded-xl p-5 border border-amber-100 shadow-sm relative overflow-hidden group">
                <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
                   <FileText size={80} className="text-amber-600" />
@@ -244,7 +244,7 @@ const AcademicStaffDashboardPage = () => {
                </div>
             </div>
 
-            {/* Alert: Low Attendance */}
+        
             <div className="bg-rose-50 rounded-xl p-5 border border-rose-100 shadow-sm relative overflow-hidden group">
                <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
                   <Users size={80} className="text-rose-600" />
@@ -269,7 +269,7 @@ const AcademicStaffDashboardPage = () => {
                </div>
             </div>
 
-            {/* Quick Actions List */}
+            
             <Card className="border border-gray-200 shadow-sm">
                <CardHeader className="border-b border-gray-50 pb-3">
                   <CardTitle className="text-sm font-bold text-gray-500 uppercase tracking-widest">Thao tác nhanh</CardTitle>
@@ -302,7 +302,7 @@ const AcademicStaffDashboardPage = () => {
                </CardContent>
             </Card>
 
-            {/* Pending Requests Mini List */}
+            
             <Card className="border border-gray-200 shadow-sm">
                <CardHeader className="border-b border-gray-50 pb-3">
                   <CardTitle className="text-sm font-bold text-gray-500 uppercase tracking-widest">Mới nhất</CardTitle>
@@ -329,7 +329,6 @@ const AcademicStaffDashboardPage = () => {
   );
 };
 
-// --- SUB COMPONENTS ---
 
 const MetricCard = ({ title, value, icon, color, subText }) => {
   const styles = {
