@@ -259,14 +259,25 @@ gradeSchema.statics.getStudentTranscript = async function (studentId) {
     }
   }
 
-  return this.find({
+  const allGrades = await this.find({
     student: resolvedId,
-    isPublished: true,
   })
-    .sort({ createdAt: -1 })
+    .sort({ isPublished: -1, updatedAt: -1 })
     .populate("class", "name classCode")
     .populate("course", "name courseCode level")
     .populate("gradedBy", "fullName");
+
+  // Filter: only return grades with at least one score
+  return allGrades.filter((g) => {
+    const s = g.scores || {};
+    return (
+      (s.midterm !== null && s.midterm !== undefined) ||
+      (s.final !== null && s.final !== undefined) ||
+      (s.attendance !== null && s.attendance !== undefined) ||
+      (s.participation !== null && s.participation !== undefined) ||
+      (s.homework !== null && s.homework !== undefined)
+    );
+  });
 };
 
 // Static method to get class grade report

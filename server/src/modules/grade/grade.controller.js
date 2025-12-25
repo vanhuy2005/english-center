@@ -164,32 +164,22 @@ exports.createOrUpdateGrade = async (req, res) => {
           }
         }
       });
-      // Determine publish behavior: if caller specified isPublished use it,
-      // otherwise default to published so students see saved grades.
+      // Only change publish state when explicitly requested
       if (req.body.isPublished !== undefined) {
         grade.isPublished = req.body.isPublished;
-      } else {
-        grade.isPublished = true;
+        grade.publishedDate = req.body.isPublished ? new Date() : undefined;
       }
-      if (grade.isPublished && !grade.publishedDate)
-        grade.publishedDate = new Date();
 
       await grade.save();
     } else {
-      // Create new grade
+      // Create new grade as draft by default
       const createPayload = {
         student,
         class: classId,
         course,
         ...gradeData,
-        isPublished:
-          req.body.isPublished !== undefined ? req.body.isPublished : true,
-        publishedDate:
-          req.body.isPublished !== undefined
-            ? req.body.isPublished
-              ? new Date()
-              : undefined
-            : new Date(),
+        isPublished: req.body.isPublished === true ? true : false,
+        publishedDate: req.body.isPublished === true ? new Date() : undefined,
       };
 
       grade = await Grade.create(createPayload);
@@ -288,6 +278,25 @@ exports.togglePublishGrade = async (req, res) => {
       return res.status(404).json({
         success: false,
         message: "Không tìm thấy điểm số",
+      });
+    }
+
+    // Prevent publishing grades without any scores
+    const hasScores =
+      grade.scores &&
+      ((grade.scores.midterm !== null && grade.scores.midterm !== undefined) ||
+        (grade.scores.final !== null && grade.scores.final !== undefined) ||
+        (grade.scores.attendance !== null &&
+          grade.scores.attendance !== undefined) ||
+        (grade.scores.participation !== null &&
+          grade.scores.participation !== undefined) ||
+        (grade.scores.homework !== null &&
+          grade.scores.homework !== undefined));
+
+    if (!grade.isPublished && !hasScores) {
+      return res.status(400).json({
+        success: false,
+        message: "Không thể công bố điểm khi chưa có điểm thành phần nào",
       });
     }
 
@@ -530,17 +539,32 @@ exports.getMyGrades = async (req, res) => {
   try {
     const studentId = req.user._id;
 
-    const grades = await Grade.find({ student: studentId, isPublished: true })
+    // Fetch all grades for student
+    const allGrades = await Grade.find({ student: studentId })
       .populate("class", "name classCode")
       .populate("course", "name courseCode level")
       .populate("gradedBy", "fullName")
-      .sort({ createdAt: -1 });
+      .sort({ isPublished: -1, updatedAt: -1 });
 
-    console.log(`📊 Found ${grades.length} grades for student ${studentId}`);
+    // Filter: only show grades that have at least one score component
+    const gradesWithScores = allGrades.filter((g) => {
+      const s = g.scores || {};
+      return (
+        (s.midterm !== null && s.midterm !== undefined) ||
+        (s.final !== null && s.final !== undefined) ||
+        (s.attendance !== null && s.attendance !== undefined) ||
+        (s.participation !== null && s.participation !== undefined) ||
+        (s.homework !== null && s.homework !== undefined)
+      );
+    });
+
+    console.log(
+      `📊 Found ${gradesWithScores.length}/${allGrades.length} grades with scores for student ${studentId}`
+    );
 
     res.status(200).json({
       success: true,
-      data: grades,
+      data: gradesWithScores,
     });
   } catch (error) {
     console.error("Error fetching my grades:", error);

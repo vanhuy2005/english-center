@@ -71,6 +71,11 @@ const GradeManagementPage = () => {
       const fin = scores.final ?? null;
       let avg = g.totalScore;
 
+      // Consider scores present only when we actually have a value
+      const hasAnyScore =
+        (mid !== null && mid !== undefined) ||
+        (fin !== null && fin !== undefined);
+
       if (avg === undefined) {
         const count = (mid !== null ? 1 : 0) + (fin !== null ? 1 : 0);
         avg = count > 0 ? (Number(mid || 0) + Number(fin || 0)) / count : 0;
@@ -81,10 +86,10 @@ const GradeManagementPage = () => {
         gradeId: g._id,
         studentCode: studentObj.studentCode || "",
         fullName: studentObj.fullName || studentObj.name || "",
-        midterm: mid,
-        final: fin,
+        midterm: mid ?? "",
+        final: fin ?? "",
         average: Number(avg),
-        status: g.isPublished ? "approved" : "pending",
+        status: hasAnyScore && g.isPublished ? "approved" : "pending",
       };
     });
   };
@@ -212,11 +217,32 @@ const GradeManagementPage = () => {
           participation: 0,
           homework: 0,
         },
+        // Keep draft until explicitly approved
+        isPublished: false,
       };
 
-      await api.post(`/grades`, payload);
+      const res = await api.post(`/grades`, payload);
+      const saved = res?.data?.data;
+
+      if (saved) {
+        // Force draft state locally even if backend returns published
+        setGrades((prev) =>
+          prev.map((g) =>
+            g._id === row._id
+              ? {
+                  ...g,
+                  gradeId: saved._id,
+                  midterm: saved.scores?.midterm ?? g.midterm,
+                  final: saved.scores?.final ?? g.final,
+                  average: Number(saved.totalScore ?? g.average ?? 0),
+                  status: "pending",
+                }
+              : g
+          )
+        );
+      }
+
       toast.success("Đã lưu điểm");
-      // Optional: Refresh or mark row as saved
     } catch (err) {
       console.error(err);
       toast.error("Lỗi lưu điểm");
@@ -224,6 +250,12 @@ const GradeManagementPage = () => {
   };
 
   const handleApprove = async (gradeId) => {
+    if (!gradeId) return toast.error("Chưa có bản ghi điểm để duyệt");
+
+    const row = grades.find((g) => g.gradeId === gradeId);
+    const hasAnyScore = row && (row.midterm !== "" || row.final !== "");
+    if (!hasAnyScore) return toast.error("Vui lòng nhập điểm trước khi duyệt");
+
     try {
       await api.patch(`/grades/${gradeId}/publish`);
       toast.success("Đã phê duyệt và công bố điểm");

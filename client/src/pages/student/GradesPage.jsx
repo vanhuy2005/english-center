@@ -41,7 +41,7 @@ const GradesPage = () => {
   const getLetterGradeColor = (letterGrade) => {
     // Handle A+, B+, etc. by taking the first character or specific cases
     const grade = letterGrade?.charAt(0);
-    
+
     switch (grade) {
       case "A":
         return "bg-[var(--color-secondary)] text-white";
@@ -252,12 +252,16 @@ const GradesPage = () => {
                     <div
                       key={grade._id}
                       className={`
-                    group bg-white rounded-xl p-6 shadow-[var(--shadow-card)] 
+                    group rounded-xl p-6 shadow-[var(--shadow-card)] 
                     hover:shadow-[var(--shadow-card-hover)] hover:-translate-y-0.5 transition-all duration-300
-                    border border-gray-100 border-l-4 ${getStatusColor(
-                      grade.status
-                    )}
+                    border border-l-4 ${getStatusColor(grade.status)}
                     w-full
+                    ${
+                      grade.isPublished &&
+                      (grade._midterm !== null || grade._final !== null)
+                        ? "bg-green-50/40 border-green-100 border-l-green-500"
+                        : "bg-white border-gray-100"
+                    }
                   `}
                     >
                       <div className="flex flex-col md:flex-row gap-6 items-start md:items-center">

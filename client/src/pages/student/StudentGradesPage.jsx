@@ -2,15 +2,15 @@ import React, { useState, useEffect } from "react";
 import { studentService } from "../../services";
 import { Loading } from "../../components/common"; // Giả sử Loading ở đây
 // import Badge from "../../components/common/Badge"; // Tạm thời comment Badge cũ để custom lại theo theme
-import { 
-  GraduationCap, 
-  TrendingUp, 
-  BookOpen, 
-  AlertCircle, 
+import {
+  GraduationCap,
+  TrendingUp,
+  BookOpen,
+  AlertCircle,
   Filter,
   CheckCircle,
   FileText,
-  Award
+  Award,
 } from "lucide-react";
 
 const StudentGradesPage = () => {
@@ -30,6 +30,8 @@ const StudentGradesPage = () => {
       setError(null);
       const response = await studentService.getMyGrades();
 
+      console.log("📊 Student getMyGrades response:", response);
+
       let payload = [];
       if (!response) payload = [];
       else if (Array.isArray(response)) payload = response;
@@ -39,6 +41,8 @@ const StudentGradesPage = () => {
           payload = response.data.data;
         else payload = [];
       } else payload = [];
+
+      console.log("📊 Parsed payload:", payload);
 
       const normalized = (payload || []).map((g) => {
         const courseName =
@@ -74,6 +78,8 @@ const StudentGradesPage = () => {
         };
       });
 
+      console.log("📊 Normalized grades:", normalized);
+
       setGrades(normalized);
     } catch (err) {
       console.error("Error fetching grades:", err);
@@ -100,7 +106,8 @@ const StudentGradesPage = () => {
   };
 
   const getBadgeStyle = (grade) => {
-    if (grade >= 8.5) return "bg-[var(--color-secondary)]/10 text-[var(--color-secondary)]";
+    if (grade >= 8.5)
+      return "bg-[var(--color-secondary)]/10 text-[var(--color-secondary)]";
     if (grade >= 7) return "bg-blue-50 text-blue-700";
     if (grade >= 5.5) return "bg-amber-50 text-amber-700";
     return "bg-red-50 text-[var(--color-danger)]";
@@ -128,7 +135,6 @@ const StudentGradesPage = () => {
   return (
     <div className="min-h-screen bg-gray-50/30 font-sans p-6 md:p-8">
       <div className="w-full mx-auto space-y-8">
-        
         {/* Header Section */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
@@ -157,7 +163,9 @@ const StudentGradesPage = () => {
           {/* Avg Grade */}
           <div className="bg-white rounded-xl p-5 shadow-[var(--shadow-card)] border border-gray-100 flex items-start justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-500 mb-1">Điểm trung bình</p>
+              <p className="text-sm font-medium text-gray-500 mb-1">
+                Điểm trung bình
+              </p>
               <h3 className="text-3xl font-bold text-[var(--color-primary)]">
                 {averageGrade}
               </h3>
@@ -170,7 +178,9 @@ const StudentGradesPage = () => {
           {/* Graded Subjects */}
           <div className="bg-white rounded-xl p-5 shadow-[var(--shadow-card)] border border-gray-100 flex items-start justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-500 mb-1">Môn đã có điểm</p>
+              <p className="text-sm font-medium text-gray-500 mb-1">
+                Môn đã có điểm
+              </p>
               <h3 className="text-3xl font-bold text-[var(--color-secondary)]">
                 {totalGrades.length}
               </h3>
@@ -183,7 +193,9 @@ const StudentGradesPage = () => {
           {/* Pending Subjects */}
           <div className="bg-white rounded-xl p-5 shadow-[var(--shadow-card)] border border-gray-100 flex items-start justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-500 mb-1">Chưa có điểm</p>
+              <p className="text-sm font-medium text-gray-500 mb-1">
+                Chưa có điểm
+              </p>
               <h3 className="text-3xl font-bold text-amber-500">
                 {grades.length - totalGrades.length}
               </h3>
@@ -196,7 +208,9 @@ const StudentGradesPage = () => {
           {/* Rank */}
           <div className="bg-white rounded-xl p-5 shadow-[var(--shadow-card)] border border-gray-100 flex items-start justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-500 mb-1">Xếp loại chung</p>
+              <p className="text-sm font-medium text-gray-500 mb-1">
+                Xếp loại chung
+              </p>
               <h3 className="text-xl font-bold text-purple-600 mt-1.5">
                 {averageGrade !== "N/A"
                   ? getGradeLabel(parseFloat(averageGrade))
@@ -211,39 +225,41 @@ const StudentGradesPage = () => {
 
         {/* Filter Section */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-           <div className="flex items-center gap-3">
-              <div className="p-2 bg-gray-100 rounded-full text-gray-500">
-                 <Filter size={16} />
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-gray-100 rounded-full text-gray-500">
+              <Filter size={16} />
+            </div>
+            <div className="flex-1">
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider block mb-1">
+                Lọc theo khóa học
+              </label>
+              <div className="relative">
+                <select
+                  value={selectedCourse}
+                  onChange={(e) => setSelectedCourse(e.target.value)}
+                  className="w-full md:w-1/3 bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-lg focus:ring-[var(--color-secondary)] focus:border-[var(--color-secondary)] block p-2.5 outline-none transition-all"
+                >
+                  {courses.map((course) => (
+                    <option key={course} value={course}>
+                      {course === "all" ? "Tất cả khóa học" : course}
+                    </option>
+                  ))}
+                </select>
               </div>
-              <div className="flex-1">
-                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider block mb-1">
-                   Lọc theo khóa học
-                </label>
-                <div className="relative">
-                  <select
-                    value={selectedCourse}
-                    onChange={(e) => setSelectedCourse(e.target.value)}
-                    className="w-full md:w-1/3 bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-lg focus:ring-[var(--color-secondary)] focus:border-[var(--color-secondary)] block p-2.5 outline-none transition-all"
-                  >
-                    {courses.map((course) => (
-                      <option key={course} value={course}>
-                        {course === "all" ? "Tất cả khóa học" : course}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-           </div>
+            </div>
+          </div>
         </div>
 
         {/* Grades Table */}
         <div className="bg-white rounded-xl shadow-[var(--shadow-card)] border border-gray-100 overflow-hidden">
           {filteredGrades.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16">
-               <div className="p-4 bg-gray-50 rounded-full mb-3">
-                  <FileText size={32} className="text-gray-300" />
-               </div>
-               <p className="text-gray-500 font-medium">Chưa có kết quả học tập</p>
+              <div className="p-4 bg-gray-50 rounded-full mb-3">
+                <FileText size={32} className="text-gray-300" />
+              </div>
+              <p className="text-gray-500 font-medium">
+                Chưa có kết quả học tập
+              </p>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -274,60 +290,80 @@ const StudentGradesPage = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {filteredGrades.map((grade, index) => (
-                    <tr key={index} className="hover:bg-gray-50/50 transition-colors">
-                      <td className="px-6 py-4">
-                        <div>
-                          <div className="text-sm font-bold text-[var(--color-primary)]">
-                            {grade.courseName || "N/A"}
+                  {filteredGrades.map((grade, index) => {
+                    const hasScores =
+                      grade.midterm !== null || grade.finalExam !== null;
+                    const isApproved = grade.isPublished && hasScores;
+                    return (
+                      <tr
+                        key={index}
+                        className={`hover:bg-gray-50/50 transition-colors ${
+                          isApproved
+                            ? "bg-green-50/30 hover:bg-green-50/50"
+                            : "bg-gray-50/20"
+                        }`}
+                      >
+                        <td className="px-6 py-4">
+                          <div>
+                            <div className="text-sm font-bold text-[var(--color-primary)]">
+                              {grade.courseName || "N/A"}
+                            </div>
+                            <div className="text-xs text-gray-500 mt-0.5 font-medium">
+                              {grade.className || "---"}
+                            </div>
                           </div>
-                          <div className="text-xs text-gray-500 mt-0.5 font-medium">
-                            {grade.className || "---"}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-4 text-center">
-                        <span className="text-sm text-gray-700 font-medium bg-gray-50 px-2 py-1 rounded">
-                          {grade.participation ?? "-"}
-                        </span>
-                      </td>
-                      <td className="px-4 py-4 text-center">
-                         <span className="text-sm text-gray-700 font-medium bg-gray-50 px-2 py-1 rounded">
-                          {grade.assignment ?? "-"}
-                        </span>
-                      </td>
-                      <td className="px-4 py-4 text-center">
-                         <span className="text-sm text-gray-700 font-medium bg-gray-50 px-2 py-1 rounded">
-                          {grade.midterm ?? "-"}
-                        </span>
-                      </td>
-                      <td className="px-4 py-4 text-center">
-                         <span className="text-sm text-gray-700 font-medium bg-gray-50 px-2 py-1 rounded">
-                          {grade.finalExam ?? "-"}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        {grade.finalGrade !== null ? (
-                          <span className={`text-base font-bold ${getGradeColor(grade.finalGrade)}`}>
-                            {grade.finalGrade.toFixed(2)}
+                        </td>
+                        <td className="px-4 py-4 text-center">
+                          <span className="text-sm text-gray-700 font-medium bg-gray-50 px-2 py-1 rounded">
+                            {grade.participation ?? "-"}
                           </span>
-                        ) : (
-                          <span className="text-xs text-gray-400 italic">Chưa có</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        {grade.finalGrade !== null ? (
-                          <span
-                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${getBadgeStyle(grade.finalGrade)}`}
-                          >
-                            {getGradeLabel(grade.finalGrade)}
+                        </td>
+                        <td className="px-4 py-4 text-center">
+                          <span className="text-sm text-gray-700 font-medium bg-gray-50 px-2 py-1 rounded">
+                            {grade.assignment ?? "-"}
                           </span>
-                        ) : (
-                          <span className="text-gray-300">-</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td className="px-4 py-4 text-center">
+                          <span className="text-sm text-gray-700 font-medium bg-gray-50 px-2 py-1 rounded">
+                            {grade.midterm ?? "-"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-4 text-center">
+                          <span className="text-sm text-gray-700 font-medium bg-gray-50 px-2 py-1 rounded">
+                            {grade.finalExam ?? "-"}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          {grade.finalGrade !== null ? (
+                            <span
+                              className={`text-base font-bold ${getGradeColor(
+                                grade.finalGrade
+                              )}`}
+                            >
+                              {grade.finalGrade.toFixed(2)}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-gray-400 italic">
+                              Chưa có
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          {grade.finalGrade !== null ? (
+                            <span
+                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${getBadgeStyle(
+                                grade.finalGrade
+                              )}`}
+                            >
+                              {getGradeLabel(grade.finalGrade)}
+                            </span>
+                          ) : (
+                            <span className="text-gray-300">-</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

@@ -3,7 +3,7 @@ import api from "./api";
 // Lấy danh sách điểm của học viên từ server (KHÔNG dùng mock)
 export const getMyGrades = async () => {
   try {
-    // Prefer student-scoped endpoint
+    // Prefer student-scoped endpoint (include drafts so student thấy ngay khi lưu)
     try {
       const response = await api.get("/grades/me");
       if (response.data?.success && Array.isArray(response.data.data)) {
@@ -13,7 +13,7 @@ export const getMyGrades = async () => {
       console.debug("/grades/me failed:", err?.response?.status || err.message);
     }
 
-    // Fallback to generic grades list if available
+    // Safe fallback (also include drafts)
     try {
       const response = await api.get("/grades");
       if (response.data?.success && Array.isArray(response.data.data)) {
