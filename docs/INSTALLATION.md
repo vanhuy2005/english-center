@@ -270,8 +270,8 @@ ENGLISH-CENTER/
     ├── DATABASE_SETUP.md      # Hướng dẫn setup database
     ├── INSTALLATION.md        # Hướng dẫn cài đặt (file này)
     ├── API_DOCUMENTATION.md   # API docs
-    ├── FOLDER_STRUCTURE.md    # Cấu trúc thư mục
-    └── archive/              # Docs cũ/chi tiết
+    ├── DATABASE_SCHEMA.md     # Schema database (tự động xuất)
+    └── FOLDER_STRUCTURE.md    # Cấu trúc thư mục
 ```
 
 ---
@@ -394,16 +394,16 @@ npm run dev
 
 - **API Documentation:** [API_DOCUMENTATION.md](./API_DOCUMENTATION.md)
 - **Database Setup:** [DATABASE_SETUP.md](./DATABASE_SETUP.md)
+- **Database Schema:** [DATABASE_SCHEMA.md](./DATABASE_SCHEMA.md) - Schema chi tiết từ database
 - **Folder Structure:** [FOLDER_STRUCTURE.md](./FOLDER_STRUCTURE.md)
-- **Archived Docs:** [archive/](./archive/) - Tài liệu chi tiết về workflow, authentication, etc.
 
 ---
 
 ## 👥 Tài Khoản Test Mặc Định
 
-| Role     | Email/Phone          | Password     | Quyền                 |
-| -------- | -------------------- | ------------ | --------------------- |
-| Director | director@example.com | Director123! | Quản lý toàn hệ thống |
+| Role     | Phone        | Password     | Quyền                 |
+| -------- | ------------ | ------------ | --------------------- |
+| Director | 0901234567   | Director123! | Quản lý toàn hệ thống |
 
 **Lưu ý:** Đổi password ngay sau khi đăng nhập lần đầu trong môi trường production!
 

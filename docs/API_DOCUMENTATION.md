@@ -3,7 +3,7 @@
 ## Base URL
 
 ```
-http://localhost:3000
+http://localhost:5000
 ```
 
 ## Authentication Header
@@ -433,8 +433,13 @@ http://localhost:3000
 
 - `leave` - Xin nghỉ học
 - `makeup` - Xin học bù
+- `transfer` - Chuyển lớp
+- `pause` - Tạm nghỉ
+- `resume` - Tiếp tục học
 - `withdrawal` - Xin rút khóa học
-- `certificate` - Xin cấp giấy chứng nhận
+- `course_enrollment` - Đăng ký khóa học
+- `consultation` - Tư vấn
+- `reserve` - Giữ chỗ
 - `other` - Khác
 
 **Request Status**:
@@ -442,6 +447,7 @@ http://localhost:3000
 - `pending` - Chờ xử lý
 - `approved` - Đã duyệt
 - `rejected` - Từ chối
+- `cancelled` - Đã hủy
 
 ---
 
@@ -899,5 +905,89 @@ Default pagination:
 
 ---
 
-**Last Updated**: November 8, 2025  
-**API Version**: 1.0.0
+**Last Updated**: March 6, 2026  
+**API Version**: 1.1.0
+
+---
+
+## 🆕 Additional Modules (Cập nhật)
+
+### Staff Academic Module (`/api/staff/academic`)
+
+| Method | Endpoint | Mô tả |
+|--------|----------|--------|
+| GET | `/api/staff/academic/dashboard` | Dashboard nhân viên học vụ |
+| GET | `/api/staff/academic/classes` | Danh sách lớp quản lý |
+| GET | `/api/staff/academic/students` | Danh sách học viên |
+| GET | `/api/staff/academic/requests` | Danh sách yêu cầu |
+| PATCH | `/api/staff/academic/requests/:id/process` | Xử lý yêu cầu |
+
+### Staff Accountant Module (`/api/staff/accountant`)
+
+| Method | Endpoint | Mô tả |
+|--------|----------|--------|
+| GET | `/api/staff/accountant/dashboard` | Dashboard kế toán |
+| GET | `/api/staff/accountant/tuition` | Quản lý học phí |
+| GET | `/api/staff/accountant/payments` | Lịch sử thanh toán |
+
+### Staff Enrollment Module (`/api/staff/enrollment`)
+
+| Method | Endpoint | Mô tả |
+|--------|----------|--------|
+| GET | `/api/staff/enrollment/classes` | Danh sách lớp học |
+| GET | `/api/staff/enrollment/students` | Danh sách học viên |
+| GET | `/api/staff/enrollment/requests` | Yêu cầu đăng ký |
+
+### Finance Module (`/api/finance`)
+
+| Method | Endpoint | Mô tả |
+|--------|----------|--------|
+| GET | `/api/finance` | Danh sách giao dịch |
+| POST | `/api/finance` | Tạo giao dịch mới |
+| GET | `/api/finance/me/payments` | Lịch sử thanh toán (student) |
+| POST | `/api/finance/:id/payment` | Xử lý thanh toán |
+
+### Receipt Module (`/api/receipts`)
+
+| Method | Endpoint | Mô tả |
+|--------|----------|--------|
+| GET | `/api/receipts` | Danh sách biên lai |
+| POST | `/api/receipts` | Tạo biên lai mới |
+| GET | `/api/receipts/stats/summary` | Thống kê biên lai |
+| GET | `/api/receipts/:id` | Chi tiết biên lai |
+
+### Director Module (`/api/director`)
+
+| Method | Endpoint | Mô tả |
+|--------|----------|--------|
+| GET | `/api/director/dashboard` | Dashboard giám đốc |
+| GET | `/api/reports/revenue-chart` | Biểu đồ doanh thu |
+| GET | `/api/reports/attendance-chart` | Biểu đồ chuyên cần |
+| GET | `/api/reports/student-distribution` | Phân bố học viên |
+| GET | `/api/reports/recent-activities` | Hoạt động gần đây |
+
+### Notification Module (`/api/notifications`)
+
+| Method | Endpoint | Mô tả |
+|--------|----------|--------|
+| GET | `/api/notifications` | Thông báo của tôi |
+| PUT | `/api/notifications/:id/read` | Đánh dấu đã đọc |
+| PUT | `/api/notifications/read-all` | Đánh dấu tất cả đã đọc |
+| DELETE | `/api/notifications/:id` | Xóa thông báo |
+
+### Class Module (`/api/classes`)
+
+| Method | Endpoint | Mô tả |
+|--------|----------|--------|
+| GET | `/api/classes` | Danh sách lớp học |
+| POST | `/api/classes` | Tạo lớp mới |
+| GET | `/api/classes/:id` | Chi tiết lớp |
+| PUT | `/api/classes/:id` | Cập nhật lớp |
+
+### Attendance Module (`/api/attendance`)
+
+| Method | Endpoint | Mô tả |
+|--------|----------|--------|
+| GET | `/api/attendance` | Danh sách điểm danh |
+| POST | `/api/attendance` | Tạo bản ghi điểm danh |
+| GET | `/api/attendance/class/:classId` | Điểm danh theo lớp |

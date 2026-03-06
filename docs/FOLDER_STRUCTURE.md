@@ -1,6 +1,6 @@
-# Cấu Trúc Thư Mục Mới
+# Cấu Trúc Thư Mục Dự Án
 
-## Ngày cập nhật: 2025-11-08
+## Ngày cập nhật: 2026-03-06
 
 ### Thay đổi chính:
 
@@ -83,19 +83,86 @@ client/src/i18n/
 └── vi.json    (từ locales/)
 ```
 
-#### 4. **Server - Staff Modules (Đã có từ trước)**
+#### 4. **Server - Modules (Cấu trúc hiện tại)**
 
 ```
-server/src/modules/staff/
-├── academic/
-│   ├── academic.controller.js
-│   └── academic.routes.js
-├── accountant/
-│   ├── accountant.controller.js
-│   └── accountant.routes.js
-└── enrollment/
-    ├── enrollment.controller.js
-    └── enrollment.routes.js
+server/src/
+├── app.js                    # Express app configuration
+├── config/
+│   └── database.js           # MongoDB connection
+├── shared/
+│   ├── middleware/
+│   │   └── auth.js           # JWT auth & role middleware
+│   └── models/               # 14 Mongoose models
+│       ├── Student.model.js
+│       ├── Staff.model.js
+│       ├── Course.model.js
+│       ├── Class.model.js
+│       ├── Attendance.model.js
+│       ├── Grade.model.js
+│       ├── Finance.model.js
+│       ├── Payment.model.js
+│       ├── Receipt.model.js
+│       ├── TuitionFee.model.js
+│       ├── Notification.model.js
+│       ├── Request.model.js
+│       ├── Schedule.model.js
+│       └── Counter.model.js
+└── modules/
+    ├── auth/
+    │   ├── auth.controller.js
+    │   ├── auth.routes.js
+    │   └── rateLimiters.js
+    ├── student/
+    │   ├── student.controller.js
+    │   ├── student.routes.js
+    │   ├── request.controller.js
+    │   └── request.routes.js
+    ├── teacher/
+    │   ├── teacher.controller.js
+    │   └── teacher.routes.js
+    ├── course/
+    │   ├── course.controller.js
+    │   └── course.routes.js
+    ├── class/
+    │   ├── class.controller.js
+    │   └── class.routes.js
+    ├── grade/
+    │   ├── grade.controller.js
+    │   └── grade.routes.js
+    ├── schedule/
+    │   ├── schedule.controller.js
+    │   └── schedule.routes.js
+    ├── attendance/
+    │   ├── attendance.controller.js
+    │   └── attendance.routes.js
+    ├── request/
+    │   ├── request.controller.js
+    │   └── request.routes.js
+    ├── notification/
+    │   ├── notification.controller.js
+    │   ├── notification.model.js
+    │   └── notification.routes.js
+    ├── finance/
+    │   ├── finance.controller.js
+    │   └── finance.routes.js
+    ├── director/
+    │   ├── director.controller.js
+    │   └── director.routes.js
+    └── staff/
+        ├── staff.controller.js
+        ├── staff.routes.js
+        ├── academic/
+        │   ├── academic.controller.js
+        │   ├── academic.routes.js
+        │   ├── request.controller.js
+        │   └── request.routes.js
+        ├── accountant/
+        │   ├── accountant.controller.js
+        │   └── accountant.routes.js
+        └── enrollment/
+            ├── enrollment.controller.js
+            └── enrollment.routes.js
 ```
 
 ### Cập nhật Routes & Imports:

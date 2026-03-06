@@ -15,13 +15,13 @@ const api = axios.create({
 api.interceptors.request.use(
   (config) => {
     // Tự động thêm /api prefix nếu chưa có
-    if (
-      config.url &&
-      !config.url.startsWith("/api/") &&
-      !config.url.startsWith("/reports/")
-    ) {
-      config.url = `/api${config.url}`;
-    }
+    // if (
+    //   config.url &&
+    //   !config.url.startsWith("/api/") &&
+    //   !config.url.startsWith("/reports/")
+    // ) {
+    //   config.url = `/api${config.url}`;
+    // }
 
     const token = localStorage.getItem("token");
     if (token) {

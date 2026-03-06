@@ -36,7 +36,7 @@ if (savedToken) {
 api.interceptors.request.use(
   (config) => {
     // Tự động thêm /api prefix nếu chưa có
-    if (
+     if (
       config.url &&
       !config.url.startsWith("/api/") &&
       !config.url.startsWith("/reports/")
