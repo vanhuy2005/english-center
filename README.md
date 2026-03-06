@@ -51,7 +51,8 @@ npm run dev
 
 # 4. Truy cập ứng dụng
 # URL: http://localhost:5173
-# Login: director@example.com / Director123!
+# Login (phone): 0901234567 / Director123!
+# Hoặc seed thêm data: node seeds/seedEnrollmentData.js
 ```
 
 ---
@@ -160,8 +161,8 @@ ENGLISH-CENTER/
 │   ├── INSTALLATION.md        # Installation guide
 │   ├── DATABASE_SETUP.md      # Database setup guide
 │   ├── API_DOCUMENTATION.md   # API documentation
-│   ├── FOLDER_STRUCTURE.md    # Folder structure
-│   └── archive/              # Archived detailed docs
+│   ├── DATABASE_SCHEMA.md     # Database schema (auto-generated)
+│   └── FOLDER_STRUCTURE.md    # Folder structure
 │
 ├── LICENSE
 └── README.md                  # This file
@@ -192,14 +193,14 @@ ENGLISH-CENTER/
 ### Tài Liệu Kỹ Thuật
 
 - **[API_DOCUMENTATION.md](docs/API_DOCUMENTATION.md)** - API endpoints và usage
+- **[DATABASE_SCHEMA.md](docs/DATABASE_SCHEMA.md)** - Chi tiết schema toàn bộ database (tự động xuất)
 - **[FOLDER_STRUCTURE.md](docs/FOLDER_STRUCTURE.md)** - Chi tiết cấu trúc project
 
-### Tài Liệu Chi Tiết (Archive)
+### Tài Liệu Server & Client
 
-- [AUTHENTICATION_WORKFLOW.md](docs/archive/AUTHENTICATION_WORKFLOW.md) - Workflow xác thực
-- [AUTHENTICATION_COMPLETED.md](docs/archive/AUTHENTICATION_COMPLETED.md) - Tài liệu auth hoàn chỉnh
-- [QUICK_START_TEST.md](docs/archive/QUICK_START_TEST.md) - Hướng dẫn test nhanh
-- [Và nhiều tài liệu khác...](docs/archive/)
+- **[server/README.md](server/README.md)** - Tổng quan backend modules
+- **[client/README.md](client/README.md)** - Tổng quan frontend
+- **[server/seeds/README.md](server/seeds/README.md)** - Hướng dẫn seed data
 
 ---
 

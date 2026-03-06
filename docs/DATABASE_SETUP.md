@@ -113,17 +113,18 @@ node seeds/seedCourses.js
 ```
 ✓ Kết nối MongoDB thành công
 ✓ Xóa dữ liệu khóa học cũ
-✓ Đã thêm 5 khóa học
+✓ Đã thêm khóa học
 ✓ Seed dữ liệu thành công!
 ```
 
-**Khóa học được tạo:**
+**Khóa học được tạo (hiện tại 8 khóa trong DB):**
 
 - English A1 - Sơ cấp (3.5 triệu VNĐ)
 - English A2 - Sơ cấp nâng cao (3.5 triệu VNĐ)
 - English B1 - Trung cấp (4.5 triệu VNĐ)
 - English B2 - Trung cấp nâng cao (4.5 triệu VNĐ)
 - English C1 - Nâng cao (6 triệu VNĐ)
+- Và các khóa bổ sung từ seed enrollment data
 
 ---
 
@@ -143,9 +144,12 @@ node seeds/seedCourses.js
 
 3. **Xác nhận dữ liệu:**
    - Tìm database `english_center` (hoặc tên bạn đặt)
-   - Kiểm tra collections:
-     - `staffs` - Có 1 document (Director)
-     - `courses` - Có 5 documents (5 khóa học)
+   - Kiểm tra collections chính:
+     - `staffs` - Nhân viên (có ít nhất 1 Director)
+     - `students` - Học viên
+     - `courses` - Khóa học
+     - `classes` - Lớp học
+     - `counters` - Bộ đếm mã tự động
 
 ### Kiểm tra bằng code
 
@@ -202,20 +206,33 @@ node seeds/seedCourses.js
 
 ## 📊 Cấu Trúc Database
 
+> **Xem chi tiết schema đầy đủ:** [DATABASE_SCHEMA.md](./DATABASE_SCHEMA.md)
+
 ```
-english_center (Database)
-├── staffs           # Nhân viên & giảng viên
+english_center (Database) - 14 Collections chính + 3 Legacy
+├── staffs           # Nhân viên & giảng viên (18 docs)
 │   └── Director account (mặc định)
-├── students         # Học viên
-├── courses          # Khóa học (5 khóa mặc định)
-├── classes          # Lớp học
-├── enrollments      # Đăng ký học
-├── schedules        # Lịch học
-├── attendances      # Điểm danh
-├── grades           # Điểm số
-├── receipts         # Biên lai thu
-└── notifications    # Thông báo
+├── students         # Học viên (30 docs)
+├── courses          # Khóa học (8 docs)
+├── classes          # Lớp học (15 docs)
+├── attendances      # Điểm danh (1648 docs)
+├── grades           # Điểm số (234 docs)
+├── finances         # Giao dịch tài chính (241 docs)
+├── payments         # Thanh toán (3 docs)
+├── receipts         # Biên lai thu (139 docs)
+├── tuitionfees      # Học phí (16 docs)
+├── notifications    # Thông báo (291 docs)
+├── requests         # Yêu cầu học viên (34 docs)
+├── schedules        # Lịch học (62 docs)
+├── counters         # Bộ đếm tự tăng (14 docs)
+│
+│ Legacy (không còn model mới):
+├── enrollmentrequests  # (8 docs - cũ)
+├── consultationrequests # (3 docs - cũ)
+└── placementtests      # (1 doc - cũ)
 ```
+
+> **Lưu ý:** Các collection legacy (`enrollmentrequests`, `consultationrequests`, `placementtests`) không có model tương ứng trong code hiện tại. Chức năng đã được gộp vào collection `requests` với các type tương ứng.
 
 ---
 
